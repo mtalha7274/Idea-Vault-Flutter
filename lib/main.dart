@@ -1,11 +1,6 @@
-import 'dart:ui';
-
 import 'package:easy_localization/easy_localization.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization_loader/easy_localization_loader.dart';
-import 'package:idea_vault/firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +10,7 @@ import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
 import 'injection_container.dart';
 import 'viewmodels/providers/language_provider.dart';
+import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
 import 'views/splash.dart';
@@ -32,25 +28,6 @@ Future<bool> _loadEnv() async {
   }
 }
 
-Future<void> initializeFirebase() async {
-  try {
-    await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
-
-    if (Config.debug) return;
-
-    FlutterError.onError = (errorDetails) {
-      FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
-    };
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
-  } catch (e) {
-    printLog('Firebase initialization failed: $e');
-  }
-}
-
 void main() async {
   if (!await _loadEnv()) {
     throw Exception(
@@ -59,7 +36,6 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
 
-  await initializeFirebase();
   await initializeDependencies();
   await switchToPortraitMode();
 
@@ -82,6 +58,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(providers: [
+      ChangeNotifierProvider<IdeasProvider>(create: (_) => sl()),
       ChangeNotifierProvider<ThemeProvider>(create: (_) => sl()),
       ChangeNotifierProvider<LanguageProvider>(create: (_) => sl()),
       ChangeNotifierProvider<InfoProvider>(create: (_) => sl(), lazy: false),

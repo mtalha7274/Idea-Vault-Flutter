@@ -44,6 +44,7 @@ class AppConstants {
   static const String theme = 'theme';
   static const String language = 'language';
   static const String skippedVersion = 'skippedVersion';
+  static const String ideas = 'ideas';
 
   // App Links
   static const String countryUrl = "http://ip-api.com";

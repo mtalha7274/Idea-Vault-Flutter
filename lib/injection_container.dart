@@ -6,16 +6,17 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/app_constants.dart';
-import 'core/services/firebase_remote_config.dart';
 import 'data/managers/local/local_storage.dart';
 import 'data/managers/local/shared_preference.dart';
 import 'data/managers/remote/api_manager.dart';
 import 'data/managers/remote/dio_api_manager.dart';
+import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
+import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
 
@@ -39,13 +40,6 @@ Future<void> initializeDependencies() async {
           : (await deviceInfo.iosInfo).systemVersion);
   sl.registerSingleton<DeviceData>(deviceName);
 
-  final firebaseRemoteConfigService =
-      await FirebaseRemoteConfigService().init();
-  if (firebaseRemoteConfigService != null) {
-    sl.registerSingleton<FirebaseRemoteConfigService>(
-        firebaseRemoteConfigService);
-  }
-
   // Managers
   sl.registerSingleton<LocalStorageManager>(
       SharedPreferenceManager(sl<SharedPreferences>()));
@@ -54,12 +48,14 @@ Future<void> initializeDependencies() async {
       instanceName: AppConstants.countryUrl);
 
   // Repositories
+  sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<ThemeRepo>(ThemeRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
       CountryRepo(sl<ApiManager>(instanceName: AppConstants.countryUrl)));
 
   // Providers
+  sl.registerFactory<IdeasProvider>(() => IdeasProvider(sl<IdeasRepo>()));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
       () => LanguageProvider(sl<LanguageRepo>()));
