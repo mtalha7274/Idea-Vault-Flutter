@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_base_project_mvvm/views/mixins/image_editor.dart';
+import 'package:idea_vault/views/mixins/image_editor.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -32,11 +32,9 @@ class _HomepageState extends State<Homepage> with ImageEditorMixin {
         children: [
           if (image != null) Image.file(image!),
           Align(
-              child: ElevatedButton(
-                  onPressed: null, child: Text('Pick Image')))
+              child: ElevatedButton(onPressed: null, child: Text('Pick Image')))
         ],
       ),
     );
   }
-
 }

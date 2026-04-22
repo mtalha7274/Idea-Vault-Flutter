@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/double.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/int.dart';
+import 'package:idea_vault/core/extensions/double.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
