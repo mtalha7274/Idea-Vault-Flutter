@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../config/router/app_router.dart';
 import '../models/idea.dart';
+import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../widgets/idea_markdown_editor.dart';
 import 'ideas/idea_vault_theme.dart';
@@ -29,14 +30,18 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   late String _initialSnapshot;
 
   bool _allowPop = false;
+  bool _isPreviewMode = false;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+
     final ideasProvider = context.read<IdeasProvider>();
     final existingIdea =
         widget.ideaId == null ? null : ideasProvider.findById(widget.ideaId!);
+    final resumeState =
+        existingIdea == null ? null : _matchingResumeState(ideasProvider);
 
     _sections =
         existingIdea?.sections.map((section) => section.copyWith()).toList() ??
@@ -44,11 +49,19 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     _sectionContentById = {
       for (final section in _sections) section.id: section.content,
     };
-    _activeSectionId = _sections.first.id;
+    _activeSectionId = _resolveInitialSectionId(resumeState);
+    _isPreviewMode = resumeState?.isPreviewMode ?? false;
 
     _titleController = TextEditingController(text: existingIdea?.title ?? '');
     _titleController.addListener(_handleDraftChanged);
     _initialSnapshot = _snapshot();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _persistEditorState();
+    });
   }
 
   @override
@@ -69,12 +82,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
       canPop: _allowPop || !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) {
+          await context.read<IdeasProvider>().clearEditorState();
           return;
         }
 
         final shouldClose = await _handleCloseRequest();
         if (shouldClose && mounted) {
-          navigator.pop();
+          await _prepareForExit();
+          if (mounted) {
+            navigator.pop();
+          }
         }
       },
       child: Scaffold(
@@ -112,6 +129,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                               initialValue:
                                   _sectionContentById[_activeSectionId] ?? '',
                               placeholder: _sectionPlaceholder(),
+                              initialPreviewMode: _isPreviewMode,
+                              onPreviewModeChanged: _handlePreviewModeChanged,
                               onChanged: _updateActiveSectionContent,
                             ),
                           ),
@@ -192,6 +211,24 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     );
   }
 
+  IdeaEditorState? _matchingResumeState(IdeasProvider ideasProvider) {
+    final state = ideasProvider.resumeEditorState;
+    if (state == null || state.ideaId != widget.ideaId) {
+      return null;
+    }
+    return state;
+  }
+
+  String _resolveInitialSectionId(IdeaEditorState? resumeState) {
+    final restoredSectionId = resumeState?.activeSectionId;
+    if (restoredSectionId != null &&
+        _sections.any((section) => section.id == restoredSectionId)) {
+      return restoredSectionId;
+    }
+
+    return _sections.first.id;
+  }
+
   String _sectionPlaceholder() {
     final activeSection = _sections.firstWhere(
       (section) => section.id == _activeSectionId,
@@ -211,19 +248,43 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     setState(() {
       _activeSectionId = sectionId;
     });
+    _persistEditorState();
   }
 
-  void _updateActiveSectionContent(String content) {
-    if (_sectionContentById[_activeSectionId] == content) {
+  void _updateSectionContent(String sectionId, String content) {
+    if (_sectionContentById[sectionId] == content) {
       return;
     }
 
     setState(() {
       _sectionContentById = {
         ..._sectionContentById,
-        _activeSectionId: content,
+        sectionId: content,
       };
     });
+  }
+
+  void _updateActiveSectionContent(String content) {
+    _updateSectionContent(_activeSectionId, content);
+  }
+
+  void _handlePreviewModeChanged(bool isPreviewMode) {
+    if (_isPreviewMode == isPreviewMode) {
+      return;
+    }
+
+    setState(() {
+      _isPreviewMode = isPreviewMode;
+    });
+    _persistEditorState();
+  }
+
+  Future<void> _persistEditorState() async {
+    await context.read<IdeasProvider>().saveEditorState(
+          ideaId: widget.ideaId,
+          activeSectionId: _activeSectionId,
+          isPreviewMode: _isPreviewMode,
+        );
   }
 
   Future<void> _showAddSectionSheet() async {
@@ -358,6 +419,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
       };
       _activeSectionId = newSection.id;
     });
+    _persistEditorState();
   }
 
   void _handleDraftChanged() {
@@ -396,18 +458,27 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     });
 
     if (savedIdea == null) {
-      AppRouter.pop(context);
+      await _prepareForExit();
+      if (mounted) {
+        AppRouter.pop(context);
+      }
       return;
     }
 
     _initialSnapshot = _snapshot();
-    AppRouter.pop(context, savedIdea.id);
+    await _prepareForExit();
+    if (mounted) {
+      AppRouter.pop(context, savedIdea.id);
+    }
   }
 
   Future<void> _onClosePressed() async {
     final shouldClose = await _handleCloseRequest();
     if (shouldClose && mounted) {
-      AppRouter.pop(context);
+      await _prepareForExit();
+      if (mounted) {
+        AppRouter.pop(context);
+      }
     }
   }
 
@@ -438,13 +509,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
       },
     );
 
-    final shouldDiscard = discardChanges ?? false;
-    if (shouldDiscard && mounted) {
+    return discardChanges ?? false;
+  }
+
+  Future<void> _prepareForExit() async {
+    if (mounted && !_allowPop) {
       setState(() {
         _allowPop = true;
       });
     }
-    return shouldDiscard;
+    await context.read<IdeasProvider>().clearEditorState();
   }
 
   String _snapshot() {

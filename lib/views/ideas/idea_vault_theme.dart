@@ -61,6 +61,16 @@ TextStyle ideaVaultHeadline(
   double? height,
   double? letterSpacing,
 }) {
+  if (!GoogleFonts.config.allowRuntimeFetching) {
+    return TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: letterSpacing,
+      color: color ?? IdeaVaultPalette.text(context),
+    );
+  }
+
   return GoogleFonts.manrope(
     fontSize: size,
     fontWeight: weight,
@@ -77,6 +87,15 @@ TextStyle ideaVaultBody(
   Color? color,
   double? height,
 }) {
+  if (!GoogleFonts.config.allowRuntimeFetching) {
+    return TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      color: color ?? IdeaVaultPalette.text(context),
+    );
+  }
+
   return GoogleFonts.manrope(
     fontSize: size,
     fontWeight: weight,
@@ -93,6 +112,17 @@ TextStyle ideaVaultLabel(
   double? height,
   double? letterSpacing,
 }) {
+  if (!GoogleFonts.config.allowRuntimeFetching) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: letterSpacing,
+      color: color ?? IdeaVaultPalette.textMuted(context),
+    );
+  }
+
   return GoogleFonts.inter(
     fontSize: size,
     fontWeight: weight,

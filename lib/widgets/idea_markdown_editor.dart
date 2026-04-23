@@ -11,11 +11,15 @@ class IdeaMarkdownEditor extends StatefulWidget {
     required this.initialValue,
     required this.onChanged,
     required this.placeholder,
+    required this.initialPreviewMode,
+    required this.onPreviewModeChanged,
   });
 
   final String initialValue;
   final ValueChanged<String> onChanged;
   final String placeholder;
+  final bool initialPreviewMode;
+  final ValueChanged<bool> onPreviewModeChanged;
 
   @override
   State<IdeaMarkdownEditor> createState() => _IdeaMarkdownEditorState();
@@ -24,32 +28,42 @@ class IdeaMarkdownEditor extends StatefulWidget {
 class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
-  bool isPreviewMode = false;
+  late bool isPreviewMode;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
     _focusNode = FocusNode();
+    isPreviewMode = widget.initialPreviewMode;
     _controller.addListener(_handleTextChanged);
   }
 
   @override
   void didUpdateWidget(covariant IdeaMarkdownEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialValue == _controller.text ||
-        widget.initialValue == oldWidget.initialValue) {
-      return;
+    if (widget.initialValue != _controller.text &&
+        widget.initialValue != oldWidget.initialValue) {
+      final cursorOffset = math.min(
+        widget.initialValue.length,
+        math.max(0, _controller.selection.extentOffset),
+      );
+      _controller.value = TextEditingValue(
+        text: widget.initialValue,
+        selection: TextSelection.collapsed(offset: cursorOffset),
+      );
     }
 
-    final cursorOffset = math.min(
-      widget.initialValue.length,
-      math.max(0, _controller.selection.extentOffset),
-    );
-    _controller.value = TextEditingValue(
-      text: widget.initialValue,
-      selection: TextSelection.collapsed(offset: cursorOffset),
-    );
+    if (widget.initialPreviewMode != oldWidget.initialPreviewMode &&
+        widget.initialPreviewMode != isPreviewMode) {
+      setState(() {
+        isPreviewMode = widget.initialPreviewMode;
+      });
+
+      if (isPreviewMode) {
+        _focusNode.unfocus();
+      }
+    }
   }
 
   @override
@@ -151,11 +165,13 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
   }
 
   void _togglePreviewMode() {
+    final nextMode = !isPreviewMode;
     setState(() {
-      isPreviewMode = !isPreviewMode;
+      isPreviewMode = nextMode;
     });
+    widget.onPreviewModeChanged(nextMode);
 
-    if (isPreviewMode) {
+    if (nextMode) {
       _focusNode.unfocus();
     } else {
       _focusNode.requestFocus();

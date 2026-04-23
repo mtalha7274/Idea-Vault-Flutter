@@ -6,10 +6,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/app_constants.dart';
+import 'data/managers/local/ideas_database.dart';
 import 'data/managers/local/local_storage.dart';
 import 'data/managers/local/shared_preference.dart';
 import 'data/managers/remote/api_manager.dart';
 import 'data/managers/remote/dio_api_manager.dart';
+import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
@@ -43,19 +45,23 @@ Future<void> initializeDependencies() async {
   // Managers
   sl.registerSingleton<LocalStorageManager>(
       SharedPreferenceManager(sl<SharedPreferences>()));
+  sl.registerSingleton<IdeasDatabaseManager>(IdeasDatabaseManager());
 
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
 
   // Repositories
-  sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<IdeaEditorStateRepo>(
+      IdeaEditorStateRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
   sl.registerSingleton<ThemeRepo>(ThemeRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
       CountryRepo(sl<ApiManager>(instanceName: AppConstants.countryUrl)));
 
   // Providers
-  sl.registerFactory<IdeasProvider>(() => IdeasProvider(sl<IdeasRepo>()));
+  sl.registerFactory<IdeasProvider>(
+      () => IdeasProvider(sl<IdeasRepo>(), sl<IdeaEditorStateRepo>()));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
       () => LanguageProvider(sl<LanguageRepo>()));
