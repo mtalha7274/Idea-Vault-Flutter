@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization_loader/easy_localization_loader.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:idea_vault/views/home.dart';
 import 'package:provider/provider.dart';
 
 import 'config/config.dart';
@@ -13,7 +14,6 @@ import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
-import 'views/splash.dart';
 import 'core/utils/helpers.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -87,7 +87,7 @@ class _BaseAppState extends State<BaseApp> {
       locale: context.locale,
       color: themeProvider.baseTheme.primary,
       theme: themeProvider.baseTheme.themeData,
-      home: const Splash(),
+      home: Home(),
     );
   }
 }

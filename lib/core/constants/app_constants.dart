@@ -45,6 +45,7 @@ class AppConstants {
   static const String language = 'language';
   static const String skippedVersion = 'skippedVersion';
   static const String ideaEditorState = 'ideaEditorState';
+  static const String ideaListSort = 'ideaListSort';
 
   // App Links
   static const String countryUrl = "http://ip-api.com";

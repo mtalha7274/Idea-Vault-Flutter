@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
+import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
+import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -18,6 +20,7 @@ void main() {
   group('Homepage ideas flow', () {
     late MemoryLocalStorageManager storage;
     late IdeasProvider provider;
+    late IdeaListPreferencesRepo sortPreferencesRepo;
 
     setUpAll(() {
       VisibilityDetectorController.instance.updateInterval = Duration.zero;
@@ -25,6 +28,7 @@ void main() {
 
     setUp(() async {
       storage = MemoryLocalStorageManager();
+      sortPreferencesRepo = IdeaListPreferencesRepo(storage);
       provider = IdeasProvider(
         InMemoryIdeasRepo(),
         IdeaEditorStateRepo(storage),
@@ -55,7 +59,7 @@ void main() {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [Locale('en')],
-            home: const Homepage(),
+            home: Homepage(sortPreferencesRepo: sortPreferencesRepo),
           ),
         ),
       );
@@ -81,6 +85,12 @@ void main() {
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-save')), findsOneWidget);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
+      expect(find.byKey(const Key('idea-editor-add-section')), findsOneWidget);
+
+      final titleField = tester.widget<TextField>(
+        find.byKey(const Key('idea-editor-title')),
+      );
+      expect(titleField.autofocus, isTrue);
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
@@ -111,7 +121,24 @@ void main() {
       await settlePersistenceAction(tester);
 
       expect(find.text('Solar Rooftop Co-op'), findsOneWidget);
+      expect(find.text('1 section'), findsOneWidget);
       expect(provider.ideas, hasLength(1));
+    });
+
+    testWidgets('requires a title before saving a new idea', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('idea-editor-save')),
+      );
+      saveButton.onPressed!.call();
+      await settleUi(tester);
+
+      expect(find.text('Please add a title before saving'), findsOneWidget);
+      expect(provider.ideas, isEmpty);
     });
 
     testWidgets('opens an existing idea with populated data', (tester) async {
@@ -132,8 +159,7 @@ void main() {
       );
 
       expect(titleField.controller?.text, 'Existing Idea');
-      expect(find.text('Requirements'), findsOneWidget);
-      expect(find.text('Design'), findsOneWidget);
+      expect(find.text('Idea'), findsOneWidget);
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
@@ -174,7 +200,7 @@ void main() {
       await settleUi(tester);
 
       expect(find.text('Notes'), findsOneWidget);
-      expect(provider.ideas.first.sections, hasLength(4));
+      expect(provider.ideas.first.sections, hasLength(2));
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
@@ -189,15 +215,29 @@ void main() {
       await tester.tap(find.byKey(const Key('ideas-fab')));
       await settleUi(tester);
 
+      await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-section-name')),
+        'Requirements',
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-create-section')));
+      await settleUi(tester);
+
       await tester.enterText(
         find.byKey(const Key('idea-markdown-text-field')),
         'Vision',
       );
       await tester.pump();
 
-      await tester.tap(find.text('Requirements'));
+      await tester.tap(
+        find.byKey(const Key('idea-editor-section-tab-requirements')),
+      );
       await settleUi(tester);
-      await tester.tap(find.text('Idea'));
+      await tester.tap(
+        find.byKey(const Key('idea-editor-section-tab-idea')),
+        warnIfMissed: false,
+      );
       await settleUi(tester);
 
       final editor = tester.widget<TextField>(
@@ -218,6 +258,27 @@ void main() {
       await settleUi(tester);
     });
 
+    testWidgets('shows tooltips for toolbar actions', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      Future<void> expectTooltip(IconData icon, String label) async {
+        await tester.longPress(find.byIcon(icon));
+        await settleUi(tester);
+        expect(find.text(label), findsOneWidget);
+        await tester.tapAt(const Offset(10, 10));
+        await settleUi(tester);
+      }
+
+      await expectTooltip(Icons.title, 'Text');
+      await expectTooltip(Icons.format_bold, 'Bold');
+      await expectTooltip(Icons.format_italic, 'Italic');
+      await expectTooltip(Icons.format_list_bulleted, 'Bullet List');
+      await expectTooltip(Icons.code, 'Code Block');
+    });
+
     testWidgets('restores the open editor with preview mode on relaunch',
         (tester) async {
       late final String ideaId;
@@ -228,7 +289,7 @@ void main() {
           sections: provider.createDefaultSections(),
         );
         ideaId = savedIdea!.id;
-        sectionId = savedIdea.sections[1].id;
+        sectionId = savedIdea.sections.first.id;
 
         await provider.saveEditorState(
           ideaId: ideaId,
@@ -288,6 +349,139 @@ void main() {
       expect(provider.ideas, isEmpty);
       expect(find.byKey(const Key('ideas-empty-state')), findsOneWidget);
       expect(find.byKey(const Key('ideas-fab')), findsOneWidget);
+    });
+
+    testWidgets('filters ideas with the search bar in real time',
+        (tester) async {
+      await tester.runAsync(() async {
+        await provider.saveIdea(
+          title: 'Neighborhood Lab',
+          sections: [
+            const IdeaSection(
+              id: 'idea-section',
+              name: 'Idea',
+              content: 'A solar rooftop garden with shared maintenance.',
+            ),
+          ],
+        );
+        await provider.saveIdea(
+          title: 'Quiet Library Pods',
+          sections: [
+            const IdeaSection(
+              id: 'library-section',
+              name: 'Idea',
+              content: 'Soundproof study spaces for teams.',
+            ),
+          ],
+        );
+      });
+
+      await pumpIdeasApp(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('ideas-search-field')),
+        'rooftop',
+      );
+      await settleUi(tester);
+
+      expect(find.text('Neighborhood Lab'), findsOneWidget);
+      expect(find.text('Quiet Library Pods'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('ideas-search-field')),
+        'zzzzz',
+      );
+      await settleUi(tester);
+
+      expect(find.text('No ideas match your search'), findsOneWidget);
+    });
+
+    testWidgets('sorts ideas and remembers the selected preference',
+        (tester) async {
+      late String olderIdeaId;
+      late String newerIdeaId;
+      await tester.runAsync(() async {
+        final olderIdea = await provider.saveIdea(
+          title: 'Deep Archive',
+          sections: [
+            ...provider.createDefaultSections(),
+            IdeaSection.empty(name: 'Design'),
+          ],
+        );
+        olderIdeaId = olderIdea!.id;
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+        final newerIdea = await provider.saveIdea(
+          title: 'Fresh Spark',
+          sections: provider.createDefaultSections(),
+        );
+        newerIdeaId = newerIdea!.id;
+      });
+
+      await pumpIdeasApp(tester);
+
+      expect(
+        tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy,
+        lessThan(
+            tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy),
+      );
+
+      await tester.tap(find.byKey(const Key('ideas-sort-button')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('ideas-sort-most-sections')));
+      await settlePersistenceAction(tester);
+
+      expect(
+        tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy,
+        lessThan(
+            tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy),
+      );
+
+      await pumpIdeasApp(tester);
+
+      expect(
+        tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy,
+        lessThan(
+            tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy),
+      );
+    });
+
+    testWidgets('renames and deletes sections from the edit sheet',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-section-name')),
+        'Notes',
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-create-section')));
+      await settleUi(tester);
+
+      await tester.tap(find.byKey(const Key('idea-editor-section-tab-notes')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-section-name')),
+        'Details',
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-create-section')));
+      await settleUi(tester);
+
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.text('Notes'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const Key('idea-editor-section-tab-details')),
+      );
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('idea-editor-delete-section')));
+      await settleUi(tester);
+
+      expect(find.text('Details'), findsNothing);
+      expect(find.text('Idea'), findsOneWidget);
     });
 
     testWidgets('shows a discard dialog when closing a dirty draft',

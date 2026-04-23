@@ -12,6 +12,7 @@ import 'data/managers/local/shared_preference.dart';
 import 'data/managers/remote/api_manager.dart';
 import 'data/managers/remote/dio_api_manager.dart';
 import 'data/repositories/local/idea_editor_state.dart';
+import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
@@ -53,6 +54,8 @@ Future<void> initializeDependencies() async {
   // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<IdeaListPreferencesRepo>(
+      IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
   sl.registerSingleton<ThemeRepo>(ThemeRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));

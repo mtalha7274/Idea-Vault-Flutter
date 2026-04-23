@@ -24,6 +24,7 @@ class IdeaEditorScreen extends StatefulWidget {
 
 class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   late final TextEditingController _titleController;
+  late final FocusNode _titleFocusNode;
   late List<IdeaSection> _sections;
   late Map<String, String> _sectionContentById;
   late String _activeSectionId;
@@ -32,6 +33,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   bool _allowPop = false;
   bool _isPreviewMode = false;
   bool _isSaving = false;
+  bool _showTitleError = false;
 
   @override
   void initState() {
@@ -53,12 +55,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     _isPreviewMode = resumeState?.isPreviewMode ?? false;
 
     _titleController = TextEditingController(text: existingIdea?.title ?? '');
+    _titleFocusNode = FocusNode();
     _titleController.addListener(_handleDraftChanged);
     _initialSnapshot = _snapshot();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
+      }
+      if (widget.ideaId == null && _titleController.text.trim().isEmpty) {
+        _titleFocusNode.requestFocus();
       }
       _persistEditorState();
     });
@@ -70,6 +76,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     _titleController
       ..removeListener(_handleDraftChanged)
       ..dispose();
+    _titleFocusNode.dispose();
     super.dispose();
   }
 
@@ -98,6 +105,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
         backgroundColor: IdeaVaultPalette.background(context),
         resizeToAvoidBottomInset: true,
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               Padding(
@@ -110,34 +118,38 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                 ),
               ),
               Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 860),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTitleField(context),
-                          const SizedBox(height: 20),
-                          _buildSectionTabs(context),
-                          const SizedBox(height: 16),
-                          Expanded(
-                            child: IdeaMarkdownEditor(
-                              key: ValueKey(_activeSectionId),
-                              initialValue:
-                                  _sectionContentById[_activeSectionId] ?? '',
-                              placeholder: _sectionPlaceholder(),
-                              initialPreviewMode: _isPreviewMode,
-                              onPreviewModeChanged: _handlePreviewModeChanged,
-                              onChanged: _updateActiveSectionContent,
-                            ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 860),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildTitleField(context),
+                              const SizedBox(height: 20),
+                              _buildSectionTabs(context),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    Expanded(
+                      child: IdeaMarkdownEditor(
+                        key: ValueKey(_activeSectionId),
+                        initialValue:
+                            _sectionContentById[_activeSectionId] ?? '',
+                        placeholder: _sectionPlaceholder(),
+                        initialPreviewMode: _isPreviewMode,
+                        onPreviewModeChanged: _handlePreviewModeChanged,
+                        onChanged: _updateActiveSectionContent,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -148,38 +160,81 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   }
 
   Widget _buildTitleField(BuildContext context) {
-    return TextField(
-      key: const Key('idea-editor-title'),
-      controller: _titleController,
-      textCapitalization: TextCapitalization.sentences,
-      minLines: 1,
-      maxLines: 3,
-      decoration: InputDecoration(
-        hintText: 'Enter idea title...',
-        hintStyle: ideaVaultHeadline(
-          context,
-          size: 38,
-          weight: FontWeight.w800,
-          color: IdeaVaultPalette.outline(context),
-          height: 1.08,
-          letterSpacing: -1.2,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          key: const Key('idea-editor-title'),
+          controller: _titleController,
+          focusNode: _titleFocusNode,
+          autofocus: widget.ideaId == null,
+          textCapitalization: TextCapitalization.sentences,
+          minLines: 1,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter idea title...',
+            hintStyle: ideaVaultHeadline(
+              context,
+              size: 38,
+              weight: FontWeight.w800,
+              color: IdeaVaultPalette.outline(context),
+              height: 1.08,
+              letterSpacing: -1.2,
+            ),
+            border: InputBorder.none,
+            isCollapsed: true,
+          ),
+          style: ideaVaultHeadline(
+            context,
+            size: 38,
+            weight: FontWeight.w800,
+            height: 1.08,
+            letterSpacing: -1.2,
+          ),
         ),
-        border: InputBorder.none,
-        isCollapsed: true,
-      ),
-      style: ideaVaultHeadline(
-        context,
-        size: 38,
-        weight: FontWeight.w800,
-        height: 1.08,
-        letterSpacing: -1.2,
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _titleErrorText == null
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _titleErrorText!,
+                    key: const Key('idea-editor-title-error'),
+                    style: ideaVaultLabel(
+                      context,
+                      size: 13,
+                      weight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  String? get _titleErrorText {
+    if (!_showTitleError || _titleController.text.trim().isNotEmpty) {
+      return null;
+    }
+    return 'Please add a title before saving';
+  }
+
+  Widget _buildAddSectionTab() {
+    return Tooltip(
+      message: 'Add section',
+      child: _SectionTabButton(
+        key: const Key('idea-editor-add-section'),
+        icon: Icons.add_rounded,
+        isActive: false,
+        onTap: _showAddSectionSheet,
       ),
     );
   }
 
   Widget _buildSectionTabs(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: IdeaVaultPalette.outlineSoft(context)),
@@ -189,22 +244,18 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            for (final section in _sections)
-              Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: _SectionTabButton(
-                  title: section.name,
-                  isActive: section.id == _activeSectionId,
-                  onTap: () => _switchSection(section.id),
-                ),
+            for (var i = 0; i < _sections.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              _SectionTabButton(
+                key: Key(
+                    'idea-editor-section-tab-${_sections[i].name.toLowerCase()}'),
+                title: _sections[i].name,
+                isActive: _sections[i].id == _activeSectionId,
+                onTap: () => _handleSectionTap(_sections[i]),
               ),
-            _SectionTabButton(
-              key: const Key('idea-editor-add-section'),
-              title: '+',
-              isActive: false,
-              onTap: _showAddSectionSheet,
-              compact: true,
-            ),
+            ],
+            const SizedBox(width: 10),
+            _buildAddSectionTab(),
           ],
         ),
       ),
@@ -251,6 +302,15 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     _persistEditorState();
   }
 
+  Future<void> _handleSectionTap(IdeaSection section) async {
+    if (section.id != _activeSectionId) {
+      _switchSection(section.id);
+      return;
+    }
+
+    await _showEditSectionSheet(section);
+  }
+
   void _updateSectionContent(String sectionId, String content) {
     if (_sectionContentById[sectionId] == content) {
       return;
@@ -288,13 +348,96 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   }
 
   Future<void> _showAddSectionSheet() async {
+    final result = await _showSectionSheet();
+    if (!mounted || result == null || result.name == null) {
+      return;
+    }
+
+    final normalizedName = result.name!.trim();
+    if (normalizedName.isEmpty) {
+      return;
+    }
+
+    final hasDuplicate = _sections.any(
+      (section) => section.name.toLowerCase() == normalizedName.toLowerCase(),
+    );
+    if (hasDuplicate) {
+      _showDuplicateSectionMessage();
+      return;
+    }
+
+    final newSection = IdeaSection.empty(name: normalizedName);
+    setState(() {
+      _sections = [..._sections, newSection];
+      _sectionContentById = {
+        ..._sectionContentById,
+        newSection.id: newSection.content,
+      };
+      _activeSectionId = newSection.id;
+    });
+    _persistEditorState();
+  }
+
+  Future<void> _showEditSectionSheet(IdeaSection section) async {
+    final result = await _showSectionSheet(section: section);
+    if (!mounted || result == null) {
+      return;
+    }
+
+    if (result.shouldDelete) {
+      _deleteSection(section.id);
+      return;
+    }
+
+    final nextName = result.name?.trim() ?? '';
+    if (nextName.isEmpty) {
+      return;
+    }
+
+    final hasDuplicate = _sections.any(
+      (candidate) =>
+          candidate.id != section.id &&
+          candidate.name.toLowerCase() == nextName.toLowerCase(),
+    );
+    if (hasDuplicate) {
+      _showDuplicateSectionMessage();
+      return;
+    }
+
+    if (nextName == section.name) {
+      return;
+    }
+
+    setState(() {
+      _sections = [
+        for (final candidate in _sections)
+          if (candidate.id == section.id)
+            candidate.copyWith(name: nextName)
+          else
+            candidate,
+      ];
+    });
+    _persistEditorState();
+  }
+
+  Future<_SectionSheetResult?> _showSectionSheet({
+    IdeaSection? section,
+  }) async {
     final nameController = TextEditingController();
-    final sectionName = await showModalBottomSheet<String>(
+    nameController.text = section?.name ?? '';
+    nameController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: nameController.text.length,
+    );
+
+    final result = await showModalBottomSheet<_SectionSheetResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: IdeaVaultPalette.surface(context),
       builder: (sheetContext) {
         final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+        final isEditing = section != null;
+        final canDelete = isEditing && _sections.length > 1;
         return Padding(
           padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
           child: Column(
@@ -302,7 +445,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Add section',
+                isEditing ? 'Edit section' : 'Add section',
                 style: ideaVaultHeadline(
                   sheetContext,
                   size: 24,
@@ -312,7 +455,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Create another space for this idea.',
+                isEditing
+                    ? 'Rename this section or remove it from this idea.'
+                    : 'Create another space for this idea.',
                 style: ideaVaultBody(
                   sheetContext,
                   size: 15,
@@ -352,6 +497,23 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                       ),
                     ),
                   ),
+                  if (canDelete) ...[
+                    TextButton(
+                      key: const Key('idea-editor-delete-section'),
+                      onPressed: () => Navigator.of(sheetContext).pop(
+                        const _SectionSheetResult.delete(),
+                      ),
+                      child: Text(
+                        'Delete',
+                        style: ideaVaultLabel(
+                          sheetContext,
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: Theme.of(sheetContext).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   FilledButton(
                     key: const Key('idea-editor-create-section'),
@@ -368,10 +530,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                       if (nextName.isEmpty) {
                         return;
                       }
-                      Navigator.of(sheetContext).pop(nextName);
+                      Navigator.of(sheetContext).pop(
+                        _SectionSheetResult.rename(nextName),
+                      );
                     },
                     child: Text(
-                      'Add',
+                      isEditing ? 'Save' : 'Add',
                       style: ideaVaultLabel(
                         sheetContext,
                         size: 14,
@@ -390,36 +554,42 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       nameController.dispose();
     });
+    return result;
+  }
 
-    if (!mounted || sectionName == null) {
+  void _deleteSection(String sectionId) {
+    if (_sections.length <= 1) {
       return;
     }
 
-    final normalizedName = sectionName.trim();
-    if (normalizedName.isEmpty) {
+    final currentIndex =
+        _sections.indexWhere((section) => section.id == sectionId);
+    if (currentIndex == -1) {
       return;
     }
 
-    final hasDuplicate = _sections.any(
-      (section) => section.name.toLowerCase() == normalizedName.toLowerCase(),
-    );
-    if (hasDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('That section already exists.')),
-      );
-      return;
-    }
+    final remainingSections = [..._sections]..removeAt(currentIndex);
+    final nextActiveSectionId = sectionId == _activeSectionId
+        ? remainingSections[
+                (currentIndex - 1).clamp(0, remainingSections.length - 1)]
+            .id
+        : _activeSectionId;
 
-    final newSection = IdeaSection.empty(name: normalizedName);
     setState(() {
-      _sections = [..._sections, newSection];
+      _sections = remainingSections;
       _sectionContentById = {
-        ..._sectionContentById,
-        newSection.id: newSection.content,
+        for (final entry in _sectionContentById.entries)
+          if (entry.key != sectionId) entry.key: entry.value,
       };
-      _activeSectionId = newSection.id;
+      _activeSectionId = nextActiveSectionId;
     });
     _persistEditorState();
+  }
+
+  void _showDuplicateSectionMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('That section already exists.')),
+    );
   }
 
   void _handleDraftChanged() {
@@ -430,7 +600,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   }
 
   Future<void> _onSavePressed() async {
+    if (_titleController.text.trim().isEmpty) {
+      setState(() {
+        _showTitleError = true;
+      });
+      _titleFocusNode.requestFocus();
+      return;
+    }
+
     setState(() {
+      _showTitleError = false;
       _isSaving = true;
     });
 
@@ -458,9 +637,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     });
 
     if (savedIdea == null) {
-      await _prepareForExit();
-      if (mounted) {
-        AppRouter.pop(context);
+      if (_titleController.text.trim().isEmpty) {
+        setState(() {
+          _showTitleError = true;
+        });
+        _titleFocusNode.requestFocus();
       }
       return;
     }
@@ -604,26 +785,50 @@ class _Header extends StatelessWidget {
 class _SectionTabButton extends StatelessWidget {
   const _SectionTabButton({
     super.key,
-    required this.title,
+    this.title,
+    this.icon,
     required this.isActive,
     required this.onTap,
-    this.compact = false,
-  });
+  }) : assert(
+          (title != null && icon == null) || (title == null && icon != null),
+          'Exactly one of title or icon must be set',
+        );
 
-  final String title;
+  final String? title;
+  final IconData? icon;
   final bool isActive;
   final VoidCallback onTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final color = isActive
+        ? IdeaVaultPalette.primary(context)
+        : IdeaVaultPalette.textMuted(context);
+
+    final child = icon != null
+        ? Icon(
+            icon,
+            size: 22,
+            color: color,
+          )
+        : Text(
+            title!,
+            style: ideaVaultBody(
+              context,
+              size: 18,
+              weight: isActive ? FontWeight.w700 : FontWeight.w600,
+              color: color,
+            ),
+          );
+
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        constraints: const BoxConstraints(minWidth: 0),
+        alignment: Alignment.center,
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 12 : 4,
+          horizontal: icon != null ? 10 : 11,
           vertical: 10,
         ),
         decoration: BoxDecoration(
@@ -636,18 +841,19 @@ class _SectionTabButton extends StatelessWidget {
             ),
           ),
         ),
-        child: Text(
-          title,
-          style: ideaVaultBody(
-            context,
-            size: compact ? 20 : 18,
-            weight: isActive ? FontWeight.w700 : FontWeight.w600,
-            color: isActive
-                ? IdeaVaultPalette.primary(context)
-                : IdeaVaultPalette.textMuted(context),
-          ),
-        ),
+        child: child,
       ),
     );
   }
+}
+
+class _SectionSheetResult {
+  const _SectionSheetResult.rename(this.name) : shouldDelete = false;
+
+  const _SectionSheetResult.delete()
+      : name = null,
+        shouldDelete = true;
+
+  final String? name;
+  final bool shouldDelete;
 }

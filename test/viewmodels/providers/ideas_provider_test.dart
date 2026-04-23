@@ -81,7 +81,7 @@ void main() {
       expect(updatedIdea, isNotNull);
       expect(provider.ideas, hasLength(1));
       expect(provider.ideas.first.title, 'Refined title');
-      expect(provider.ideas.first.sections, hasLength(4));
+      expect(provider.ideas.first.sections, hasLength(2));
       expect(provider.ideas.first.createdAt, initialIdea.createdAt);
       expect(
         provider.ideas.first.updatedAt.isAfter(initialIdea.updatedAt),
@@ -125,7 +125,7 @@ void main() {
 
       await provider.saveEditorState(
         ideaId: savedIdea!.id,
-        activeSectionId: savedIdea.sections[1].id,
+        activeSectionId: savedIdea.sections.first.id,
         isPreviewMode: true,
       );
 
@@ -136,7 +136,7 @@ void main() {
       expect(restoredProvider.resumeEditorState!.ideaId, savedIdea.id);
       expect(
         restoredProvider.resumeEditorState!.activeSectionId,
-        savedIdea.sections[1].id,
+        savedIdea.sections.first.id,
       );
       expect(restoredProvider.resumeEditorState!.isPreviewMode, isTrue);
     });

@@ -2,8 +2,6 @@ import 'package:equatable/equatable.dart';
 
 const List<String> defaultIdeaSectionNames = [
   'Idea',
-  'Requirements',
-  'Design',
 ];
 
 int _ideaVaultIdCounter = 0;
@@ -57,8 +55,8 @@ class IdeaSection extends Equatable {
     return IdeaSection(
       id: json['id'] as String? ?? generateIdeaVaultId('section'),
       name: json['name'] as String? ?? 'Untitled Section',
-      content: json['content'] as String? ??
-          _legacyContentFromDelta(json['delta']),
+      content:
+          json['content'] as String? ?? _legacyContentFromDelta(json['delta']),
     );
   }
 

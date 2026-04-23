@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config/router/app_router.dart';
+import '../data/repositories/local/idea_list_preferences.dart';
+import '../injection_container.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 
 class Homepage extends StatefulWidget {
-  const Homepage({super.key});
+  const Homepage({
+    super.key,
+    this.sortPreferencesRepo,
+  });
+
+  final IdeaListPreferencesRepo? sortPreferencesRepo;
 
   @override
   State<Homepage> createState() => _HomepageState();
@@ -16,22 +23,41 @@ class Homepage extends StatefulWidget {
 
 class _HomepageState extends State<Homepage> {
   final Set<String> _selectedIdeaIds = <String>{};
+  late final TextEditingController _searchController;
+  late final IdeaListPreferencesRepo _sortPreferencesRepo;
+
   bool _didHandleResume = false;
+  late IdeaSortOption _sortOption;
 
   bool get _isSelectionMode => _selectedIdeaIds.isNotEmpty;
+  String get _searchQuery => _searchController.text.trim();
 
   @override
   void initState() {
     super.initState();
+    _sortPreferencesRepo =
+        widget.sortPreferencesRepo ?? sl<IdeaListPreferencesRepo>();
+    _sortOption = _sortPreferencesRepo.getSortOption();
+    _searchController = TextEditingController()
+      ..addListener(_handleSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resumeEditorIfNeeded();
     });
   }
 
   @override
+  void dispose() {
+    _searchController
+      ..removeListener(_handleSearchChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ideasProvider = context.watch<IdeasProvider>();
     final ideas = ideasProvider.ideas;
+    final visibleIdeas = _visibleIdeas(ideas);
 
     return Scaffold(
       backgroundColor: IdeaVaultPalette.background(context),
@@ -51,26 +77,35 @@ class _HomepageState extends State<Homepage> {
                     selectedCount: _selectedIdeaIds.length,
                     onDeletePressed:
                         _isSelectionMode ? _confirmDeleteSelection : null,
+                    onSortPressed: _isSelectionMode ? null : _showSortSheet,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 18),
+                  _SearchField(
+                    controller: _searchController,
+                  ),
+                  const SizedBox(height: 22),
                   Expanded(
                     child: ideas.isEmpty
                         ? const _EmptyIdeasState()
-                        : ListView.separated(
-                            padding: const EdgeInsets.only(bottom: 120),
-                            itemCount: ideas.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 16),
-                            itemBuilder: (context, index) {
-                              final idea = ideas[index];
-                              return _IdeaCard(
-                                idea: idea,
-                                isSelected: _selectedIdeaIds.contains(idea.id),
-                                onTap: () => _handleIdeaTap(idea),
-                                onLongPress: () => _handleIdeaLongPress(idea),
-                              );
-                            },
-                          ),
+                        : visibleIdeas.isEmpty
+                            ? const _NoSearchResultsState()
+                            : ListView.separated(
+                                padding: const EdgeInsets.only(bottom: 120),
+                                itemCount: visibleIdeas.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 16),
+                                itemBuilder: (context, index) {
+                                  final idea = visibleIdeas[index];
+                                  return _IdeaCard(
+                                    idea: idea,
+                                    isSelected:
+                                        _selectedIdeaIds.contains(idea.id),
+                                    onTap: () => _handleIdeaTap(idea),
+                                    onLongPress: () =>
+                                        _handleIdeaLongPress(idea),
+                                  );
+                                },
+                              ),
                   ),
                 ],
               ),
@@ -207,6 +242,123 @@ class _HomepageState extends State<Homepage> {
       _selectedIdeaIds.clear();
     });
   }
+
+  void _handleSearchChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
+  List<Idea> _visibleIdeas(List<Idea> ideas) {
+    final filteredIdeas = ideas
+        .where((idea) => _matchesSearch(idea, _searchQuery))
+        .toList(growable: false);
+
+    switch (_sortOption) {
+      case IdeaSortOption.newestFirst:
+        filteredIdeas.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        break;
+      case IdeaSortOption.oldestFirst:
+        filteredIdeas.sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
+        break;
+      case IdeaSortOption.mostSections:
+        filteredIdeas.sort((a, b) {
+          final sectionCountDifference = b.sections.length - a.sections.length;
+          if (sectionCountDifference != 0) {
+            return sectionCountDifference;
+          }
+          return b.updatedAt.compareTo(a.updatedAt);
+        });
+        break;
+    }
+
+    return filteredIdeas;
+  }
+
+  bool _matchesSearch(Idea idea, String query) {
+    if (query.isEmpty) {
+      return true;
+    }
+
+    final normalizedQuery = query.toLowerCase();
+    final titleMatches = idea.title.toLowerCase().contains(normalizedQuery);
+    final previewMatches = ideaPreviewText(
+      idea,
+      fallbackIfEmpty: false,
+    ).toLowerCase().contains(normalizedQuery);
+
+    return titleMatches || previewMatches;
+  }
+
+  Future<void> _showSortSheet() async {
+    final selectedSortOption = await showModalBottomSheet<IdeaSortOption>(
+      context: context,
+      backgroundColor: IdeaVaultPalette.surface(context),
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sort ideas',
+                style: ideaVaultHeadline(
+                  sheetContext,
+                  size: 24,
+                  weight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose how your vault is arranged.',
+                style: ideaVaultBody(
+                  sheetContext,
+                  size: 15,
+                  weight: FontWeight.w500,
+                  color: IdeaVaultPalette.textMuted(sheetContext),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _SortOptionTile(
+                key: const Key('ideas-sort-newest'),
+                title: 'Newest First',
+                isSelected: _sortOption == IdeaSortOption.newestFirst,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(IdeaSortOption.newestFirst),
+              ),
+              _SortOptionTile(
+                key: const Key('ideas-sort-oldest'),
+                title: 'Oldest First',
+                isSelected: _sortOption == IdeaSortOption.oldestFirst,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(IdeaSortOption.oldestFirst),
+              ),
+              _SortOptionTile(
+                key: const Key('ideas-sort-most-sections'),
+                title: 'Most Sections',
+                isSelected: _sortOption == IdeaSortOption.mostSections,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(IdeaSortOption.mostSections),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selectedSortOption == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _sortOption = selectedSortOption;
+    });
+    await _sortPreferencesRepo.saveSortOption(selectedSortOption);
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -214,11 +366,13 @@ class _Header extends StatelessWidget {
     required this.ideaCount,
     required this.selectedCount,
     required this.onDeletePressed,
+    required this.onSortPressed,
   });
 
   final int ideaCount;
   final int selectedCount;
   final VoidCallback? onDeletePressed;
+  final VoidCallback? onSortPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -274,36 +428,42 @@ class _Header extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
             ] else
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: IdeaVaultPalette.surfaceLow(context),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  label,
-                  style: ideaVaultLabel(
-                    context,
-                    size: 12,
-                    weight: FontWeight.w700,
-                    color: IdeaVaultPalette.textMuted(context),
-                    letterSpacing: 0.2,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: IdeaVaultPalette.surfaceLow(context),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      label,
+                      style: ideaVaultLabel(
+                        context,
+                        size: 12,
+                        weight: FontWeight.w700,
+                        color: IdeaVaultPalette.textMuted(context),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    key: const Key('ideas-sort-button'),
+                    onPressed: onSortPressed,
+                    style: IconButton.styleFrom(
+                      backgroundColor: IdeaVaultPalette.surfaceLow(context),
+                      foregroundColor: IdeaVaultPalette.primary(context),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    icon: const Icon(Icons.swap_vert_rounded),
+                  ),
+                ],
               ),
           ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Capture rough sparks, refine them into sections, and keep momentum without losing the thread.',
-          style: ideaVaultBody(
-            context,
-            size: 16,
-            weight: FontWeight.w500,
-            color: IdeaVaultPalette.textMuted(context),
-            height: 1.6,
-          ),
         ),
       ],
     );
@@ -315,54 +475,61 @@ class _EmptyIdeasState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        key: const Key('ideas-empty-state'),
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          color: IdeaVaultPalette.surface(context),
-          borderRadius: BorderRadius.circular(32),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 78,
-              width: 78,
-              decoration: BoxDecoration(
-                color: IdeaVaultPalette.accentTint(context),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.auto_awesome_outlined,
-                size: 36,
-                color: IdeaVaultPalette.primary(context),
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 120),
+      child: SizedBox.expand(
+        child: Center(
+          child: Container(
+            key: const Key('ideas-empty-state'),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: IdeaVaultPalette.surface(context),
+              borderRadius: BorderRadius.circular(32),
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Nothing saved yet',
-              style: ideaVaultHeadline(
-                context,
-                size: 24,
-                weight: FontWeight.w800,
-                height: 1.15,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  height: 78,
+                  width: 78,
+                  decoration: BoxDecoration(
+                    color: IdeaVaultPalette.accentTint(context),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.auto_awesome_outlined,
+                    size: 36,
+                    color: IdeaVaultPalette.primary(context),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Nothing saved yet',
+                  textAlign: TextAlign.center,
+                  style: ideaVaultHeadline(
+                    context,
+                    size: 24,
+                    weight: FontWeight.w800,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Start with one fast idea, then break it into requirements, design notes, or any custom section you need.',
+                  textAlign: TextAlign.center,
+                  style: ideaVaultBody(
+                    context,
+                    size: 15,
+                    weight: FontWeight.w500,
+                    color: IdeaVaultPalette.textMuted(context),
+                    height: 1.55,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Start with one fast idea, then break it into requirements, design notes, or any custom section you need.',
-              textAlign: TextAlign.center,
-              style: ideaVaultBody(
-                context,
-                size: 15,
-                weight: FontWeight.w500,
-                color: IdeaVaultPalette.textMuted(context),
-                height: 1.55,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -433,7 +600,9 @@ class _IdeaCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      '${idea.sections.length} sections',
+                      idea.sections.length == 1
+                          ? '1 section'
+                          : '${idea.sections.length} sections',
                       style: ideaVaultLabel(
                         context,
                         size: 12,
@@ -485,32 +654,7 @@ class _IdeaCard extends StatelessWidget {
   }
 
   String _ideaPreview(Idea idea) {
-    for (final section in idea.sections) {
-      final text = _plainPreview(section.content);
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-
-    return 'Tap to keep building this idea.';
-  }
-
-  String _plainPreview(String markdown) {
-    return markdown
-        .replaceAll('```', ' ')
-        .replaceAllMapped(
-          RegExp(r'\*\*(.*?)\*\*', dotAll: true),
-          (match) => match.group(1) ?? '',
-        )
-        .replaceAllMapped(
-          RegExp(r'_(.*?)_', dotAll: true),
-          (match) => match.group(1) ?? '',
-        )
-        .replaceAll(RegExp(r'^#\s*', multiLine: true), '')
-        .replaceAll(RegExp(r'^-\s*', multiLine: true), '')
-        .replaceAll('\n', ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    return ideaPreviewText(idea);
   }
 
   String _formatUpdatedAt(BuildContext context, DateTime updatedAt) {
@@ -530,4 +674,133 @@ class _IdeaCard extends StatelessWidget {
 
     return 'Updated ${localizations.formatMediumDate(updatedAt)}';
   }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+  });
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const Key('ideas-search-field'),
+      controller: controller,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(
+        hintText: 'Search ideas',
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: IdeaVaultPalette.textMuted(context),
+        ),
+        filled: true,
+        fillColor: IdeaVaultPalette.surface(context),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide.none,
+        ),
+        hintStyle: ideaVaultBody(
+          context,
+          size: 15,
+          weight: FontWeight.w500,
+          color: IdeaVaultPalette.outline(context),
+        ),
+      ),
+      style: ideaVaultBody(
+        context,
+        size: 15,
+        weight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _NoSearchResultsState extends StatelessWidget {
+  const _NoSearchResultsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        'No ideas match your search',
+        textAlign: TextAlign.center,
+        style: ideaVaultBody(
+          context,
+          size: 16,
+          weight: FontWeight.w600,
+          color: IdeaVaultPalette.textMuted(context),
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _SortOptionTile extends StatelessWidget {
+  const _SortOptionTile({
+    super.key,
+    required this.title,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        title,
+        style: ideaVaultBody(
+          context,
+          size: 16,
+          weight: FontWeight.w600,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(
+              Icons.check_rounded,
+              color: IdeaVaultPalette.primary(context),
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+String ideaPreviewText(
+  Idea idea, {
+  bool fallbackIfEmpty = true,
+}) {
+  for (final section in idea.sections) {
+    final text = plainPreviewText(section.content);
+    if (text.isNotEmpty) {
+      return text;
+    }
+  }
+
+  return fallbackIfEmpty ? 'Tap to keep building this idea.' : '';
+}
+
+String plainPreviewText(String markdown) {
+  return markdown
+      .replaceAll('```', ' ')
+      .replaceAllMapped(
+        RegExp(r'\*\*(.*?)\*\*', dotAll: true),
+        (match) => match.group(1) ?? '',
+      )
+      .replaceAllMapped(
+        RegExp(r'_(.*?)_', dotAll: true),
+        (match) => match.group(1) ?? '',
+      )
+      .replaceAll(RegExp(r'^#\s*', multiLine: true), '')
+      .replaceAll(RegExp(r'^-\s*', multiLine: true), '')
+      .replaceAll('\n', ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }

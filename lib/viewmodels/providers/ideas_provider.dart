@@ -78,16 +78,14 @@ class IdeasProvider with ChangeNotifier {
         sections.map((section) => section.copyWith()).toList();
     final existingIdea = ideaId == null ? null : findById(ideaId);
 
-    if (existingIdea == null &&
-        normalizedTitle.isEmpty &&
-        _allSectionsEmpty(normalizedSections)) {
+    if (normalizedTitle.isEmpty) {
       return null;
     }
 
     final now = DateTime.now();
     final savedIdea = Idea(
       id: existingIdea?.id ?? generateIdeaVaultId('idea'),
-      title: normalizedTitle.isEmpty ? 'Untitled idea' : normalizedTitle,
+      title: normalizedTitle,
       createdAt: existingIdea?.createdAt ?? now,
       updatedAt: now,
       sections: normalizedSections,
@@ -139,15 +137,5 @@ class IdeasProvider with ChangeNotifier {
     final sortedIdeas = [...ideas];
     sortedIdeas.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return sortedIdeas;
-  }
-
-  bool _allSectionsEmpty(List<IdeaSection> sections) {
-    for (final section in sections) {
-      final text = section.content.trim();
-      if (text.isNotEmpty) {
-        return false;
-      }
-    }
-    return true;
   }
 }

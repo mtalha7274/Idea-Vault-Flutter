@@ -79,41 +79,23 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              key: const Key('idea-markdown-preview-toggle'),
-              onPressed: _togglePreviewMode,
-              style: IconButton.styleFrom(
-                backgroundColor: IdeaVaultPalette.surfaceLow(context),
-                foregroundColor: IdeaVaultPalette.primary(context),
-              ),
-              icon: Icon(
-                isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: IdeaVaultPalette.surface(context),
-              borderRadius: BorderRadius.circular(28),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!isPreviewMode) ...[
-                    IdeaEditorToolbar(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                    ),
-                    const SizedBox(height: 14),
-                  ],
+                  IdeaEditorToolbar(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    isPreviewMode: isPreviewMode,
+                    onPreviewToggle: _togglePreviewMode,
+                  ),
+                  const SizedBox(height: 14),
                   Expanded(
                     child: isPreviewMode
                         ? _PreviewPane(
@@ -184,40 +166,68 @@ class IdeaEditorToolbar extends StatelessWidget {
     super.key,
     required this.controller,
     required this.focusNode,
+    required this.isPreviewMode,
+    required this.onPreviewToggle,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
+  final bool isPreviewMode;
+  final VoidCallback onPreviewToggle;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _ToolbarIconButton(
-            icon: Icons.title,
-            onPressed: () => _wrapSelection(controller, '# ', '', true),
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _ToolbarIconButton(
+                  icon: Icons.title,
+                  tooltip: 'Text',
+                  enabled: !isPreviewMode,
+                  onPressed: () => _wrapSelection(controller, '# ', '', true),
+                ),
+                _ToolbarIconButton(
+                  icon: Icons.format_bold,
+                  tooltip: 'Bold',
+                  enabled: !isPreviewMode,
+                  onPressed: () =>
+                      _wrapSelection(controller, '**', '**', false),
+                ),
+                _ToolbarIconButton(
+                  icon: Icons.format_italic,
+                  tooltip: 'Italic',
+                  enabled: !isPreviewMode,
+                  onPressed: () => _wrapSelection(controller, '_', '_', false),
+                ),
+                _ToolbarIconButton(
+                  icon: Icons.format_list_bulleted,
+                  tooltip: 'Bullet List',
+                  enabled: !isPreviewMode,
+                  onPressed: () => _wrapSelection(controller, '- ', '', true),
+                ),
+                _ToolbarIconButton(
+                  icon: Icons.code,
+                  tooltip: 'Code Block',
+                  enabled: !isPreviewMode,
+                  onPressed: () =>
+                      _wrapSelection(controller, '```\n', '\n```', false),
+                ),
+              ],
+            ),
           ),
-          _ToolbarIconButton(
-            icon: Icons.format_bold,
-            onPressed: () => _wrapSelection(controller, '**', '**', false),
-          ),
-          _ToolbarIconButton(
-            icon: Icons.format_italic,
-            onPressed: () => _wrapSelection(controller, '_', '_', false),
-          ),
-          _ToolbarIconButton(
-            icon: Icons.format_list_bulleted,
-            onPressed: () => _wrapSelection(controller, '- ', '', true),
-          ),
-          _ToolbarIconButton(
-            icon: Icons.code,
-            onPressed: () =>
-                _wrapSelection(controller, '```\n', '\n```', false),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        _ToolbarIconButton(
+          key: const Key('idea-markdown-preview-toggle'),
+          icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
+          tooltip: isPreviewMode ? 'Edit' : 'Preview',
+          onPressed: onPreviewToggle,
+        ),
+      ],
     );
   }
 
@@ -311,24 +321,39 @@ class _PreviewPane extends StatelessWidget {
 
 class _ToolbarIconButton extends StatelessWidget {
   const _ToolbarIconButton({
+    super.key,
     required this.icon,
+    required this.tooltip,
     required this.onPressed,
+    this.enabled = true,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
+  final String tooltip;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
+    final foregroundColor = enabled
+        ? IdeaVaultPalette.primary(context)
+        : IdeaVaultPalette.textMuted(context).withValues(alpha: 0.55);
+
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: IconButton(
-        onPressed: onPressed,
-        style: IconButton.styleFrom(
-          backgroundColor: IdeaVaultPalette.surfaceLow(context),
-          foregroundColor: IdeaVaultPalette.primary(context),
+      child: Tooltip(
+        message: tooltip,
+        child: IgnorePointer(
+          ignoring: !enabled,
+          child: IconButton(
+            onPressed: enabled ? onPressed : () {},
+            style: IconButton.styleFrom(
+              backgroundColor: IdeaVaultPalette.surfaceLow(context),
+              foregroundColor: foregroundColor,
+            ),
+            icon: Icon(icon),
+          ),
         ),
-        icon: Icon(icon),
       ),
     );
   }
