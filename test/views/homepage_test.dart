@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
+import 'package:idea_vault/data/repositories/local/theme.dart';
 import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
+import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +22,7 @@ void main() {
   group('Homepage ideas flow', () {
     late MemoryLocalStorageManager storage;
     late IdeasProvider provider;
+    late ThemeProvider themeProvider;
     late IdeaListPreferencesRepo sortPreferencesRepo;
 
     setUpAll(() {
@@ -29,6 +32,7 @@ void main() {
     setUp(() async {
       storage = MemoryLocalStorageManager();
       sortPreferencesRepo = IdeaListPreferencesRepo(storage);
+      themeProvider = ThemeProvider(ThemeRepo(storage));
       provider = IdeasProvider(
         InMemoryIdeasRepo(),
         IdeaEditorStateRepo(storage),
@@ -50,8 +54,11 @@ void main() {
 
     Future<void> pumpIdeasApp(WidgetTester tester) async {
       await tester.pumpWidget(
-        ChangeNotifierProvider<IdeasProvider>.value(
-          value: provider,
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<IdeasProvider>.value(value: provider),
+            ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+          ],
           child: MaterialApp(
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -59,6 +66,7 @@ void main() {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [Locale('en')],
+            theme: themeProvider.baseTheme.themeData,
             home: Homepage(sortPreferencesRepo: sortPreferencesRepo),
           ),
         ),
@@ -85,6 +93,7 @@ void main() {
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-save')), findsOneWidget);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
+      expect(find.byKey(const Key('idea-editor-mic-fab')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-add-section')), findsOneWidget);
 
       final titleField = tester.widget<TextField>(

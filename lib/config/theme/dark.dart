@@ -5,19 +5,35 @@ import 'base.dart';
 
 class DarkTheme implements BaseTheme {
   @override
-  final Color primary = const Color(0xFF2DAE77);
+  final Color primary = const Color(0xFF446556);
   @override
-  final Color onPrimary = const Color(0xFFFFFFFF);
+  final Color secondary = const Color(0xFFd7ccfe);
   @override
-  final Color background = const Color(0xFF1E1E1E);
+  final Color onPrimary = const Color(0xFFE0FFEE);
   @override
-  final Color primaryText = const Color(0xFFFFFFFF);
+  final Color background = const Color(0xFFF9F9F9);
   @override
-  final Color surface = const Color(0xFF292E3A);
+  final Color primaryText = const Color(0xFF2D3435);
   @override
-  final Color onSurface = const Color(0xFF8E9FC7);
+  final Color surface = const Color(0xFFFFFFFF);
   @override
-  final Color overlay = const Color(0xFF000000).withOpacity(0.2);
+  final Color onSurface = const Color(0xFF5A6061);
+  @override
+  final Color overlay = const Color(0xFF000000).withOpacity(0.1);
+  @override
+  final Color surfaceLow = const Color(0xFFF2F4F4);
+  @override
+  final Color surfaceHigh = const Color(0xFFDDE4E5);
+  @override
+  final Color outline = const Color(0xFFADB3B4);
+  @override
+  final Color textMuted = const Color(0xFF5A6061);
+
+  @override
+  Color get accentTint => primary.withValues(alpha: 0.12);
+
+  @override
+  Color get outlineSoft => outline.withValues(alpha: 0.16);
 
   @override
   final SettingsColors settings = SettingsColorsImpl();
@@ -26,9 +42,10 @@ class DarkTheme implements BaseTheme {
 
   @override
   late final ThemeData themeData = ThemeData(
-      fontFamily: Config.fontFamily,
-      scaffoldBackgroundColor: background,
-      colorScheme: ColorScheme.fromSeed(seedColor: primary));
+    fontFamily: Config.fontFamily,
+    scaffoldBackgroundColor: background,
+    colorScheme: ColorScheme.fromSeed(seedColor: primary),
+  );
 }
 
 class SettingsColorsImpl implements SettingsColors {

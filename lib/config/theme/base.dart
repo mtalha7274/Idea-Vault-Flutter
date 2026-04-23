@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 
 abstract class BaseTheme {
   Color get primary;
+  Color get secondary;
   Color get onPrimary;
   Color get background;
   Color get primaryText;
   Color get surface;
   Color get onSurface;
   Color get overlay;
+  Color get surfaceLow;
+  Color get surfaceHigh;
+  Color get outline;
+  Color get textMuted;
+  Color get accentTint;
+  Color get outlineSoft;
 
   SettingsColors get settings;
   BottomNavBarColors get bottomNavBar;

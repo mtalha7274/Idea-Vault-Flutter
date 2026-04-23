@@ -39,6 +39,9 @@ dependencies:
   sqflite: ^2.4.2+1
   google_fonts: ^8.0.2
   markdown_widget: ^2.3.2+8
+  permission_handler: ^12.0.1
+  speech_to_text: ^7.3.0
+  rename_app: ^1.6.5
 
 dev_dependencies:
   flutter_test:
@@ -50,15 +53,15 @@ dev_dependencies:
 # TODO: Currently native splash icon is blank icon with same color as background color
 # You can use your app background color here but then also change the icon (as currently its a blank background colored image) 
 flutter_native_splash:
-  color: "#1E1E1E"
-  image: "assets/images/splash_icon.png"
-  android: true
+  color: "#d7ccfe"
+  image: "assets/images/logo.png"
+  android: false
   ios: true
   web: false
   android_12:
-    color: "#1E1E1E"
-    icon_background_color: "#1E1E1E"
-    image: "assets/images/splash_icon.png"
+    color: "#d7ccfe"
+    icon_background_color: "#d7ccfe"
+    image: "assets/images/logo.png"
 
 flutter:
   uses-material-design: true

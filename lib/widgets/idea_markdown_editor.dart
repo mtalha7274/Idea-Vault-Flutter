@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import 'package:provider/provider.dart';
 
+import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 class IdeaMarkdownEditor extends StatefulWidget {
@@ -22,10 +24,10 @@ class IdeaMarkdownEditor extends StatefulWidget {
   final ValueChanged<bool> onPreviewModeChanged;
 
   @override
-  State<IdeaMarkdownEditor> createState() => _IdeaMarkdownEditorState();
+  State<IdeaMarkdownEditor> createState() => IdeaMarkdownEditorState();
 }
 
-class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
+class IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   late bool isPreviewMode;
@@ -77,12 +79,13 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Column(
       children: [
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: IdeaVaultPalette.surface(context),
+              color: theme.surface,
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
@@ -116,7 +119,7 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
                               context,
                               size: 18,
                               weight: FontWeight.w500,
-                              color: IdeaVaultPalette.text(context),
+                              color: theme.primaryText,
                               height: 1.72,
                             ),
                             decoration: InputDecoration(
@@ -125,7 +128,7 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
                                 context,
                                 size: 18,
                                 weight: FontWeight.w500,
-                                color: IdeaVaultPalette.outline(context),
+                                color: theme.outline,
                                 height: 1.72,
                               ),
                               border: InputBorder.none,
@@ -146,6 +149,41 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
     widget.onChanged(_controller.text);
   }
 
+  void insertRecognizedText(String dictatedText) {
+    final normalizedText = dictatedText.trim();
+    if (normalizedText.isEmpty) {
+      return;
+    }
+
+    final selection = _controller.selection;
+    final currentText = _controller.text;
+    final canInsertAtCursor = !isPreviewMode &&
+        _focusNode.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end >= 0;
+
+    if (canInsertAtCursor) {
+      final before = currentText.substring(0, selection.start);
+      final after = currentText.substring(selection.end);
+      final middle = _dictatedTextOnOwnLine(before, after, normalizedText);
+      final updatedText = before + middle + after;
+      final nextOffset = before.length + middle.length;
+      _controller.value = TextEditingValue(
+        text: updatedText,
+        selection: TextSelection.collapsed(offset: nextOffset),
+      );
+      return;
+    }
+
+    final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
+    final updatedText = currentText + middle;
+    _controller.value = TextEditingValue(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: updatedText.length),
+    );
+  }
+
   void _togglePreviewMode() {
     final nextMode = !isPreviewMode;
     setState(() {
@@ -159,6 +197,22 @@ class _IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
       _focusNode.requestFocus();
     }
   }
+}
+
+/// Builds the dictated chunk so it always starts on its own line.
+///
+/// [before] and [after] are the document segments around the insertion point.
+String _dictatedTextOnOwnLine(String before, String after, String dictated) {
+  if (before.isEmpty && after.isEmpty) {
+    return dictated;
+  }
+  if (before.isEmpty && after.isNotEmpty) {
+    return '$dictated\n';
+  }
+  if (before.isNotEmpty && !before.endsWith('\n')) {
+    return '\n$dictated';
+  }
+  return dictated;
 }
 
 class IdeaEditorToolbar extends StatelessWidget {
@@ -298,6 +352,7 @@ class _PreviewPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (markdown.trim().isEmpty) {
+      final theme = context.watch<ThemeProvider>().baseTheme;
       return Align(
         alignment: Alignment.topLeft,
         child: Text(
@@ -306,7 +361,7 @@ class _PreviewPane extends StatelessWidget {
             context,
             size: 18,
             weight: FontWeight.w500,
-            color: IdeaVaultPalette.outline(context),
+            color: theme.outline,
             height: 1.72,
           ),
         ),
@@ -335,9 +390,10 @@ class _ToolbarIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     final foregroundColor = enabled
-        ? IdeaVaultPalette.primary(context)
-        : IdeaVaultPalette.textMuted(context).withValues(alpha: 0.55);
+        ? theme.primary
+        : theme.textMuted.withValues(alpha: 0.55);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -348,7 +404,7 @@ class _ToolbarIconButton extends StatelessWidget {
           child: IconButton(
             onPressed: enabled ? onPressed : () {},
             style: IconButton.styleFrom(
-              backgroundColor: IdeaVaultPalette.surfaceLow(context),
+              backgroundColor: theme.surfaceLow,
               foregroundColor: foregroundColor,
             ),
             icon: Icon(icon),

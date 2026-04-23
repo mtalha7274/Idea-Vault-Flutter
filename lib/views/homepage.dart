@@ -6,6 +6,7 @@ import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/theme_provider.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -55,12 +56,13 @@ class _HomepageState extends State<Homepage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     final ideasProvider = context.watch<IdeasProvider>();
     final ideas = ideasProvider.ideas;
     final visibleIdeas = _visibleIdeas(ideas);
 
     return Scaffold(
-      backgroundColor: IdeaVaultPalette.background(context),
+      backgroundColor: theme.background,
       body: SafeArea(
         bottom: false,
         child: Align(
@@ -121,8 +123,8 @@ class _HomepageState extends State<Homepage> {
                 context,
                 const IdeaEditorScreen(),
               ),
-              backgroundColor: IdeaVaultPalette.primary(context),
-              foregroundColor: IdeaVaultPalette.onPrimary(context),
+              backgroundColor: theme.primary,
+              foregroundColor: theme.onPrimary,
               icon: const Icon(Icons.add_rounded),
               label: Text(
                 'New Idea',
@@ -130,7 +132,7 @@ class _HomepageState extends State<Homepage> {
                   context,
                   size: 14,
                   weight: FontWeight.w700,
-                  color: IdeaVaultPalette.onPrimary(context),
+                  color: theme.onPrimary,
                 ),
               ),
             ),
@@ -292,10 +294,12 @@ class _HomepageState extends State<Homepage> {
   }
 
   Future<void> _showSortSheet() async {
+    final sheetSurface = context.read<ThemeProvider>().baseTheme.surface;
     final selectedSortOption = await showModalBottomSheet<IdeaSortOption>(
       context: context,
-      backgroundColor: IdeaVaultPalette.surface(context),
+      backgroundColor: sheetSurface,
       builder: (sheetContext) {
+        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
           child: Column(
@@ -318,7 +322,7 @@ class _HomepageState extends State<Homepage> {
                   sheetContext,
                   size: 15,
                   weight: FontWeight.w500,
-                  color: IdeaVaultPalette.textMuted(sheetContext),
+                  color: sheetTheme.textMuted,
                   height: 1.5,
                 ),
               ),
@@ -376,6 +380,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     final label = ideaCount == 1 ? '1 saved idea' : '$ideaCount saved ideas';
     final selectionLabel =
         selectedCount == 1 ? '1 selected' : '$selectedCount selected';
@@ -402,7 +407,7 @@ class _Header extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: IdeaVaultPalette.surfaceLow(context),
+                  color: theme.surfaceLow,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -411,7 +416,7 @@ class _Header extends StatelessWidget {
                     context,
                     size: 12,
                     weight: FontWeight.w700,
-                    color: IdeaVaultPalette.textMuted(context),
+                    color: theme.textMuted,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -421,8 +426,8 @@ class _Header extends StatelessWidget {
                 key: const Key('ideas-delete-button'),
                 onPressed: onDeletePressed,
                 style: IconButton.styleFrom(
-                  backgroundColor: IdeaVaultPalette.surfaceLow(context),
-                  foregroundColor: IdeaVaultPalette.primary(context),
+                  backgroundColor: theme.surfaceLow,
+                  foregroundColor: theme.primary,
                   padding: const EdgeInsets.all(12),
                 ),
                 icon: const Icon(Icons.delete_outline_rounded),
@@ -436,7 +441,7 @@ class _Header extends StatelessWidget {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: IdeaVaultPalette.surfaceLow(context),
+                      color: theme.surfaceLow,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -445,7 +450,7 @@ class _Header extends StatelessWidget {
                         context,
                         size: 12,
                         weight: FontWeight.w700,
-                        color: IdeaVaultPalette.textMuted(context),
+                        color: theme.textMuted,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -455,8 +460,8 @@ class _Header extends StatelessWidget {
                     key: const Key('ideas-sort-button'),
                     onPressed: onSortPressed,
                     style: IconButton.styleFrom(
-                      backgroundColor: IdeaVaultPalette.surfaceLow(context),
-                      foregroundColor: IdeaVaultPalette.primary(context),
+                      backgroundColor: theme.surfaceLow,
+                      foregroundColor: theme.primary,
                       padding: const EdgeInsets.all(12),
                     ),
                     icon: const Icon(Icons.swap_vert_rounded),
@@ -475,6 +480,7 @@ class _EmptyIdeasState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 120),
       child: SizedBox.expand(
@@ -483,7 +489,7 @@ class _EmptyIdeasState extends StatelessWidget {
             key: const Key('ideas-empty-state'),
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: IdeaVaultPalette.surface(context),
+              color: theme.surface,
               borderRadius: BorderRadius.circular(32),
             ),
             child: Column(
@@ -494,14 +500,14 @@ class _EmptyIdeasState extends StatelessWidget {
                   height: 78,
                   width: 78,
                   decoration: BoxDecoration(
-                    color: IdeaVaultPalette.accentTint(context),
+                    color: theme.accentTint,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.auto_awesome_outlined,
                     size: 36,
-                    color: IdeaVaultPalette.primary(context),
+                    color: theme.primary,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -523,7 +529,7 @@ class _EmptyIdeasState extends StatelessWidget {
                     context,
                     size: 15,
                     weight: FontWeight.w500,
-                    color: IdeaVaultPalette.textMuted(context),
+                    color: theme.textMuted,
                     height: 1.55,
                   ),
                 ),
@@ -551,6 +557,7 @@ class _IdeaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -560,13 +567,11 @@ class _IdeaCard extends StatelessWidget {
         onLongPress: onLongPress,
         child: Ink(
           decoration: BoxDecoration(
-            color: isSelected
-                ? IdeaVaultPalette.accentTint(context)
-                : IdeaVaultPalette.surface(context),
+            color: isSelected ? theme.accentTint : theme.surface,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: isSelected
-                  ? IdeaVaultPalette.primary(context).withValues(alpha: 0.32)
+                  ? theme.primary.withValues(alpha: 0.32)
                   : Colors.transparent,
             ),
           ),
@@ -596,7 +601,7 @@ class _IdeaCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: IdeaVaultPalette.surfaceLow(context),
+                      color: theme.surfaceLow,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -622,7 +627,7 @@ class _IdeaCard extends StatelessWidget {
                   context,
                   size: 15,
                   weight: FontWeight.w500,
-                  color: IdeaVaultPalette.textMuted(context),
+                  color: theme.textMuted,
                   height: 1.65,
                 ),
               ),
@@ -632,7 +637,7 @@ class _IdeaCard extends StatelessWidget {
                   Icon(
                     Icons.schedule_rounded,
                     size: 18,
-                    color: IdeaVaultPalette.textMuted(context),
+                    color: theme.textMuted,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -641,7 +646,7 @@ class _IdeaCard extends StatelessWidget {
                       context,
                       size: 13,
                       weight: FontWeight.w600,
-                      color: IdeaVaultPalette.textMuted(context),
+                      color: theme.textMuted,
                     ),
                   ),
                 ],
@@ -685,6 +690,7 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return TextField(
       key: const Key('ideas-search-field'),
       controller: controller,
@@ -693,10 +699,10 @@ class _SearchField extends StatelessWidget {
         hintText: 'Search ideas',
         prefixIcon: Icon(
           Icons.search_rounded,
-          color: IdeaVaultPalette.textMuted(context),
+          color: theme.textMuted,
         ),
         filled: true,
-        fillColor: IdeaVaultPalette.surface(context),
+        fillColor: theme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
@@ -705,7 +711,7 @@ class _SearchField extends StatelessWidget {
           context,
           size: 15,
           weight: FontWeight.w500,
-          color: IdeaVaultPalette.outline(context),
+          color: theme.outline,
         ),
       ),
       style: ideaVaultBody(
@@ -722,6 +728,7 @@ class _NoSearchResultsState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Center(
       child: Text(
         'No ideas match your search',
@@ -730,7 +737,7 @@ class _NoSearchResultsState extends StatelessWidget {
           context,
           size: 16,
           weight: FontWeight.w600,
-          color: IdeaVaultPalette.textMuted(context),
+          color: theme.textMuted,
           height: 1.5,
         ),
       ),
@@ -752,6 +759,7 @@ class _SortOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(
@@ -765,7 +773,7 @@ class _SortOptionTile extends StatelessWidget {
       trailing: isSelected
           ? Icon(
               Icons.check_rounded,
-              color: IdeaVaultPalette.primary(context),
+              color: theme.primary,
             )
           : null,
       onTap: onTap,

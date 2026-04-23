@@ -1,12 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config/router/app_router.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_markdown_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -22,9 +28,16 @@ class IdeaEditorScreen extends StatefulWidget {
   State<IdeaEditorScreen> createState() => _IdeaEditorScreenState();
 }
 
-class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
+class _IdeaEditorScreenState extends State<IdeaEditorScreen>
+    with TickerProviderStateMixin {
+  final GlobalKey<IdeaMarkdownEditorState> _editorKey =
+      GlobalKey<IdeaMarkdownEditorState>();
+  final SpeechToText _speechToText = SpeechToText();
   late final TextEditingController _titleController;
   late final FocusNode _titleFocusNode;
+  late final AnimationController _micScaleController;
+  late final AnimationController _micGlowController;
+  late final Animation<double> _micScaleAnimation;
   late List<IdeaSection> _sections;
   late Map<String, String> _sectionContentById;
   late String _activeSectionId;
@@ -33,6 +46,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   bool _allowPop = false;
   bool _isPreviewMode = false;
   bool _isSaving = false;
+  bool _isListening = false;
+  bool _isMicPressHeld = false;
+  bool _isSpeechInitialized = false;
+  bool _didShowPermissionDialog = false;
   bool _showTitleError = false;
 
   @override
@@ -56,6 +73,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
 
     _titleController = TextEditingController(text: existingIdea?.title ?? '');
     _titleFocusNode = FocusNode();
+    _micScaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _micGlowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _micScaleAnimation = Tween<double>(begin: 1, end: 1.38).animate(
+      CurvedAnimation(
+        parent: _micScaleController,
+        curve: Curves.easeInOut,
+      ),
+    );
     _titleController.addListener(_handleDraftChanged);
     _initialSnapshot = _snapshot();
 
@@ -73,10 +104,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   @override
   void dispose() {
     FocusManager.instance.primaryFocus?.unfocus();
+    _speechToText.stop();
     _titleController
       ..removeListener(_handleDraftChanged)
       ..dispose();
     _titleFocusNode.dispose();
+    _micScaleController.dispose();
+    _micGlowController.dispose();
     super.dispose();
   }
 
@@ -84,6 +118,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     final navigator = Navigator.of(context);
     return PopScope<Object?>(
       canPop: _allowPop || !_hasUnsavedChanges,
@@ -102,8 +137,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: IdeaVaultPalette.background(context),
+        backgroundColor: theme.background,
         resizeToAvoidBottomInset: true,
+        floatingActionButton: _buildSpeechFab(context),
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -140,7 +176,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                     ),
                     Expanded(
                       child: IdeaMarkdownEditor(
-                        key: ValueKey(_activeSectionId),
+                        key: _editorKey,
                         initialValue:
                             _sectionContentById[_activeSectionId] ?? '',
                         placeholder: _sectionPlaceholder(),
@@ -160,6 +196,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   }
 
   Widget _buildTitleField(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -177,7 +214,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
               context,
               size: 38,
               weight: FontWeight.w800,
-              color: IdeaVaultPalette.outline(context),
+              color: theme.outline,
               height: 1.08,
               letterSpacing: -1.2,
             ),
@@ -214,6 +251,99 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
     );
   }
 
+  Widget _buildSpeechFab(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final primaryColor = theme.primary;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSlide(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          offset: _isListening ? Offset.zero : const Offset(0, 0.18),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: _isListening ? 1 : 0,
+            child: IgnorePointer(
+              ignoring: !_isListening,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Listening...',
+                  style: ideaVaultLabel(
+                    context,
+                    size: 13,
+                    weight: FontWeight.w700,
+                    color: primaryColor,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          key: const Key('idea-editor-mic-fab'),
+          behavior: HitTestBehavior.opaque,
+          onLongPress: _handleMicLongPress,
+          onLongPressEnd: (_) => _handleMicLongPressEnd(),
+          child: ScaleTransition(
+            scale: _micScaleAnimation,
+            child: AnimatedBuilder(
+              animation: _micGlowController,
+              builder: (context, child) {
+                final glowOpacity = 0.14 + (_micGlowController.value * 0.18);
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: _isListening
+                        ? [
+                            BoxShadow(
+                              color:
+                                  primaryColor.withValues(alpha: glowOpacity),
+                              blurRadius: 28,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : const [],
+                  ),
+                  child: child,
+                );
+              },
+              child: AbsorbPointer(
+                child: FloatingActionButton(
+                  heroTag: 'idea-editor-mic-fab',
+                  onPressed: () {},
+                  backgroundColor: primaryColor,
+                  foregroundColor: theme.onPrimary,
+                  child: Icon(_isListening ? Icons.mic_none : Icons.mic),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   String? get _titleErrorText {
     if (!_showTitleError || _titleController.text.trim().isNotEmpty) {
       return null;
@@ -234,10 +364,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
   }
 
   Widget _buildSectionTabs(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: IdeaVaultPalette.outlineSoft(context)),
+          bottom: BorderSide(color: theme.outlineSoft),
         ),
       ),
       child: SingleChildScrollView(
@@ -326,6 +457,202 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
 
   void _updateActiveSectionContent(String content) {
     _updateSectionContent(_activeSectionId, content);
+  }
+
+  Future<void> _handleMicLongPress() async {
+    if (_isListening) {
+      return;
+    }
+
+    _isMicPressHeld = true;
+    await _micScaleController.forward();
+
+    final hasPermission = await _ensureSpeechPermission();
+    if (!hasPermission || !_isMicPressHeld || !mounted) {
+      await _setListeningState(false);
+      return;
+    }
+
+    final isAvailable = await _ensureSpeechReady();
+    if (!isAvailable || !_isMicPressHeld || !mounted) {
+      await _setListeningState(false);
+      if (mounted) {
+        _showSpeechUnavailableMessage();
+      }
+      return;
+    }
+
+    await _speechToText.listen(
+      onResult: _handleSpeechResult,
+      listenOptions: SpeechListenOptions(
+        partialResults: false,
+        cancelOnError: true,
+        listenMode: ListenMode.dictation,
+      ),
+    );
+
+    if (!mounted || !_speechToText.isListening) {
+      await _setListeningState(false);
+      return;
+    }
+
+    await _setListeningState(true);
+  }
+
+  Future<void> _handleMicLongPressEnd() async {
+    _isMicPressHeld = false;
+    await _stopListening();
+  }
+
+  Future<bool> _ensureSpeechPermission() async {
+    final microphoneStatus = await Permission.microphone.request();
+    PermissionStatus speechStatus = PermissionStatus.granted;
+
+    if (Platform.isIOS) {
+      speechStatus = await Permission.speech.request();
+    }
+
+    final hasPermission = microphoneStatus.isGranted && speechStatus.isGranted;
+    if (!hasPermission && mounted) {
+      await _showMicrophonePermissionDialog();
+    }
+    return hasPermission;
+  }
+
+  Future<bool> _ensureSpeechReady() async {
+    if (_isSpeechInitialized) {
+      return _speechToText.isAvailable;
+    }
+
+    final isAvailable = await _speechToText.initialize(
+      onStatus: _handleSpeechStatus,
+      onError: _handleSpeechError,
+    );
+    _isSpeechInitialized = true;
+    return isAvailable;
+  }
+
+  Future<void> _setListeningState(bool isListening) async {
+    if (_isListening == isListening) {
+      if (!isListening && _micScaleController.value != 0) {
+        await _micScaleController.reverse();
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isListening = isListening;
+      });
+    } else {
+      _isListening = isListening;
+    }
+
+    if (isListening) {
+      _micGlowController
+        ..stop()
+        ..reset()
+        ..repeat(reverse: true);
+      return;
+    }
+
+    _micGlowController
+      ..stop()
+      ..reset();
+    await _micScaleController.reverse();
+  }
+
+  Future<void> _stopListening() async {
+    if (_speechToText.isListening) {
+      await _speechToText.stop();
+    }
+    await _setListeningState(false);
+  }
+
+  void _handleSpeechStatus(String status) {
+    if (!mounted) {
+      return;
+    }
+
+    if (status == 'done' || status == 'notListening') {
+      _stopListening();
+    }
+  }
+
+  void _handleSpeechError(SpeechRecognitionError error) {
+    if (!mounted) {
+      return;
+    }
+
+    _stopListening();
+
+    final errorMessage = error.errorMsg.toLowerCase();
+    final isPermissionIssue =
+        errorMessage.contains('permission') || errorMessage.contains('denied');
+    if (isPermissionIssue) {
+      _showMicrophonePermissionDialog();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Speech recognition stopped. Please try again.'),
+      ),
+    );
+  }
+
+  void _handleSpeechResult(SpeechRecognitionResult result) {
+    if (!result.finalResult) {
+      return;
+    }
+
+    final recognizedWords = result.recognizedWords.trim();
+    if (recognizedWords.isEmpty) {
+      return;
+    }
+
+    _editorKey.currentState?.insertRecognizedText(recognizedWords);
+  }
+
+  void _showSpeechUnavailableMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Speech recognition is unavailable on this device.'),
+      ),
+    );
+  }
+
+  Future<void> _showMicrophonePermissionDialog() async {
+    if (_didShowPermissionDialog || !mounted) {
+      return;
+    }
+
+    _didShowPermissionDialog = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Microphone Access Needed'),
+          content: const Text(
+            'To use speech to text, please enable microphone access in your device settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await openAppSettings();
+              },
+              child: const Text('Open Settings'),
+            ),
+          ],
+        );
+      },
+    );
+    _didShowPermissionDialog = false;
   }
 
   void _handlePreviewModeChanged(bool isPreviewMode) {
@@ -430,11 +757,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
       extentOffset: nameController.text.length,
     );
 
+    final sheetSurface = context.read<ThemeProvider>().baseTheme.surface;
     final result = await showModalBottomSheet<_SectionSheetResult>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: IdeaVaultPalette.surface(context),
+      backgroundColor: sheetSurface,
       builder: (sheetContext) {
+        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
         final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
         final isEditing = section != null;
         final canDelete = isEditing && _sections.length > 1;
@@ -462,7 +791,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                   sheetContext,
                   size: 15,
                   weight: FontWeight.w500,
-                  color: IdeaVaultPalette.textMuted(sheetContext),
+                  color: sheetTheme.textMuted,
                   height: 1.5,
                 ),
               ),
@@ -475,7 +804,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                 decoration: InputDecoration(
                   hintText: 'Section name',
                   filled: true,
-                  fillColor: IdeaVaultPalette.surfaceLow(sheetContext),
+                  fillColor: sheetTheme.surfaceLow,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(18),
                     borderSide: BorderSide.none,
@@ -493,7 +822,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                         sheetContext,
                         size: 14,
                         weight: FontWeight.w700,
-                        color: IdeaVaultPalette.textMuted(sheetContext),
+                        color: sheetTheme.textMuted,
                       ),
                     ),
                   ),
@@ -518,8 +847,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                   FilledButton(
                     key: const Key('idea-editor-create-section'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: IdeaVaultPalette.primary(sheetContext),
-                      foregroundColor: IdeaVaultPalette.onPrimary(sheetContext),
+                      backgroundColor: sheetTheme.primary,
+                      foregroundColor: sheetTheme.onPrimary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 18,
                         vertical: 14,
@@ -540,7 +869,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen> {
                         sheetContext,
                         size: 14,
                         weight: FontWeight.w700,
-                        color: IdeaVaultPalette.onPrimary(sheetContext),
+                        color: sheetTheme.onPrimary,
                       ),
                     ),
                   ),
@@ -735,14 +1064,15 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Row(
       children: [
         IconButton(
           key: const Key('idea-editor-close'),
           onPressed: onClose,
           style: IconButton.styleFrom(
-            backgroundColor: IdeaVaultPalette.surfaceLow(context),
-            foregroundColor: IdeaVaultPalette.primary(context),
+            backgroundColor: theme.surfaceLow,
+            foregroundColor: theme.primary,
             padding: const EdgeInsets.all(14),
           ),
           icon: const Icon(Icons.close_rounded),
@@ -763,8 +1093,8 @@ class _Header extends StatelessWidget {
           key: const Key('idea-editor-save'),
           onPressed: onSave,
           style: FilledButton.styleFrom(
-            backgroundColor: IdeaVaultPalette.primary(context),
-            foregroundColor: IdeaVaultPalette.onPrimary(context),
+            backgroundColor: theme.primary,
+            foregroundColor: theme.onPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           ),
           child: Text(
@@ -773,7 +1103,7 @@ class _Header extends StatelessWidget {
               context,
               size: 14,
               weight: FontWeight.w700,
-              color: IdeaVaultPalette.onPrimary(context),
+              color: theme.onPrimary,
             ),
           ),
         ),
@@ -801,9 +1131,8 @@ class _SectionTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive
-        ? IdeaVaultPalette.primary(context)
-        : IdeaVaultPalette.textMuted(context);
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final color = isActive ? theme.primary : theme.textMuted;
 
     final child = icon != null
         ? Icon(
@@ -834,9 +1163,7 @@ class _SectionTabButton extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isActive
-                  ? IdeaVaultPalette.primary(context)
-                  : Colors.transparent,
+              color: isActive ? theme.primary : Colors.transparent,
               width: 2.5,
             ),
           ),
