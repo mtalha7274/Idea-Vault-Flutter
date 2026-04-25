@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
+const double _editorBodyTextSize = 17;
+
 class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
     super.key,
@@ -51,7 +53,7 @@ class IdeaMarkdownEditor extends StatelessWidget {
                 scrollPhysics: const NeverScrollableScrollPhysics(),
                 style: ideaVaultBody(
                   context,
-                  size: 18,
+                  size: _editorBodyTextSize,
                   weight: FontWeight.w500,
                   color: theme.primaryText,
                   height: 1.72,
@@ -60,7 +62,7 @@ class IdeaMarkdownEditor extends StatelessWidget {
                   hintText: placeholder,
                   hintStyle: ideaVaultBody(
                     context,
-                    size: 18,
+                    size: _editorBodyTextSize,
                     weight: FontWeight.w500,
                     color: theme.outline,
                     height: 1.72,
@@ -247,7 +249,7 @@ class _PreviewPane extends StatelessWidget {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final bodyStyle = ideaVaultBody(
       context,
-      size: 18,
+      size: _editorBodyTextSize,
       weight: FontWeight.w500,
       color: theme.primaryText,
       height: 1.72,
@@ -265,6 +267,7 @@ class _PreviewPane extends StatelessWidget {
     return MarkdownBlock(
       data: markdown,
       config: _previewMarkdownConfig(bodyStyle),
+      generator: MarkdownGenerator(linesMargin: EdgeInsets.zero),
     );
   }
 
@@ -274,15 +277,28 @@ class _PreviewPane extends StatelessWidget {
     return MarkdownConfig(
       configs: [
         PConfig(textStyle: bodyStyle),
-        H1Config(style: headingStyle),
-        H2Config(style: headingStyle),
-        H3Config(style: headingStyle),
-        H4Config(style: headingStyle),
-        H5Config(style: headingStyle),
-        H6Config(style: headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h1.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h2.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h3.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h4.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h5.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h6.name, headingStyle),
       ],
     );
   }
+}
+
+class _PreviewHeadingConfig extends HeadingConfig {
+  const _PreviewHeadingConfig(this.tag, this.style);
+
+  @override
+  final String tag;
+
+  @override
+  final TextStyle style;
+
+  @override
+  EdgeInsets get padding => EdgeInsets.zero;
 }
 
 class _ToolbarIconButton extends StatelessWidget {
