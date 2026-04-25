@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,34 +31,43 @@ class IdeaEditorScreen extends StatefulWidget {
 }
 
 class _IdeaEditorScreenState extends State<IdeaEditorScreen>
-    with TickerProviderStateMixin {
-  final GlobalKey<IdeaMarkdownEditorState> _editorKey =
-      GlobalKey<IdeaMarkdownEditorState>();
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  static const _autosaveDelay = Duration(milliseconds: 700);
+  static const _untitledIdeaTitle = 'Untitled Idea';
+
   final SpeechToText _speechToText = SpeechToText();
   late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
   late final FocusNode _titleFocusNode;
+  late final FocusNode _contentFocusNode;
   late final AnimationController _micScaleController;
   late final AnimationController _micGlowController;
   late final Animation<double> _micScaleAnimation;
   late List<IdeaSection> _sections;
   late Map<String, String> _sectionContentById;
   late String _activeSectionId;
-  late String _initialSnapshot;
+  late String _lastSavedSnapshot;
+  late IdeasProvider _ideasProvider;
 
+  Timer? _autosaveTimer;
+  Future<void>? _saveInFlight;
+  String? _savedIdeaId;
   bool _allowPop = false;
   bool _isPreviewMode = false;
-  bool _isSaving = false;
+  bool _isAutosaving = false;
+  bool _hasSaveFailed = false;
   bool _isListening = false;
   bool _isMicPressHeld = false;
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
-  bool _showTitleError = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     final ideasProvider = context.read<IdeasProvider>();
+    _ideasProvider = ideasProvider;
     final existingIdea =
         widget.ideaId == null ? null : ideasProvider.findById(widget.ideaId!);
     final resumeState =
@@ -70,9 +81,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     };
     _activeSectionId = _resolveInitialSectionId(resumeState);
     _isPreviewMode = resumeState?.isPreviewMode ?? false;
+    _savedIdeaId = existingIdea?.id;
 
     _titleController = TextEditingController(text: existingIdea?.title ?? '');
+    _contentController = TextEditingController(
+      text: _sectionContentById[_activeSectionId] ?? '',
+    );
     _titleFocusNode = FocusNode();
+    _contentFocusNode = FocusNode();
     _micScaleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 150),
@@ -88,7 +104,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       ),
     );
     _titleController.addListener(_handleDraftChanged);
-    _initialSnapshot = _snapshot();
+    _contentController.addListener(_handleEditorContentChanged);
+    _lastSavedSnapshot = _snapshot();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -97,44 +114,55 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       if (widget.ideaId == null && _titleController.text.trim().isEmpty) {
         _titleFocusNode.requestFocus();
       }
-      _persistEditorState();
+      if (_savedIdeaId == null) {
+        unawaited(_flushAutosave(force: true));
+      } else {
+        _persistEditorState();
+      }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.primaryFocus?.unfocus();
     _speechToText.stop();
+    _autosaveTimer?.cancel();
+    unawaited(_flushAutosave(updateUi: false));
     _titleController
       ..removeListener(_handleDraftChanged)
       ..dispose();
+    _contentController
+      ..removeListener(_handleEditorContentChanged)
+      ..dispose();
     _titleFocusNode.dispose();
+    _contentFocusNode.dispose();
     _micScaleController.dispose();
     _micGlowController.dispose();
     super.dispose();
   }
 
-  bool get _hasUnsavedChanges => _snapshot() != _initialSnapshot;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      unawaited(_flushAutosave());
+    }
+  }
+
+  bool get _hasUnsavedChanges => _snapshot() != _lastSavedSnapshot;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final navigator = Navigator.of(context);
     return PopScope<Object?>(
       canPop: _allowPop || !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) {
-          await context.read<IdeasProvider>().clearEditorState();
+          await _ideasProvider.clearEditorState();
           return;
         }
 
-        final shouldClose = await _handleCloseRequest();
-        if (shouldClose && mounted) {
-          await _prepareForExit();
-          if (mounted) {
-            navigator.pop();
-          }
-        }
+        await _closeEditor();
       },
       child: Scaffold(
         backgroundColor: theme.background,
@@ -142,53 +170,92 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         floatingActionButton: _buildSpeechFab(context),
         body: SafeArea(
           bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
-                child: _Header(
-                  onClose: _onClosePressed,
-                  onSave: _isSaving ? null : _onSavePressed,
-                  isSaving: _isSaving,
-                  isEditingExisting: widget.ideaId != null,
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              _buildCollapsibleEditorHeader(context),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _PinnedHeaderDelegate(
+                  extent: _PinnedHeaderDelegate.sectionTabsExtent,
+                  child: _buildPinnedSectionTabsContent(context),
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 860),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildTitleField(context),
-                              const SizedBox(height: 20),
-                              _buildSectionTabs(context),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: IdeaMarkdownEditor(
-                        key: _editorKey,
-                        initialValue:
-                            _sectionContentById[_activeSectionId] ?? '',
-                        placeholder: _sectionPlaceholder(),
-                        initialPreviewMode: _isPreviewMode,
-                        onPreviewModeChanged: _handlePreviewModeChanged,
-                        onChanged: _updateActiveSectionContent,
-                      ),
-                    ),
-                  ],
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _PinnedHeaderDelegate(
+                  extent: _PinnedHeaderDelegate.toolbarExtent,
+                  child: IdeaEditorToolbarContainer(
+                    controller: _contentController,
+                    focusNode: _contentFocusNode,
+                    isPreviewMode: _isPreviewMode,
+                    onPreviewToggle: _togglePreviewMode,
+                  ),
+                ),
+              ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: IdeaMarkdownEditor(
+                  controller: _contentController,
+                  focusNode: _contentFocusNode,
+                  placeholder: _sectionPlaceholder(),
+                  isPreviewMode: _isPreviewMode,
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleEditorHeader(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+            child: _Header(
+              onClose: _onClosePressed,
+              isAutosaving: _isAutosaving,
+              hasSaveFailed: _hasSaveFailed,
+              isEditingExisting: widget.ideaId != null,
+            ),
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: _buildTitleField(context),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPinnedSectionTabsContent(
+    BuildContext context, {
+    Color? background,
+  }) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return SizedBox(
+      height: _PinnedHeaderDelegate.sectionTabsExtent,
+      child: ColoredBox(
+        color: background ?? theme.background,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _buildSectionTabs(context),
+            ),
           ),
         ),
       ),
@@ -228,24 +295,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             height: 1.08,
             letterSpacing: -1.2,
           ),
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: _titleErrorText == null
-              ? const SizedBox.shrink()
-              : Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    _titleErrorText!,
-                    key: const Key('idea-editor-title-error'),
-                    style: ideaVaultLabel(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
         ),
       ],
     );
@@ -344,13 +393,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
-  String? get _titleErrorText {
-    if (!_showTitleError || _titleController.text.trim().isNotEmpty) {
-      return null;
-    }
-    return 'Please add a title before saving';
-  }
-
   Widget _buildAddSectionTab() {
     return Tooltip(
       message: 'Add section',
@@ -427,9 +469,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
+    final nextContent = _sectionContentById[sectionId] ?? '';
     setState(() {
       _activeSectionId = sectionId;
     });
+    _replaceEditorContent(nextContent);
     _persistEditorState();
   }
 
@@ -453,10 +497,30 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         sectionId: content,
       };
     });
+    _scheduleAutosave();
   }
 
   void _updateActiveSectionContent(String content) {
     _updateSectionContent(_activeSectionId, content);
+  }
+
+  void _handleEditorContentChanged() {
+    _updateActiveSectionContent(_contentController.text);
+  }
+
+  void _replaceEditorContent(String content) {
+    final selection = _contentController.selection;
+    final cursorOffset = math.min(
+      content.length,
+      math.max(0, selection.extentOffset),
+    );
+    _contentController
+      ..removeListener(_handleEditorContentChanged)
+      ..value = TextEditingValue(
+        text: content,
+        selection: TextSelection.collapsed(offset: cursorOffset),
+      )
+      ..addListener(_handleEditorContentChanged);
   }
 
   Future<void> _handleMicLongPress() async {
@@ -611,7 +675,42 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
-    _editorKey.currentState?.insertRecognizedText(recognizedWords);
+    _insertRecognizedText(recognizedWords);
+  }
+
+  void _insertRecognizedText(String dictatedText) {
+    final normalizedText = dictatedText.trim();
+    if (normalizedText.isEmpty) {
+      return;
+    }
+
+    final selection = _contentController.selection;
+    final currentText = _contentController.text;
+    final canInsertAtCursor = !_isPreviewMode &&
+        _contentFocusNode.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end >= 0;
+
+    if (canInsertAtCursor) {
+      final before = currentText.substring(0, selection.start);
+      final after = currentText.substring(selection.end);
+      final middle = _dictatedTextOnOwnLine(before, after, normalizedText);
+      final updatedText = before + middle + after;
+      final nextOffset = before.length + middle.length;
+      _contentController.value = TextEditingValue(
+        text: updatedText,
+        selection: TextSelection.collapsed(offset: nextOffset),
+      );
+      return;
+    }
+
+    final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
+    final updatedText = currentText + middle;
+    _contentController.value = TextEditingValue(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: updatedText.length),
+    );
   }
 
   void _showSpeechUnavailableMessage() {
@@ -660,18 +759,30 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
+    if (isPreviewMode) {
+      _contentFocusNode.unfocus();
+    }
     setState(() {
       _isPreviewMode = isPreviewMode;
     });
     _persistEditorState();
   }
 
+  void _togglePreviewMode() {
+    final nextMode = !_isPreviewMode;
+    _handlePreviewModeChanged(nextMode);
+
+    if (!nextMode) {
+      _contentFocusNode.requestFocus();
+    }
+  }
+
   Future<void> _persistEditorState() async {
-    await context.read<IdeasProvider>().saveEditorState(
-          ideaId: widget.ideaId,
-          activeSectionId: _activeSectionId,
-          isPreviewMode: _isPreviewMode,
-        );
+    await _ideasProvider.saveEditorState(
+      ideaId: _savedIdeaId,
+      activeSectionId: _activeSectionId,
+      isPreviewMode: _isPreviewMode,
+    );
   }
 
   Future<void> _showAddSectionSheet() async {
@@ -702,6 +813,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       };
       _activeSectionId = newSection.id;
     });
+    _replaceEditorContent(newSection.content);
+    _scheduleAutosave();
     _persistEditorState();
   }
 
@@ -744,6 +857,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             candidate,
       ];
     });
+    _scheduleAutosave();
     _persistEditorState();
   }
 
@@ -903,6 +1017,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 (currentIndex - 1).clamp(0, remainingSections.length - 1)]
             .id
         : _activeSectionId;
+    final nextContent = _sectionContentById[nextActiveSectionId] ?? '';
 
     setState(() {
       _sections = remainingSections;
@@ -912,6 +1027,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       };
       _activeSectionId = nextActiveSectionId;
     });
+    _replaceEditorContent(nextContent);
+    _scheduleAutosave();
     _persistEditorState();
   }
 
@@ -926,109 +1043,136 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
     setState(() {});
+    _scheduleAutosave();
   }
 
-  Future<void> _onSavePressed() async {
-    if (_titleController.text.trim().isEmpty) {
+  Future<void> _onClosePressed() async {
+    await _closeEditor();
+  }
+
+  void _scheduleAutosave() {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(_autosaveDelay, () {
+      unawaited(_flushAutosave());
+    });
+  }
+
+  Future<void> _flushAutosave({
+    bool updateUi = true,
+    bool force = false,
+  }) {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = null;
+
+    final inFlightSave = _saveInFlight;
+    if (inFlightSave != null) {
+      return inFlightSave.then(
+        (_) => _flushAutosave(updateUi: updateUi, force: force),
+      );
+    }
+
+    if (!force && !_hasUnsavedChanges && !_hasSaveFailed) {
+      return Future<void>.value();
+    }
+
+    final snapshot = _snapshot();
+    final saveFuture = _performAutosave(snapshot, updateUi: updateUi);
+    _saveInFlight = saveFuture;
+    return saveFuture.whenComplete(() {
+      if (identical(_saveInFlight, saveFuture)) {
+        _saveInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _performAutosave(
+    String snapshot, {
+    required bool updateUi,
+  }) async {
+    if (updateUi && mounted) {
       setState(() {
-        _showTitleError = true;
+        _isAutosaving = true;
       });
-      _titleFocusNode.requestFocus();
+    } else {
+      _isAutosaving = true;
+    }
+
+    try {
+      final savedIdea = await _ideasProvider.saveIdea(
+        ideaId: _savedIdeaId,
+        title: _autosaveTitle,
+        sections: _sectionsToSave(),
+      );
+
+      if (savedIdea == null) {
+        _setAutosaveFailed(updateUi);
+        return;
+      }
+
+      _savedIdeaId = savedIdea.id;
+      _lastSavedSnapshot = snapshot;
+      await _persistEditorState();
+
+      if (updateUi && mounted) {
+        setState(() {
+          _isAutosaving = false;
+          _hasSaveFailed = false;
+        });
+      } else {
+        _isAutosaving = false;
+        _hasSaveFailed = false;
+      }
+    } catch (_) {
+      _setAutosaveFailed(updateUi);
+    }
+  }
+
+  void _setAutosaveFailed(bool updateUi) {
+    if (updateUi && mounted) {
+      setState(() {
+        _isAutosaving = false;
+        _hasSaveFailed = true;
+      });
       return;
     }
 
-    setState(() {
-      _showTitleError = false;
-      _isSaving = true;
-    });
+    _isAutosaving = false;
+    _hasSaveFailed = true;
+  }
 
-    final ideasProvider = context.read<IdeasProvider>();
-    final sectionsToSave = _sections
+  String get _autosaveTitle {
+    final title = _titleController.text.trim();
+    return title.isEmpty ? _untitledIdeaTitle : title;
+  }
+
+  List<IdeaSection> _sectionsToSave() {
+    return _sections
         .map(
           (section) => section.copyWith(
             content: _sectionContentById[section.id] ?? '',
           ),
         )
         .toList();
+  }
 
-    final savedIdea = await ideasProvider.saveIdea(
-      ideaId: widget.ideaId,
-      title: _titleController.text,
-      sections: sectionsToSave,
-    );
-
+  Future<void> _closeEditor() async {
+    await _flushAutosave();
     if (!mounted) {
       return;
     }
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    if (savedIdea == null) {
-      if (_titleController.text.trim().isEmpty) {
-        setState(() {
-          _showTitleError = true;
-        });
-        _titleFocusNode.requestFocus();
-      }
+    await _ideasProvider.clearEditorState();
+    if (!mounted) {
       return;
     }
-
-    _initialSnapshot = _snapshot();
-    await _prepareForExit();
-    if (mounted) {
-      AppRouter.pop(context, savedIdea.id);
-    }
-  }
-
-  Future<void> _onClosePressed() async {
-    final shouldClose = await _handleCloseRequest();
-    if (shouldClose && mounted) {
-      await _prepareForExit();
-      if (mounted) {
-        AppRouter.pop(context);
+    setState(() {
+      _allowPop = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
       }
-    }
-  }
-
-  Future<bool> _handleCloseRequest() async {
-    if (!_hasUnsavedChanges) {
-      return true;
-    }
-
-    final discardChanges = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Discard changes?'),
-          content: const Text(
-            'You have unsaved edits in this idea. Leaving now will lose them.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Keep editing'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Discard'),
-            ),
-          ],
-        );
-      },
-    );
-
-    return discardChanges ?? false;
-  }
-
-  Future<void> _prepareForExit() async {
-    if (mounted && !_allowPop) {
-      setState(() {
-        _allowPop = true;
-      });
-    }
-    await context.read<IdeasProvider>().clearEditorState();
+      AppRouter.pop(context, _savedIdeaId);
+    });
   }
 
   String _snapshot() {
@@ -1049,17 +1193,64 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 }
 
+/// Builds the dictated chunk so it always starts on its own line.
+String _dictatedTextOnOwnLine(String before, String after, String dictated) {
+  if (before.isEmpty && after.isEmpty) {
+    return dictated;
+  }
+  if (before.isEmpty && after.isNotEmpty) {
+    return '$dictated\n';
+  }
+  if (before.isNotEmpty && !before.endsWith('\n')) {
+    return '\n$dictated';
+  }
+  return dictated;
+}
+
+class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _PinnedHeaderDelegate({
+    required this.extent,
+    required this.child,
+  });
+
+  static const sectionTabsExtent = 46.0;
+  static const toolbarExtent = 62.0;
+
+  final double extent;
+  final Widget child;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedHeaderDelegate oldDelegate) {
+    return extent != oldDelegate.extent || child != oldDelegate.child;
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
-    required this.onSave,
-    required this.isSaving,
+    required this.isAutosaving,
+    required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
-  final VoidCallback? onSave;
-  final bool isSaving;
+  final bool isAutosaving;
+  final bool hasSaveFailed;
   final bool isEditingExisting;
 
   @override
@@ -1089,21 +1280,37 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        FilledButton(
-          key: const Key('idea-editor-save'),
-          onPressed: onSave,
-          style: FilledButton.styleFrom(
-            backgroundColor: theme.primary,
-            foregroundColor: theme.onPrimary,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          ),
-          child: Text(
-            isSaving ? 'Saving...' : 'Save',
-            style: ideaVaultLabel(
-              context,
-              size: 14,
-              weight: FontWeight.w700,
-              color: theme.onPrimary,
+        SizedBox(
+          width: 92,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: hasSaveFailed
+                  ? Text(
+                      'Save failed',
+                      key: const Key('idea-editor-save-failed'),
+                      textAlign: TextAlign.right,
+                      style: ideaVaultLabel(
+                        context,
+                        size: 12,
+                        weight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    )
+                  : isAutosaving
+                      ? Text(
+                          'Saving...',
+                          key: const Key('idea-editor-saving'),
+                          textAlign: TextAlign.right,
+                          style: ideaVaultLabel(
+                            context,
+                            size: 12,
+                            weight: FontWeight.w700,
+                            color: theme.textMuted,
+                          ),
+                        )
+                      : const SizedBox.shrink(),
             ),
           ),
         ),

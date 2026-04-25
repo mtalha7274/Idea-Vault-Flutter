@@ -7,212 +7,105 @@ import 'package:provider/provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
-class IdeaMarkdownEditor extends StatefulWidget {
+class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
     super.key,
-    required this.initialValue,
-    required this.onChanged,
+    required this.controller,
+    required this.focusNode,
     required this.placeholder,
-    required this.initialPreviewMode,
-    required this.onPreviewModeChanged,
+    required this.isPreviewMode,
   });
 
-  final String initialValue;
-  final ValueChanged<String> onChanged;
+  final TextEditingController controller;
+  final FocusNode focusNode;
   final String placeholder;
-  final bool initialPreviewMode;
-  final ValueChanged<bool> onPreviewModeChanged;
-
-  @override
-  State<IdeaMarkdownEditor> createState() => IdeaMarkdownEditorState();
-}
-
-class IdeaMarkdownEditorState extends State<IdeaMarkdownEditor> {
-  late final TextEditingController _controller;
-  late final FocusNode _focusNode;
-  late bool isPreviewMode;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-    _focusNode = FocusNode();
-    isPreviewMode = widget.initialPreviewMode;
-    _controller.addListener(_handleTextChanged);
-  }
-
-  @override
-  void didUpdateWidget(covariant IdeaMarkdownEditor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != _controller.text &&
-        widget.initialValue != oldWidget.initialValue) {
-      final cursorOffset = math.min(
-        widget.initialValue.length,
-        math.max(0, _controller.selection.extentOffset),
-      );
-      _controller.value = TextEditingValue(
-        text: widget.initialValue,
-        selection: TextSelection.collapsed(offset: cursorOffset),
-      );
-    }
-
-    if (widget.initialPreviewMode != oldWidget.initialPreviewMode &&
-        widget.initialPreviewMode != isPreviewMode) {
-      setState(() {
-        isPreviewMode = widget.initialPreviewMode;
-      });
-
-      if (isPreviewMode) {
-        _focusNode.unfocus();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller
-      ..removeListener(_handleTextChanged)
-      ..dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
+  final bool isPreviewMode;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return Column(
-      children: [
-        Expanded(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.surface,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  IdeaEditorToolbar(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    isPreviewMode: isPreviewMode,
-                    onPreviewToggle: _togglePreviewMode,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surface,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+        child: isPreviewMode
+            ? ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) {
+                  return _PreviewPane(
+                    markdown: value.text,
+                    placeholder: placeholder,
+                  );
+                },
+              )
+            : TextField(
+                key: const Key('idea-markdown-text-field'),
+                controller: controller,
+                focusNode: focusNode,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                keyboardType: TextInputType.multiline,
+                textCapitalization: TextCapitalization.sentences,
+                scrollPhysics: const NeverScrollableScrollPhysics(),
+                style: ideaVaultBody(
+                  context,
+                  size: 18,
+                  weight: FontWeight.w500,
+                  color: theme.primaryText,
+                  height: 1.72,
+                ),
+                decoration: InputDecoration(
+                  hintText: placeholder,
+                  hintStyle: ideaVaultBody(
+                    context,
+                    size: 18,
+                    weight: FontWeight.w500,
+                    color: theme.outline,
+                    height: 1.72,
                   ),
-                  const SizedBox(height: 14),
-                  Expanded(
-                    child: isPreviewMode
-                        ? _PreviewPane(
-                            markdown: _controller.text,
-                            placeholder: widget.placeholder,
-                          )
-                        : TextField(
-                            key: const Key('idea-markdown-text-field'),
-                            controller: _controller,
-                            focusNode: _focusNode,
-                            expands: true,
-                            minLines: null,
-                            maxLines: null,
-                            textAlignVertical: TextAlignVertical.top,
-                            keyboardType: TextInputType.multiline,
-                            textCapitalization: TextCapitalization.sentences,
-                            style: ideaVaultBody(
-                              context,
-                              size: 18,
-                              weight: FontWeight.w500,
-                              color: theme.primaryText,
-                              height: 1.72,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: widget.placeholder,
-                              hintStyle: ideaVaultBody(
-                                context,
-                                size: 18,
-                                weight: FontWeight.w500,
-                                color: theme.outline,
-                                height: 1.72,
-                              ),
-                              border: InputBorder.none,
-                              isCollapsed: true,
-                            ),
-                          ),
-                  ),
-                ],
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                ),
               ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
-  }
-
-  void _handleTextChanged() {
-    widget.onChanged(_controller.text);
-  }
-
-  void insertRecognizedText(String dictatedText) {
-    final normalizedText = dictatedText.trim();
-    if (normalizedText.isEmpty) {
-      return;
-    }
-
-    final selection = _controller.selection;
-    final currentText = _controller.text;
-    final canInsertAtCursor = !isPreviewMode &&
-        _focusNode.hasFocus &&
-        selection.isValid &&
-        selection.start >= 0 &&
-        selection.end >= 0;
-
-    if (canInsertAtCursor) {
-      final before = currentText.substring(0, selection.start);
-      final after = currentText.substring(selection.end);
-      final middle = _dictatedTextOnOwnLine(before, after, normalizedText);
-      final updatedText = before + middle + after;
-      final nextOffset = before.length + middle.length;
-      _controller.value = TextEditingValue(
-        text: updatedText,
-        selection: TextSelection.collapsed(offset: nextOffset),
-      );
-      return;
-    }
-
-    final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
-    final updatedText = currentText + middle;
-    _controller.value = TextEditingValue(
-      text: updatedText,
-      selection: TextSelection.collapsed(offset: updatedText.length),
-    );
-  }
-
-  void _togglePreviewMode() {
-    final nextMode = !isPreviewMode;
-    setState(() {
-      isPreviewMode = nextMode;
-    });
-    widget.onPreviewModeChanged(nextMode);
-
-    if (nextMode) {
-      _focusNode.unfocus();
-    } else {
-      _focusNode.requestFocus();
-    }
   }
 }
 
-/// Builds the dictated chunk so it always starts on its own line.
-///
-/// [before] and [after] are the document segments around the insertion point.
-String _dictatedTextOnOwnLine(String before, String after, String dictated) {
-  if (before.isEmpty && after.isEmpty) {
-    return dictated;
+class IdeaEditorToolbarContainer extends StatelessWidget {
+  const IdeaEditorToolbarContainer({
+    super.key,
+    required this.controller,
+    required this.focusNode,
+    required this.isPreviewMode,
+    required this.onPreviewToggle,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool isPreviewMode;
+  final VoidCallback onPreviewToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surface,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+        child: IdeaEditorToolbar(
+          controller: controller,
+          focusNode: focusNode,
+          isPreviewMode: isPreviewMode,
+          onPreviewToggle: onPreviewToggle,
+        ),
+      ),
+    );
   }
-  if (before.isEmpty && after.isNotEmpty) {
-    return '$dictated\n';
-  }
-  if (before.isNotEmpty && !before.endsWith('\n')) {
-    return '\n$dictated';
-  }
-  return dictated;
 }
 
 class IdeaEditorToolbar extends StatelessWidget {
@@ -351,25 +244,43 @@ class _PreviewPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final bodyStyle = ideaVaultBody(
+      context,
+      size: 18,
+      weight: FontWeight.w500,
+      color: theme.primaryText,
+      height: 1.72,
+    );
     if (markdown.trim().isEmpty) {
-      final theme = context.watch<ThemeProvider>().baseTheme;
       return Align(
         alignment: Alignment.topLeft,
         child: Text(
           placeholder,
-          style: ideaVaultBody(
-            context,
-            size: 18,
-            weight: FontWeight.w500,
-            color: theme.outline,
-            height: 1.72,
-          ),
+          style: bodyStyle.copyWith(color: theme.outline),
         ),
       );
     }
 
-    return MarkdownWidget(
+    return MarkdownBlock(
       data: markdown,
+      config: _previewMarkdownConfig(bodyStyle),
+    );
+  }
+
+  MarkdownConfig _previewMarkdownConfig(TextStyle bodyStyle) {
+    final headingStyle = bodyStyle.copyWith(fontWeight: FontWeight.w700);
+
+    return MarkdownConfig(
+      configs: [
+        PConfig(textStyle: bodyStyle),
+        H1Config(style: headingStyle),
+        H2Config(style: headingStyle),
+        H3Config(style: headingStyle),
+        H4Config(style: headingStyle),
+        H5Config(style: headingStyle),
+        H6Config(style: headingStyle),
+      ],
     );
   }
 }
@@ -391,9 +302,8 @@ class _ToolbarIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final foregroundColor = enabled
-        ? theme.primary
-        : theme.textMuted.withValues(alpha: 0.55);
+    final foregroundColor =
+        enabled ? theme.primary : theme.textMuted.withValues(alpha: 0.55);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),

@@ -91,9 +91,10 @@ class IdeasProvider with ChangeNotifier {
       sections: normalizedSections,
     );
 
+    await _ideasRepo.upsertIdea(savedIdea);
+
     final existingIndex =
         _ideas.indexWhere((storedIdea) => storedIdea.id == savedIdea.id);
-
     if (existingIndex == -1) {
       _ideas = _sortIdeas([..._ideas, savedIdea]);
     } else {
@@ -102,7 +103,6 @@ class IdeasProvider with ChangeNotifier {
       _ideas = _sortIdeas(nextIdeas);
     }
 
-    await _ideasRepo.upsertIdea(savedIdea);
     notifyListeners();
     return savedIdea;
   }

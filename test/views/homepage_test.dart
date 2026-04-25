@@ -46,6 +46,11 @@ void main() {
     }
 
     Future<void> settlePersistenceAction(WidgetTester tester) async {
+      await settleUi(tester);
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await settleUi(tester);
       await tester.runAsync(() async {
         await Future<void>.delayed(Duration.zero);
       });
@@ -88,10 +93,10 @@ void main() {
       await pumpIdeasApp(tester);
 
       await tester.tap(find.byKey(const Key('ideas-fab')));
-      await settleUi(tester);
+      await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
-      expect(find.byKey(const Key('idea-editor-save')), findsOneWidget);
+      expect(find.byKey(const Key('idea-editor-save')), findsNothing);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-mic-fab')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-add-section')), findsOneWidget);
@@ -100,15 +105,18 @@ void main() {
         find.byKey(const Key('idea-editor-title')),
       );
       expect(titleField.autofocus, isTrue);
+      expect(titleField.controller?.text, isEmpty);
+      expect(provider.ideas, hasLength(1));
+      expect(provider.ideas.single.title, 'Untitled Idea');
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
       );
       closeButton.onPressed!.call();
-      await settleUi(tester);
+      await settlePersistenceAction(tester);
     });
 
-    testWidgets('saves a new idea and returns to the list', (tester) async {
+    testWidgets('autosaves a new idea and returns to the list', (tester) async {
       await pumpIdeasApp(tester);
 
       await tester.tap(find.byKey(const Key('ideas-fab')));
@@ -123,10 +131,11 @@ void main() {
       );
       expect(titleField.controller?.text, 'Solar Rooftop Co-op');
 
-      final saveButton = tester.widget<FilledButton>(
-        find.byKey(const Key('idea-editor-save')),
+      await settlePersistenceAction(tester);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
       );
-      saveButton.onPressed!.call();
+      closeButton.onPressed!.call();
       await settlePersistenceAction(tester);
 
       expect(find.text('Solar Rooftop Co-op'), findsOneWidget);
@@ -134,20 +143,24 @@ void main() {
       expect(provider.ideas, hasLength(1));
     });
 
-    testWidgets('requires a title before saving a new idea', (tester) async {
+    testWidgets('autosaves an untitled draft when title is empty',
+        (tester) async {
       await pumpIdeasApp(tester);
 
       await tester.tap(find.byKey(const Key('ideas-fab')));
       await settleUi(tester);
-
-      final saveButton = tester.widget<FilledButton>(
-        find.byKey(const Key('idea-editor-save')),
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        'A title can come later.',
       );
-      saveButton.onPressed!.call();
-      await settleUi(tester);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
 
-      expect(find.text('Please add a title before saving'), findsOneWidget);
-      expect(provider.ideas, isEmpty);
+      expect(provider.ideas, hasLength(1));
+      expect(provider.ideas.single.title, 'Untitled Idea');
     });
 
     testWidgets('opens an existing idea with populated data', (tester) async {
@@ -177,7 +190,7 @@ void main() {
       await settleUi(tester);
     });
 
-    testWidgets('adds a custom section and persists it after save',
+    testWidgets('adds a custom section and persists it after autosave',
         (tester) async {
       await pumpIdeasApp(tester);
 
@@ -199,10 +212,12 @@ void main() {
 
       expect(find.text('Notes'), findsOneWidget);
 
-      final saveButton = tester.widget<FilledButton>(
-        find.byKey(const Key('idea-editor-save')),
+      await settlePersistenceAction(tester);
+
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
       );
-      saveButton.onPressed!.call();
+      closeButton.onPressed!.call();
       await settlePersistenceAction(tester);
 
       await tester.tap(find.text('Audio journal prompts'));
@@ -211,10 +226,10 @@ void main() {
       expect(find.text('Notes'), findsOneWidget);
       expect(provider.ideas.first.sections, hasLength(2));
 
-      final closeButton = tester.widget<IconButton>(
+      final reopenedCloseButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
       );
-      closeButton.onPressed!.call();
+      reopenedCloseButton.onPressed!.call();
       await settleUi(tester);
     });
 
@@ -256,15 +271,14 @@ void main() {
 
       await tester.tap(find.byKey(const Key('idea-markdown-preview-toggle')));
       await settleUi(tester);
-      expect(find.byType(MarkdownWidget), findsOneWidget);
+      expect(find.byType(MarkdownBlock), findsOneWidget);
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
       );
       closeButton.onPressed!.call();
-      await settleUi(tester);
-      await tester.tap(find.text('Discard'));
-      await settleUi(tester);
+      await settlePersistenceAction(tester);
+      expect(find.text('Discard changes?'), findsNothing);
     });
 
     testWidgets('shows tooltips for toolbar actions', (tester) async {
@@ -493,8 +507,7 @@ void main() {
       expect(find.text('Idea'), findsOneWidget);
     });
 
-    testWidgets('shows a discard dialog when closing a dirty draft',
-        (tester) async {
+    testWidgets('flushes autosave when closing a dirty draft', (tester) async {
       await pumpIdeasApp(tester);
 
       await tester.tap(find.byKey(const Key('ideas-fab')));
@@ -508,20 +521,78 @@ void main() {
         find.byKey(const Key('idea-editor-close')),
       );
       closeButton.onPressed!.call();
-      await settleUi(tester);
+      await settlePersistenceAction(tester);
 
-      expect(find.text('Discard changes?'), findsOneWidget);
-      expect(find.text('Keep editing'), findsOneWidget);
+      expect(find.text('Discard changes?'), findsNothing);
+      expect(find.text('Unsaved concept'), findsOneWidget);
+      expect(provider.ideas.single.title, 'Unsaved concept');
+    });
 
-      await tester.tap(find.text('Keep editing'));
+    testWidgets('flushes autosave when the app is paused', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
       await settleUi(tester);
-      final closeButtonAgain = tester.widget<IconButton>(
-        find.byKey(const Key('idea-editor-close')),
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-title')),
+        'Background save',
       );
-      closeButtonAgain.onPressed!.call();
-      await settleUi(tester);
-      await tester.tap(find.text('Discard'));
-      await settleUi(tester);
+      await tester.pump();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await settlePersistenceAction(tester);
+
+      expect(provider.ideas.single.title, 'Background save');
+    });
+
+    testWidgets('shows and clears save failed indicator', (tester) async {
+      final failingRepo = _FailingIdeasRepo();
+      provider = IdeasProvider(
+        failingRepo,
+        IdeaEditorStateRepo(storage),
+      );
+      await provider.ensureLoaded();
+
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settlePersistenceAction(tester);
+      expect(provider.ideas.single.title, 'Untitled Idea');
+
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-title')),
+        'Failure visible',
+      );
+      await tester.pump();
+
+      failingRepo.failWrites = true;
+      await settlePersistenceAction(tester);
+
+      expect(find.byKey(const Key('idea-editor-save-failed')), findsOneWidget);
+      expect(provider.ideas.single.title, 'Untitled Idea');
+
+      failingRepo.failWrites = false;
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-title')),
+        'Failure recovered',
+      );
+      await tester.pump();
+      await settlePersistenceAction(tester);
+
+      expect(find.byKey(const Key('idea-editor-save-failed')), findsNothing);
+      expect(provider.ideas.single.title, 'Failure recovered');
     });
   });
+}
+
+class _FailingIdeasRepo extends InMemoryIdeasRepo {
+  bool failWrites = false;
+
+  @override
+  Future<void> upsertIdea(Idea idea) async {
+    if (failWrites) {
+      throw StateError('sqlite write failed');
+    }
+    await super.upsertIdea(idea);
+  }
 }
