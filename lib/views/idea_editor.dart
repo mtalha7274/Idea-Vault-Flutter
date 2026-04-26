@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -60,6 +61,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isMicPressHeld = false;
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
+  String _partialSpeechText = '';
+  int _lastInsertedSpeechOffset = 0;
 
   @override
   void initState() {
@@ -91,16 +94,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _contentFocusNode = FocusNode();
     _micScaleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 100),
     );
     _micGlowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
     );
-    _micScaleAnimation = Tween<double>(begin: 1, end: 1.38).animate(
+    _micScaleAnimation = Tween<double>(begin: 1, end: 1.65).animate(
       CurvedAnimation(
         parent: _micScaleController,
-        curve: Curves.easeInOut,
+        curve: Curves.easeOutBack,
       ),
     );
     _titleController.addListener(_handleDraftChanged);
@@ -319,11 +322,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             AnimatedSlide(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeInOut,
-              offset: _isListening ? Offset.zero : const Offset(0, 0.18),
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              offset: _isListening ? Offset.zero : const Offset(0, 0.3),
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 160),
                 opacity: _isListening ? 1 : 0,
                 child: IgnorePointer(
                   ignoring: !_isListening,
@@ -335,8 +338,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                       borderRadius: BorderRadius.circular(999),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.12),
-                          blurRadius: 18,
+                          color: primaryColor.withValues(alpha: 0.15),
+                          blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
                       ],
@@ -355,7 +358,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             GestureDetector(
               key: const Key('idea-editor-mic-fab'),
               behavior: HitTestBehavior.opaque,
@@ -366,10 +369,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 child: AnimatedBuilder(
                   animation: _micGlowController,
                   builder: (context, child) {
-                    final glowOpacity = 0.14 + (_micGlowController.value * 0.18);
+                    final glowOpacity = 0.16 + (_micGlowController.value * 0.22);
+                    final glowRadius = 32.0 + (_micGlowController.value * 12.0);
                     return AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeInOut,
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOutCubic,
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -378,8 +382,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                                 BoxShadow(
                                   color:
                                       primaryColor.withValues(alpha: glowOpacity),
-                                  blurRadius: 28,
-                                  spreadRadius: 2,
+                                  blurRadius: glowRadius,
+                                  spreadRadius: 3,
                                 ),
                               ]
                             : const [],
@@ -391,9 +395,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                     child: FloatingActionButton(
                       heroTag: 'idea-editor-mic-fab',
                       onPressed: () {},
+                      elevation: _isListening ? 8 : 6,
                       backgroundColor: primaryColor,
                       foregroundColor: theme.onPrimary,
-                      child: Icon(_isListening ? Icons.mic_none : Icons.mic),
+                      child: Icon(
+                        _isListening ? Icons.mic_none : Icons.mic,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),
@@ -547,8 +555,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
 
     _isMicPressHeld = true;
-    await _micScaleController.forward();
-
+    
+    HapticFeedback.mediumImpact();
+    SystemSound.play(SystemSoundType.click);
+    
+    _micScaleController.forward();
+    
     final hasPermission = await _ensureSpeechPermission();
     if (!hasPermission || !_isMicPressHeld || !mounted) {
       await _setListeningState(false);
@@ -564,10 +576,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
+    _partialSpeechText = '';
+    _lastInsertedSpeechOffset = _contentController.selection.start;
+
     await _speechToText.listen(
       onResult: _handleSpeechResult,
       listenOptions: SpeechListenOptions(
-        partialResults: false,
+        partialResults: true,
         cancelOnError: true,
         listenMode: ListenMode.dictation,
       ),
@@ -583,7 +598,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Future<void> _handleMicLongPressEnd() async {
     _isMicPressHeld = false;
+    if (_isListening) {
+      HapticFeedback.lightImpact();
+    }
     await _stopListening();
+    _partialSpeechText = '';
+    _lastInsertedSpeechOffset = 0;
   }
 
   Future<bool> _ensureSpeechPermission() async {
@@ -641,7 +661,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _micGlowController
       ..stop()
       ..reset();
-    await _micScaleController.reverse();
+    _micScaleController.reverse();
   }
 
   Future<void> _stopListening() async {
@@ -684,19 +704,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   void _handleSpeechResult(SpeechRecognitionResult result) {
-    if (!result.finalResult) {
-      return;
-    }
-
     final recognizedWords = result.recognizedWords.trim();
     if (recognizedWords.isEmpty) {
       return;
     }
 
-    _insertRecognizedText(recognizedWords);
+    if (result.finalResult) {
+      _insertRecognizedText(recognizedWords, isFinal: true);
+      _partialSpeechText = '';
+    } else {
+      _insertRecognizedText(recognizedWords, isFinal: false);
+    }
   }
 
-  void _insertRecognizedText(String dictatedText) {
+  void _insertRecognizedText(String dictatedText, {required bool isFinal}) {
     final normalizedText = dictatedText.trim();
     if (normalizedText.isEmpty) {
       return;
@@ -710,25 +731,44 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         selection.start >= 0 &&
         selection.end >= 0;
 
-    if (canInsertAtCursor) {
-      final before = currentText.substring(0, selection.start);
-      final after = currentText.substring(selection.end);
-      final middle = _dictatedTextOnOwnLine(before, after, normalizedText);
-      final updatedText = before + middle + after;
-      final nextOffset = before.length + middle.length;
-      _contentController.value = TextEditingValue(
-        text: updatedText,
-        selection: TextSelection.collapsed(offset: nextOffset),
-      );
+    if (!canInsertAtCursor) {
+      if (isFinal) {
+        final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
+        final updatedText = currentText + middle;
+        _contentController.value = TextEditingValue(
+          text: updatedText,
+          selection: TextSelection.collapsed(offset: updatedText.length),
+        );
+        _lastInsertedSpeechOffset = updatedText.length;
+      }
       return;
     }
 
-    final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
-    final updatedText = currentText + middle;
+    final before = currentText.substring(0, _lastInsertedSpeechOffset);
+    final after = currentText.substring(
+      _lastInsertedSpeechOffset + _partialSpeechText.length,
+    );
+
+    final middle = _dictatedTextOnOwnLine(
+      before,
+      after,
+      normalizedText,
+    );
+    
+    final updatedText = before + middle + after;
+    final nextOffset = before.length + middle.length;
+
     _contentController.value = TextEditingValue(
       text: updatedText,
-      selection: TextSelection.collapsed(offset: updatedText.length),
+      selection: TextSelection.collapsed(offset: nextOffset),
     );
+
+    if (isFinal) {
+      _lastInsertedSpeechOffset = nextOffset;
+      _partialSpeechText = '';
+    } else {
+      _partialSpeechText = middle;
+    }
   }
 
   void _showSpeechUnavailableMessage() {
