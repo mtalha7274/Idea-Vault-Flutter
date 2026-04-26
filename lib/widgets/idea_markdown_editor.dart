@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -51,6 +52,7 @@ class IdeaMarkdownEditor extends StatelessWidget {
                 keyboardType: TextInputType.multiline,
                 textCapitalization: TextCapitalization.sentences,
                 scrollPhysics: const NeverScrollableScrollPhysics(),
+                inputFormatters: [_BulletListFormatter()],
                 style: ideaVaultBody(
                   context,
                   size: _editorBodyTextSize,
@@ -191,27 +193,43 @@ class IdeaEditorToolbar extends StatelessWidget {
     final selection = value.selection;
 
     if (linePrefix) {
-      final cursorOffset = selection.start < 0 ? text.length : selection.start;
-      final lineBreakIndex =
-          text.lastIndexOf('\n', cursorOffset == 0 ? 0 : cursorOffset - 1);
-      final lineStart = lineBreakIndex == -1 ? 0 : lineBreakIndex + 1;
-      final hasPrefix = text.startsWith(prefix, lineStart);
-      final updatedText = hasPrefix
-          ? text.replaceRange(lineStart, lineStart + prefix.length, '')
-          : text.replaceRange(lineStart, lineStart, prefix);
-      final offsetDelta = hasPrefix ? -prefix.length : prefix.length;
-      final baseOffset = selection.baseOffset >= lineStart
-          ? selection.baseOffset + offsetDelta
-          : selection.baseOffset;
-      final extentOffset = selection.extentOffset >= lineStart
-          ? selection.extentOffset + offsetDelta
-          : selection.extentOffset;
-
+      final start = selection.start < 0 ? text.length : selection.start;
+      final end = selection.end < 0 ? text.length : selection.end;
+      
+      final lineStartIndex =
+          text.lastIndexOf('\n', start == 0 ? 0 : start - 1);
+      final lineStart = lineStartIndex == -1 ? 0 : lineStartIndex + 1;
+      
+      final lineEndIndex = end < text.length ? text.indexOf('\n', end) : -1;
+      final lineEnd = lineEndIndex == -1 ? text.length : lineEndIndex;
+      
+      final selectedLines = text.substring(lineStart, lineEnd);
+      final lines = selectedLines.split('\n');
+      
+      final allHavePrefix = lines.every((line) => line.startsWith(prefix));
+      
+      final transformedLines = lines.map((line) {
+        if (allHavePrefix) {
+          return line.startsWith(prefix)
+              ? line.substring(prefix.length)
+              : line;
+        } else {
+          return line.startsWith(prefix) ? line : '$prefix$line';
+        }
+      }).toList();
+      
+      final transformedText = transformedLines.join('\n');
+      final updatedText = text.replaceRange(lineStart, lineEnd, transformedText);
+      
+      final offsetDelta = allHavePrefix ? -prefix.length : prefix.length;
+      final newStart = start + (start >= lineStart ? offsetDelta : 0);
+      final newEnd = end + (lines.length * offsetDelta);
+      
       controller.value = TextEditingValue(
         text: updatedText,
         selection: TextSelection(
-          baseOffset: math.max(0, math.min(updatedText.length, baseOffset)),
-          extentOffset: math.max(0, math.min(updatedText.length, extentOffset)),
+          baseOffset: math.max(0, math.min(updatedText.length, newStart)),
+          extentOffset: math.max(0, math.min(updatedText.length, newEnd)),
         ),
       );
       focusNode.requestFocus();
@@ -264,38 +282,40 @@ class _PreviewPane extends StatelessWidget {
       );
     }
 
+    final preservedMarkdown = markdown.replaceAll('\n\n', '\n\u200B\n');
+
     return MarkdownBlock(
-      data: markdown,
+      data: preservedMarkdown,
       config: _previewMarkdownConfig(bodyStyle),
       generator: MarkdownGenerator(linesMargin: EdgeInsets.zero),
     );
   }
 
   MarkdownConfig _previewMarkdownConfig(TextStyle bodyStyle) {
-    final headingStyle = bodyStyle.copyWith(fontWeight: FontWeight.w700);
-
     return MarkdownConfig(
       configs: [
         PConfig(textStyle: bodyStyle),
-        _PreviewHeadingConfig(MarkdownTag.h1.name, headingStyle),
-        _PreviewHeadingConfig(MarkdownTag.h2.name, headingStyle),
-        _PreviewHeadingConfig(MarkdownTag.h3.name, headingStyle),
-        _PreviewHeadingConfig(MarkdownTag.h4.name, headingStyle),
-        _PreviewHeadingConfig(MarkdownTag.h5.name, headingStyle),
-        _PreviewHeadingConfig(MarkdownTag.h6.name, headingStyle),
+        _PreviewHeadingConfig(MarkdownTag.h1.name, bodyStyle),
+        _PreviewHeadingConfig(MarkdownTag.h2.name, bodyStyle),
+        _PreviewHeadingConfig(MarkdownTag.h3.name, bodyStyle),
+        _PreviewHeadingConfig(MarkdownTag.h4.name, bodyStyle),
+        _PreviewHeadingConfig(MarkdownTag.h5.name, bodyStyle),
+        _PreviewHeadingConfig(MarkdownTag.h6.name, bodyStyle),
       ],
     );
   }
 }
 
 class _PreviewHeadingConfig extends HeadingConfig {
-  const _PreviewHeadingConfig(this.tag, this.style);
+  const _PreviewHeadingConfig(this.tag, this.baseStyle);
 
   @override
   final String tag;
 
+  final TextStyle baseStyle;
+
   @override
-  final TextStyle style;
+  TextStyle get style => baseStyle.copyWith(fontWeight: FontWeight.w700);
 
   @override
   EdgeInsets get padding => EdgeInsets.zero;
@@ -337,6 +357,75 @@ class _ToolbarIconButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BulletListFormatter extends TextInputFormatter {
+  static final _bulletPattern = RegExp(r'^(\s*)(- )(.*)$');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (oldValue.text == newValue.text) {
+      return newValue;
+    }
+
+    final oldText = oldValue.text;
+    final newText = newValue.text;
+
+    if (newText.length <= oldText.length) {
+      return newValue;
+    }
+
+    final insertedText = newText.substring(
+      oldValue.selection.start,
+      oldValue.selection.start + (newText.length - oldText.length),
+    );
+
+    if (insertedText != '\n') {
+      return newValue;
+    }
+
+    final cursorOffset = oldValue.selection.start;
+    final lineStart = newText.lastIndexOf('\n', cursorOffset - 1) + 1;
+    final lineEnd = newText.indexOf('\n', cursorOffset);
+    final actualLineEnd = lineEnd == -1 ? newText.length : lineEnd;
+    final previousLine = newText.substring(lineStart, cursorOffset);
+
+    final match = _bulletPattern.firstMatch(previousLine);
+    if (match == null) {
+      return newValue;
+    }
+
+    final indent = match.group(1) ?? '';
+    final bullet = match.group(2) ?? '';
+    final content = match.group(3) ?? '';
+
+    if (content.trim().isEmpty) {
+      final beforeBullet = newText.substring(0, lineStart);
+      final afterLine = actualLineEnd < newText.length
+          ? newText.substring(actualLineEnd)
+          : '';
+      final updatedText = beforeBullet + afterLine;
+      final newCursor = lineStart;
+
+      return TextEditingValue(
+        text: updatedText,
+        selection: TextSelection.collapsed(offset: newCursor),
+      );
+    }
+
+    final beforeCursor = newText.substring(0, cursorOffset + 1);
+    final afterCursor = newText.substring(cursorOffset + 1);
+    final updatedText = '$beforeCursor$indent$bullet$afterCursor';
+    final newCursor = cursorOffset + 1 + indent.length + bullet.length;
+
+    return TextEditingValue(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: newCursor),
     );
   }
 }

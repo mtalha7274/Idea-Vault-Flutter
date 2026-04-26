@@ -303,93 +303,105 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   Widget _buildSpeechFab(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final primaryColor = theme.primary;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardVisible = keyboardHeight > 0;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        AnimatedSlide(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeInOut,
-          offset: _isListening ? Offset.zero : const Offset(0, 0.18),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 180),
-            opacity: _isListening ? 1 : 0,
-            child: IgnorePointer(
-              ignoring: !_isListening,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.surface,
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.12),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+    return AnimatedScale(
+      scale: isKeyboardVisible ? 0 : 1,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOutCubic,
+      child: AnimatedOpacity(
+        opacity: isKeyboardVisible ? 0 : 1,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            AnimatedSlide(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeInOut,
+              offset: _isListening ? Offset.zero : const Offset(0, 0.18),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _isListening ? 1 : 0,
+                child: IgnorePointer(
+                  ignoring: !_isListening,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.surface,
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.12),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Text(
-                  'Listening...',
-                  style: ideaVaultLabel(
-                    context,
-                    size: 13,
-                    weight: FontWeight.w700,
-                    color: primaryColor,
-                    letterSpacing: 0.2,
+                    child: Text(
+                      'Listening...',
+                      style: ideaVaultLabel(
+                        context,
+                        size: 13,
+                        weight: FontWeight.w700,
+                        color: primaryColor,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          key: const Key('idea-editor-mic-fab'),
-          behavior: HitTestBehavior.opaque,
-          onLongPress: _handleMicLongPress,
-          onLongPressEnd: (_) => _handleMicLongPressEnd(),
-          child: ScaleTransition(
-            scale: _micScaleAnimation,
-            child: AnimatedBuilder(
-              animation: _micGlowController,
-              builder: (context, child) {
-                final glowOpacity = 0.14 + (_micGlowController.value * 0.18);
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeInOut,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: _isListening
-                        ? [
-                            BoxShadow(
-                              color:
-                                  primaryColor.withValues(alpha: glowOpacity),
-                              blurRadius: 28,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : const [],
+            const SizedBox(height: 12),
+            GestureDetector(
+              key: const Key('idea-editor-mic-fab'),
+              behavior: HitTestBehavior.opaque,
+              onLongPress: _handleMicLongPress,
+              onLongPressEnd: (_) => _handleMicLongPressEnd(),
+              child: ScaleTransition(
+                scale: _micScaleAnimation,
+                child: AnimatedBuilder(
+                  animation: _micGlowController,
+                  builder: (context, child) {
+                    final glowOpacity = 0.14 + (_micGlowController.value * 0.18);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeInOut,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: _isListening
+                            ? [
+                                BoxShadow(
+                                  color:
+                                      primaryColor.withValues(alpha: glowOpacity),
+                                  blurRadius: 28,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                            : const [],
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: AbsorbPointer(
+                    child: FloatingActionButton(
+                      heroTag: 'idea-editor-mic-fab',
+                      onPressed: () {},
+                      backgroundColor: primaryColor,
+                      foregroundColor: theme.onPrimary,
+                      child: Icon(_isListening ? Icons.mic_none : Icons.mic),
+                    ),
                   ),
-                  child: child,
-                );
-              },
-              child: AbsorbPointer(
-                child: FloatingActionButton(
-                  heroTag: 'idea-editor-mic-fab',
-                  onPressed: () {},
-                  backgroundColor: primaryColor,
-                  foregroundColor: theme.onPrimary,
-                  child: Icon(_isListening ? Icons.mic_none : Icons.mic),
                 ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -413,24 +425,30 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           bottom: BorderSide(color: theme.outlineSoft),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < _sections.length; i++) ...[
-              if (i > 0) const SizedBox(width: 10),
-              _SectionTabButton(
-                key: Key(
-                    'idea-editor-section-tab-${_sections[i].name.toLowerCase()}'),
-                title: _sections[i].name,
-                isActive: _sections[i].id == _activeSectionId,
-                onTap: () => _handleSectionTap(_sections[i]),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var i = 0; i < _sections.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    _SectionTabButton(
+                      key: Key(
+                          'idea-editor-section-tab-${_sections[i].name.toLowerCase()}'),
+                      title: _sections[i].name,
+                      isActive: _sections[i].id == _activeSectionId,
+                      onTap: () => _handleSectionTap(_sections[i]),
+                    ),
+                  ],
+                  const SizedBox(width: 10),
+                  _buildAddSectionTab(),
+                ],
               ),
-            ],
-            const SizedBox(width: 10),
-            _buildAddSectionTab(),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
