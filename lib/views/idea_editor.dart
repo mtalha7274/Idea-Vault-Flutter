@@ -12,6 +12,8 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config/router/app_router.dart';
+import '../data/repositories/remote/idea_organization_repository.dart';
+import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
@@ -49,6 +51,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late String _activeSectionId;
   late String _lastSavedSnapshot;
   late IdeasProvider _ideasProvider;
+  late IdeaOrganizationRepository _organizationRepo;
 
   Timer? _autosaveTimer;
   Future<void>? _saveInFlight;
@@ -61,6 +64,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isMicPressHeld = false;
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
+  bool _isOrganizing = false;
   String _partialSpeechText = '';
   int _lastInsertedSpeechOffset = 0;
 
@@ -71,6 +75,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     final ideasProvider = context.read<IdeasProvider>();
     _ideasProvider = ideasProvider;
+    _organizationRepo = sl<IdeaOrganizationRepository>();
     final existingIdea =
         widget.ideaId == null ? null : ideasProvider.findById(widget.ideaId!);
     final resumeState =
@@ -167,47 +172,53 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
         await _closeEditor();
       },
-      child: Scaffold(
-        backgroundColor: theme.background,
-        resizeToAvoidBottomInset: true,
-        floatingActionButton: _buildSpeechFab(context),
-        body: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            slivers: [
-              _buildCollapsibleEditorHeader(context),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _PinnedHeaderDelegate(
-                  extent: _PinnedHeaderDelegate.sectionTabsExtent,
-                  child: _buildPinnedSectionTabsContent(context),
-                ),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _PinnedHeaderDelegate(
-                  extent: _PinnedHeaderDelegate.toolbarExtent,
-                  child: IdeaEditorToolbarContainer(
-                    controller: _contentController,
-                    focusNode: _contentFocusNode,
-                    isPreviewMode: _isPreviewMode,
-                    onPreviewToggle: _togglePreviewMode,
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: theme.background,
+            resizeToAvoidBottomInset: true,
+            floatingActionButton: _buildSpeechFab(context),
+            body: SafeArea(
+              bottom: false,
+              child: CustomScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                slivers: [
+                  _buildCollapsibleEditorHeader(context),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _PinnedHeaderDelegate(
+                      extent: _PinnedHeaderDelegate.sectionTabsExtent,
+                      child: _buildPinnedSectionTabsContent(context),
+                    ),
                   ),
-                ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _PinnedHeaderDelegate(
+                      extent: _PinnedHeaderDelegate.toolbarExtent,
+                      child: IdeaEditorToolbarContainer(
+                        controller: _contentController,
+                        focusNode: _contentFocusNode,
+                        isPreviewMode: _isPreviewMode,
+                        onPreviewToggle: _togglePreviewMode,
+                      ),
+                    ),
+                  ),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: IdeaMarkdownEditor(
+                      controller: _contentController,
+                      focusNode: _contentFocusNode,
+                      placeholder: _sectionPlaceholder(),
+                      isPreviewMode: _isPreviewMode,
+                    ),
+                  ),
+                ],
               ),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: IdeaMarkdownEditor(
-                  controller: _contentController,
-                  focusNode: _contentFocusNode,
-                  placeholder: _sectionPlaceholder(),
-                  isPreviewMode: _isPreviewMode,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          if (_isOrganizing) _buildOrganizingOverlay(context),
+        ],
       ),
     );
   }
@@ -218,9 +229,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
             child: _Header(
               onClose: _onClosePressed,
+              onOrganize: _handleOrganize,
               isAutosaving: _isAutosaving,
               hasSaveFailed: _hasSaveFailed,
               isEditingExisting: widget.ideaId != null,
@@ -331,8 +343,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 child: IgnorePointer(
                   ignoring: !_isListening,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: theme.surface,
                       borderRadius: BorderRadius.circular(999),
@@ -369,7 +381,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 child: AnimatedBuilder(
                   animation: _micGlowController,
                   builder: (context, child) {
-                    final glowOpacity = 0.16 + (_micGlowController.value * 0.22);
+                    final glowOpacity =
+                        0.16 + (_micGlowController.value * 0.22);
                     final glowRadius = 32.0 + (_micGlowController.value * 12.0);
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 160),
@@ -380,8 +393,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         boxShadow: _isListening
                             ? [
                                 BoxShadow(
-                                  color:
-                                      primaryColor.withValues(alpha: glowOpacity),
+                                  color: primaryColor.withValues(
+                                      alpha: glowOpacity),
                                   blurRadius: glowRadius,
                                   spreadRadius: 3,
                                 ),
@@ -410,6 +423,43 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOrganizingOverlay(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Stack(
+      children: [
+        ModalBarrier(
+          color: Colors.black.withValues(alpha: 0.54),
+          dismissible: false,
+        ),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: theme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: theme.primary),
+                const SizedBox(height: 16),
+                Text(
+                  'AI is organizing your idea...',
+                  style: ideaVaultBody(
+                    context,
+                    size: 16,
+                    weight: FontWeight.w600,
+                    color: theme.primaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -555,12 +605,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
 
     _isMicPressHeld = true;
-    
+
     HapticFeedback.mediumImpact();
     SystemSound.play(SystemSoundType.click);
-    
+
     _micScaleController.forward();
-    
+
     final hasPermission = await _ensureSpeechPermission();
     if (!hasPermission || !_isMicPressHeld || !mounted) {
       await _setListeningState(false);
@@ -754,7 +804,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       after,
       normalizedText,
     );
-    
+
     final updatedText = before + middle + after;
     final nextOffset = before.length + middle.length;
 
@@ -1233,6 +1283,50 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
   }
 
+  Future<void> _handleOrganize() async {
+    final currentText = _contentController.text.trim();
+
+    if (currentText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing to organize')),
+      );
+      return;
+    }
+
+    if (currentText.length > 2000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Idea is too long (max 2000 chars)')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isOrganizing = true;
+    });
+
+    try {
+      final organizedContent =
+          await _organizationRepo.organizeIdea(currentText);
+      _replaceEditorContent(organizedContent);
+
+      if (mounted) {
+        setState(() {
+          _isOrganizing = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isOrganizing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Failed to organize. Please try again.')),
+        );
+      }
+    }
+  }
+
   String _snapshot() {
     final sectionsSnapshot = _sections
         .map(
@@ -1301,12 +1395,14 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
+    required this.onOrganize,
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
+  final VoidCallback onOrganize;
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
@@ -1338,38 +1434,29 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(
-          width: 92,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: hasSaveFailed
-                  ? Text(
-                      'Save failed',
-                      key: const Key('idea-editor-save-failed'),
-                      textAlign: TextAlign.right,
-                      style: ideaVaultLabel(
-                        context,
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    )
-                  : isAutosaving
-                      ? Text(
-                          'Saving...',
-                          key: const Key('idea-editor-saving'),
-                          textAlign: TextAlign.right,
-                          style: ideaVaultLabel(
-                            context,
-                            size: 12,
-                            weight: FontWeight.w700,
-                            color: theme.textMuted,
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-            ),
+        IconButton(
+          key: const Key('idea-editor-organize'),
+          onPressed: onOrganize,
+          style: IconButton.styleFrom(
+            backgroundColor: theme.surfaceLow,
+            foregroundColor: theme.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.auto_awesome, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'Organize',
+                style: ideaVaultLabel(
+                  context,
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: theme.primary,
+                ),
+              ),
+            ],
           ),
         ),
       ],

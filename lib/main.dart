@@ -4,11 +4,13 @@ import 'package:easy_localization_loader/easy_localization_loader.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:idea_vault/views/home.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'config/config.dart';
 import 'config/languages/language_config.dart';
 import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
+import 'firebase_options.dart';
 import 'injection_container.dart';
 import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
@@ -35,6 +37,10 @@ void main() async {
   }
 
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   await initializeDependencies();
   await switchToPortraitMode();

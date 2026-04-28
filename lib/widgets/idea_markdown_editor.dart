@@ -9,6 +9,7 @@ import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 const double _editorBodyTextSize = 17;
+const double _previewH2Scale = 1.15;
 
 class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
@@ -137,9 +138,11 @@ class IdeaEditorToolbar extends StatelessWidget {
               children: [
                 _ToolbarIconButton(
                   icon: Icons.title,
-                  tooltip: 'Text',
+                  tooltip: 'Heading',
+                  iconSize: 26,
                   enabled: !isPreviewMode,
-                  onPressed: () => _wrapSelection(controller, '# ', '', true),
+                  onPressed: () =>
+                      _wrapSelection(controller, '## ', '', true),
                 ),
                 _ToolbarIconButton(
                   icon: Icons.format_bold,
@@ -296,7 +299,11 @@ class _PreviewPane extends StatelessWidget {
       configs: [
         PConfig(textStyle: bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h1.name, bodyStyle),
-        _PreviewHeadingConfig(MarkdownTag.h2.name, bodyStyle),
+        _PreviewHeadingConfig(
+          MarkdownTag.h2.name,
+          bodyStyle,
+          fontScale: _previewH2Scale,
+        ),
         _PreviewHeadingConfig(MarkdownTag.h3.name, bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h4.name, bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h5.name, bodyStyle),
@@ -307,15 +314,26 @@ class _PreviewPane extends StatelessWidget {
 }
 
 class _PreviewHeadingConfig extends HeadingConfig {
-  const _PreviewHeadingConfig(this.tag, this.baseStyle);
+  const _PreviewHeadingConfig(
+    this.tag,
+    this.baseStyle, {
+    this.fontScale = 1,
+  });
 
   @override
   final String tag;
 
   final TextStyle baseStyle;
+  final double fontScale;
 
   @override
-  TextStyle get style => baseStyle.copyWith(fontWeight: FontWeight.w700);
+  TextStyle get style {
+    final baseSize = baseStyle.fontSize ?? _editorBodyTextSize;
+    return baseStyle.copyWith(
+      fontWeight: FontWeight.w700,
+      fontSize: baseSize * fontScale,
+    );
+  }
 
   @override
   EdgeInsets get padding => EdgeInsets.zero;
@@ -327,12 +345,14 @@ class _ToolbarIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.iconSize,
     this.enabled = true,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
   final String tooltip;
+  final double? iconSize;
   final bool enabled;
 
   @override
@@ -353,7 +373,7 @@ class _ToolbarIconButton extends StatelessWidget {
               backgroundColor: theme.surfaceLow,
               foregroundColor: foregroundColor,
             ),
-            icon: Icon(icon),
+            icon: Icon(icon, size: iconSize),
           ),
         ),
       ),
