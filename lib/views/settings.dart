@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/double.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/int.dart';
+import 'package:idea_vault/core/extensions/double.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:in_app_review/in_app_review.dart';

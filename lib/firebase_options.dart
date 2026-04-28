@@ -50,24 +50,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'test_android_api_key',
-    appId: 'test_android_app_id',
-    messagingSenderId: 'test_messaging_sender_id',
-    projectId: 'test_project_id',
-    storageBucket: 'test_storage_bucket',
-    databaseURL: 'https://test-project.firebaseio.com',
+    apiKey: 'AIzaSyALAnEoOYiOVH1ukrAW_FZBBt4ksRf7Jug',
+    appId: '1:911513267572:android:c8bd2bda381dc7c2f05021',
+    messagingSenderId: '911513267572',
+    projectId: 'idea-vault-8593e',
+    storageBucket: 'idea-vault-8593e.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'test_ios_api_key',
-    appId: 'test_ios_app_id',
-    messagingSenderId: 'test_messaging_sender_id',
-    projectId: 'test_project_id',
-    storageBucket: 'test_storage_bucket',
-    databaseURL: 'https://test-project.firebaseio.com',
-    androidClientId: 'test_android_client_id',
-    iosClientId: 'test_ios_client_id',
-    iosBundleId: 'com.example.testapp',
-    measurementId: 'test_measurement_id',
+    apiKey: 'AIzaSyD8lab23sdquViIBP0Hd-fY2O_LhotQxE0',
+    appId: '1:911513267572:ios:19c77291e7f2b59af05021',
+    messagingSenderId: '911513267572',
+    projectId: 'idea-vault-8593e',
+    storageBucket: 'idea-vault-8593e.firebasestorage.app',
+    iosBundleId: 'com.pocketmicros.ideavault',
   );
 }
