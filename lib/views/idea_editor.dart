@@ -18,6 +18,7 @@ import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -427,40 +428,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Widget _buildOrganizingOverlay(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    return Stack(
-      children: [
-        ModalBarrier(
-          color: Colors.black.withValues(alpha: 0.54),
-          dismissible: false,
-        ),
-        Center(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: theme.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: theme.primary),
-                const SizedBox(height: 16),
-                Text(
-                  'AI is organizing your idea...',
-                  style: ideaVaultBody(
-                    context,
-                    size: 16,
-                    weight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return const AiLoadingOverlay();
   }
 
   Widget _buildAddSectionTab() {
@@ -1308,6 +1276,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       final organizedContent =
           await _organizationRepo.organizeIdea(currentText);
       _replaceEditorContent(organizedContent);
+      _updateActiveSectionContent(organizedContent);
+      _scheduleAutosave();
 
       if (mounted) {
         setState(() {
