@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "911513267572",
+    "project_id": "idea-vault-8593e",
+    "storage_bucket": "idea-vault-8593e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:911513267572:android:c8bd2bda381dc7c2f05021",
+        "android_client_info": {
+          "package_name": "com.pocketmicros.ideavault"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALAnEoOYiOVH1ukrAW_FZBBt4ksRf7Jug"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyD8lab23sdquViIBP0Hd-fY2O_LhotQxE0</string>
+	<key>GCM_SENDER_ID</key>
+	<string>911513267572</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.pocketmicros.ideavault</string>
+	<key>PROJECT_ID</key>
+	<string>idea-vault-8593e</string>
+	<key>STORAGE_BUCKET</key>
+	<string>idea-vault-8593e.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:911513267572:ios:19c77291e7f2b59af05021</string>
+</dict>
+</plist>
