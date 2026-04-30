@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:get_it/get_it.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,6 +17,7 @@ import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
+import 'data/repositories/remote/idea_organization_repository.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
@@ -51,6 +53,9 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
 
+  // Firebase
+  sl.registerSingleton<FirebaseFunctions>(FirebaseFunctions.instance);
+
   // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
@@ -61,6 +66,8 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
       CountryRepo(sl<ApiManager>(instanceName: AppConstants.countryUrl)));
+  sl.registerSingleton<IdeaOrganizationRepository>(
+      IdeaOrganizationRepository(sl<FirebaseFunctions>()));
 
   // Providers
   sl.registerFactory<IdeasProvider>(

@@ -9,6 +9,7 @@ import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 const double _editorBodyTextSize = 17;
+const double _previewH2Scale = 1.15;
 
 class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
@@ -137,9 +138,10 @@ class IdeaEditorToolbar extends StatelessWidget {
               children: [
                 _ToolbarIconButton(
                   icon: Icons.title,
-                  tooltip: 'Text',
+                  tooltip: 'Heading',
+                  iconSize: 26,
                   enabled: !isPreviewMode,
-                  onPressed: () => _wrapSelection(controller, '# ', '', true),
+                  onPressed: () => _wrapSelection(controller, '## ', '', true),
                 ),
                 _ToolbarIconButton(
                   icon: Icons.format_bold,
@@ -195,36 +197,34 @@ class IdeaEditorToolbar extends StatelessWidget {
     if (linePrefix) {
       final start = selection.start < 0 ? text.length : selection.start;
       final end = selection.end < 0 ? text.length : selection.end;
-      
-      final lineStartIndex =
-          text.lastIndexOf('\n', start == 0 ? 0 : start - 1);
+
+      final lineStartIndex = text.lastIndexOf('\n', start == 0 ? 0 : start - 1);
       final lineStart = lineStartIndex == -1 ? 0 : lineStartIndex + 1;
-      
+
       final lineEndIndex = end < text.length ? text.indexOf('\n', end) : -1;
       final lineEnd = lineEndIndex == -1 ? text.length : lineEndIndex;
-      
+
       final selectedLines = text.substring(lineStart, lineEnd);
       final lines = selectedLines.split('\n');
-      
+
       final allHavePrefix = lines.every((line) => line.startsWith(prefix));
-      
+
       final transformedLines = lines.map((line) {
         if (allHavePrefix) {
-          return line.startsWith(prefix)
-              ? line.substring(prefix.length)
-              : line;
+          return line.startsWith(prefix) ? line.substring(prefix.length) : line;
         } else {
           return line.startsWith(prefix) ? line : '$prefix$line';
         }
       }).toList();
-      
+
       final transformedText = transformedLines.join('\n');
-      final updatedText = text.replaceRange(lineStart, lineEnd, transformedText);
-      
+      final updatedText =
+          text.replaceRange(lineStart, lineEnd, transformedText);
+
       final offsetDelta = allHavePrefix ? -prefix.length : prefix.length;
       final newStart = start + (start >= lineStart ? offsetDelta : 0);
       final newEnd = end + (lines.length * offsetDelta);
-      
+
       controller.value = TextEditingValue(
         text: updatedText,
         selection: TextSelection(
@@ -282,12 +282,31 @@ class _PreviewPane extends StatelessWidget {
       );
     }
 
-    final preservedMarkdown = markdown.replaceAll('\n\n', '\n\u200B\n');
+    // Count only leading newlines (not other whitespace)
+    var leadingNewlines = 0;
+    for (var i = 0; i < markdown.length; i++) {
+      if (markdown[i] == '\n') {
+        leadingNewlines++;
+      } else {
+        break;
+      }
+    }
 
-    return MarkdownBlock(
-      data: preservedMarkdown,
-      config: _previewMarkdownConfig(bodyStyle),
-      generator: MarkdownGenerator(linesMargin: EdgeInsets.zero),
+    // Remove leading newlines from original markdown and replace with preserved version
+    final markdownWithoutLeadingNewlines = markdown.substring(leadingNewlines);
+    final leadingSpacing = '\u200B\n' * leadingNewlines;
+
+    // Preserve double newlines throughout the content
+    final preservedMarkdown = leadingSpacing +
+        markdownWithoutLeadingNewlines.replaceAll('\n\n', '\n\u200B\n');
+
+    return Align(
+      alignment: Alignment.topLeft,
+      child: MarkdownBlock(
+        data: preservedMarkdown,
+        config: _previewMarkdownConfig(bodyStyle),
+        generator: MarkdownGenerator(linesMargin: EdgeInsets.zero),
+      ),
     );
   }
 
@@ -296,7 +315,11 @@ class _PreviewPane extends StatelessWidget {
       configs: [
         PConfig(textStyle: bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h1.name, bodyStyle),
-        _PreviewHeadingConfig(MarkdownTag.h2.name, bodyStyle),
+        _PreviewHeadingConfig(
+          MarkdownTag.h2.name,
+          bodyStyle,
+          fontScale: _previewH2Scale,
+        ),
         _PreviewHeadingConfig(MarkdownTag.h3.name, bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h4.name, bodyStyle),
         _PreviewHeadingConfig(MarkdownTag.h5.name, bodyStyle),
@@ -307,15 +330,26 @@ class _PreviewPane extends StatelessWidget {
 }
 
 class _PreviewHeadingConfig extends HeadingConfig {
-  const _PreviewHeadingConfig(this.tag, this.baseStyle);
+  const _PreviewHeadingConfig(
+    this.tag,
+    this.baseStyle, {
+    this.fontScale = 1,
+  });
 
   @override
   final String tag;
 
   final TextStyle baseStyle;
+  final double fontScale;
 
   @override
-  TextStyle get style => baseStyle.copyWith(fontWeight: FontWeight.w700);
+  TextStyle get style {
+    final baseSize = baseStyle.fontSize ?? _editorBodyTextSize;
+    return baseStyle.copyWith(
+      fontWeight: FontWeight.w700,
+      fontSize: baseSize * fontScale,
+    );
+  }
 
   @override
   EdgeInsets get padding => EdgeInsets.zero;
@@ -327,12 +361,14 @@ class _ToolbarIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.iconSize,
     this.enabled = true,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
   final String tooltip;
+  final double? iconSize;
   final bool enabled;
 
   @override
@@ -353,7 +389,7 @@ class _ToolbarIconButton extends StatelessWidget {
               backgroundColor: theme.surfaceLow,
               foregroundColor: foregroundColor,
             ),
-            icon: Icon(icon),
+            icon: Icon(icon, size: iconSize),
           ),
         ),
       ),
