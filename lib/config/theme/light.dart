@@ -36,6 +36,8 @@ class LightTheme implements BaseTheme {
   Color get outlineSoft => outline.withValues(alpha: 0.16);
 
   @override
+  final Color warning = Color(0xFFF4BD2B);
+  @override
   final SettingsColors settings = SettingsColorsImpl();
   @override
   final BottomNavBarColors bottomNavBar = BottomNavBarColorsImpl();

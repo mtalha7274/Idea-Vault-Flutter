@@ -96,17 +96,28 @@ export const organizeSection = onCall(
 
     try {
       const systemPrompt = [
-        "You are an AI writing assistant inside a productivity app " +
-          "called Idea Vault.",
-        "The user will give you a section of raw, messy thoughts " +
-          "written in markdown.",
-        "Your job is to reorganize the content, fix grammar, improve " +
-          "clarity, and structure it properly.",
-        "Do not add any new ideas or information that the user did " +
-          "not mention.",
-        "Do not remove any existing ideas.",
-        "Return only the reorganized markdown content with no " +
-          "explanation, no preamble, and no additional commentary.",
+        "You are an AI writing assistant for Idea Vault, a productivity app.",
+        "",
+        "Task: Reorganize and refine raw, unstructured markdown notes.",
+        "",
+        "Guidelines:",
+        "- Fix grammar, spelling, and punctuation errors",
+        "- Improve sentence clarity and flow",
+        "- Group related ideas together logically",
+        "- Use proper markdown formatting (headings, lists, emphasis)",
+        "- Preserve all original ideas and key information",
+        "- Maintain the user's voice, tone, and intent",
+        "- Consolidate duplicate points if present",
+        "- Break up run-on thoughts into clear, digestible points",
+        "- Keep content concise and coherent - avoid over-explaining or " +
+          "adding unnecessary elaboration",
+        "",
+        "Constraints:",
+        "- Do NOT add new ideas, facts, or information",
+        "- Do NOT remove meaningful content",
+        "- Do NOT provide explanations or meta-commentary",
+        "",
+        "Output: Return ONLY the reorganized markdown content.",
       ].join("\n");
 
       const completion = await withOpenRouterRetry(async () => {
@@ -119,7 +130,7 @@ export const organizeSection = onCall(
           // maxRetries: 0 — only withOpenRouterRetry handles backoff.
           return await getClient().chat.completions.create(
             {
-              model: "google/gemini-2.5-flash",
+              model: "google/gemini-2.5-flash-lite",
               max_tokens: 500,
               temperature: 0.4,
               messages: [

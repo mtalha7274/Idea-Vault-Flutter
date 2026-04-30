@@ -11,6 +11,12 @@ import '../views/ideas/idea_vault_theme.dart';
 const double _editorBodyTextSize = 17;
 const double _previewH2Scale = 1.15;
 
+/// Width of the fade strip before the Organize control (toolbar surface → opaque).
+const double _toolbarScrollFadeWidth = 44;
+
+/// Slightly larger than format tools so AI organise reads as the primary toolbar action.
+const double _toolbarOrganizeIconSize = 24;
+
 class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
     super.key,
@@ -86,12 +92,18 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     required this.focusNode,
     required this.isPreviewMode,
     required this.onPreviewToggle,
+    required this.onOrganize,
+    this.organizeEnabled = true,
+    this.exceedsAiCharacterLimit = false,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
+  final VoidCallback onOrganize;
+  final bool organizeEnabled;
+  final bool exceedsAiCharacterLimit;
 
   @override
   Widget build(BuildContext context) {
@@ -101,12 +113,15 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
         color: theme.surface,
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
         child: IdeaEditorToolbar(
           controller: controller,
           focusNode: focusNode,
           isPreviewMode: isPreviewMode,
           onPreviewToggle: onPreviewToggle,
+          onOrganize: onOrganize,
+          organizeEnabled: organizeEnabled,
+          exceedsAiCharacterLimit: exceedsAiCharacterLimit,
         ),
       ),
     );
@@ -120,58 +135,108 @@ class IdeaEditorToolbar extends StatelessWidget {
     required this.focusNode,
     required this.isPreviewMode,
     required this.onPreviewToggle,
+    required this.onOrganize,
+    this.organizeEnabled = true,
+    this.exceedsAiCharacterLimit = false,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
+  final VoidCallback onOrganize;
+  final bool organizeEnabled;
+  final bool exceedsAiCharacterLimit;
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _ToolbarIconButton(
-                  icon: Icons.title,
-                  tooltip: 'Heading',
-                  iconSize: 26,
-                  enabled: !isPreviewMode,
-                  onPressed: () => _wrapSelection(controller, '## ', '', true),
-                ),
-                _ToolbarIconButton(
-                  icon: Icons.format_bold,
-                  tooltip: 'Bold',
-                  enabled: !isPreviewMode,
-                  onPressed: () =>
-                      _wrapSelection(controller, '**', '**', false),
-                ),
-                _ToolbarIconButton(
-                  icon: Icons.format_italic,
-                  tooltip: 'Italic',
-                  enabled: !isPreviewMode,
-                  onPressed: () => _wrapSelection(controller, '_', '_', false),
-                ),
-                _ToolbarIconButton(
-                  icon: Icons.format_list_bulleted,
-                  tooltip: 'Bullet List',
-                  enabled: !isPreviewMode,
-                  onPressed: () => _wrapSelection(controller, '- ', '', true),
-                ),
-                _ToolbarIconButton(
-                  icon: Icons.code,
-                  tooltip: 'Code Block',
-                  enabled: !isPreviewMode,
-                  onPressed: () =>
-                      _wrapSelection(controller, '```\n', '\n```', false),
-                ),
-              ],
-            ),
+          child: ListenableBuilder(
+            listenable: controller,
+            builder: (context, _) {
+              final theme = context.watch<ThemeProvider>().baseTheme;
+              final fadeColor = theme.surface;
+              return Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.centerLeft,
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _ToolbarIconButton(
+                          icon: Icons.title,
+                          tooltip: 'Heading',
+                          iconSize: 26,
+                          enabled: !isPreviewMode,
+                          onPressed: () =>
+                              _wrapSelection(controller, '## ', '', true),
+                        ),
+                        _ToolbarIconButton(
+                          icon: Icons.format_bold,
+                          tooltip: 'Bold',
+                          enabled: !isPreviewMode,
+                          onPressed: () =>
+                              _wrapSelection(controller, '**', '**', false),
+                        ),
+                        _ToolbarIconButton(
+                          icon: Icons.format_italic,
+                          tooltip: 'Italic',
+                          enabled: !isPreviewMode,
+                          onPressed: () =>
+                              _wrapSelection(controller, '_', '_', false),
+                        ),
+                        _ToolbarIconButton(
+                          icon: Icons.format_list_bulleted,
+                          tooltip: 'Bullet List',
+                          enabled: !isPreviewMode,
+                          onPressed: () =>
+                              _wrapSelection(controller, '- ', '', true),
+                        ),
+                        _ToolbarIconButton(
+                          icon: Icons.code,
+                          tooltip: 'Code Block',
+                          enabled: !isPreviewMode,
+                          onPressed: () => _wrapSelection(
+                              controller, '```\n', '\n```', false),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                    width: _toolbarScrollFadeWidth,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              fadeColor.withValues(alpha: 0),
+                              fadeColor,
+                            ],
+                            stops: const [0.15, 1],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
+        ),
+        const SizedBox(width: 6),
+        _ToolbarOrganizeButton(
+          onPressed: onOrganize,
+          enabled: organizeEnabled,
+          exceedsCharacterLimit: exceedsAiCharacterLimit,
         ),
         const SizedBox(width: 8),
         _ToolbarIconButton(
@@ -390,6 +455,55 @@ class _ToolbarIconButton extends StatelessWidget {
               foregroundColor: foregroundColor,
             ),
             icon: Icon(icon, size: iconSize),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolbarOrganizeButton extends StatelessWidget {
+  const _ToolbarOrganizeButton({
+    required this.onPressed,
+    required this.enabled,
+    required this.exceedsCharacterLimit,
+  });
+
+  final VoidCallback onPressed;
+  final bool enabled;
+  final bool exceedsCharacterLimit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final overLimit = exceedsCharacterLimit;
+    final foregroundColor = !enabled
+        ? theme.textMuted.withValues(alpha: 0.55)
+        : overLimit
+            ? theme.warning
+            : theme.primary;
+    final backgroundColor = enabled && overLimit
+        ? theme.warning.withValues(alpha: 0.08)
+        : theme.surfaceLow;
+
+    return Tooltip(
+      message: exceedsCharacterLimit
+          ? 'Long text — review before organizing'
+          : 'Organise with AI',
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: IconButton(
+          key: const Key('idea-editor-organize'),
+          onPressed: enabled ? onPressed : () {},
+          style: IconButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+          ),
+          icon: Icon(
+            overLimit
+                ? Icons.warning_amber_rounded
+                : Icons.auto_awesome_rounded,
+            size: _toolbarOrganizeIconSize,
           ),
         ),
       ),

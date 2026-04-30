@@ -26,3 +26,7 @@ cropImage,Crop Image
 errorOpeningCamera,Error opening camera
 cameraAccessDenied,Camera access denied
 requestTimeout,Request timeout
+organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose the extra information.
+organizeSectionSheetTitle,Organise section
+organizeSectionSheetDescription,The text in this section will be restructured and clarified with AI. Other sections stay as they are.
+organizeSectionSheetConfirmButton,Organise

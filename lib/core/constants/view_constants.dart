@@ -31,4 +31,13 @@ class ViewConstants {
   static const String more = "more";
   static const String cropImage = "cropImage";
   static const String requestTimeout = "requestTimeout";
+
+  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiSoftCharacterLimit]).
+  static const String organizeOverLimitDialogBody = 'organizeOverLimitDialogBody';
+
+  static const String organizeSectionSheetTitle = 'organizeSectionSheetTitle';
+  static const String organizeSectionSheetDescription =
+      'organizeSectionSheetDescription';
+  static const String organizeSectionSheetConfirmButton =
+      'organizeSectionSheetConfirmButton';
 }
