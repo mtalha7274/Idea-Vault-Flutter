@@ -21,11 +21,11 @@ import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
-import '../widgets/idea_vault_action_button.dart';
 import '../widgets/idea_markdown_editor.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
-import '../widgets/popups/idea_editor_section_sheet.dart';
-import '../widgets/popups/organise_section_sheet.dart';
+import '../widgets/sheets/idea_editor_section_sheet.dart';
+import '../widgets/sheets/idea_options_sheet.dart';
+import '../widgets/sheets/organise_section_sheet.dart';
 import '../core/constants/view_constants.dart';
 import '../widgets/translated_text.dart';
 import 'export_for_ai_screen.dart';
@@ -1041,103 +1041,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showMoreOptionsSheet() async {
-    final action = await showModalBottomSheet<_IdeaEditorMenuAction>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.32),
-      builder: (sheetContext) {
-        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
-        final errorColor = Theme.of(sheetContext).colorScheme.error;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: sheetTheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border(
-              top: BorderSide(
-                color: sheetTheme.outline.withValues(alpha: 0.12),
-              ),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: sheetTheme.outline.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Idea options',
-                    style: ideaVaultHeadline(
-                      sheetContext,
-                      size: 22,
-                      weight: FontWeight.w800,
-                      height: 1.2,
-                      color: sheetTheme.primaryText,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  IdeaVaultActionButton(
-                    label: 'Export for AI',
-                    backgroundColor: sheetTheme.surfaceLow,
-                    foregroundColor: sheetTheme.primary,
-                    height: 48,
-                    textSize: 14,
-                    onPressed: () => Navigator.of(sheetContext)
-                        .pop(_IdeaEditorMenuAction.exportForAI),
-                  ),
-                  const SizedBox(height: 10),
-                  IdeaVaultActionButton(
-                    label: 'Export to PDF',
-                    backgroundColor: sheetTheme.surfaceLow,
-                    foregroundColor: sheetTheme.primary,
-                    height: 48,
-                    textSize: 14,
-                    onPressed: () => Navigator.of(sheetContext)
-                        .pop(_IdeaEditorMenuAction.exportToPDF),
-                  ),
-                  const SizedBox(height: 10),
-                  IdeaVaultActionButton(
-                    label: 'Delete Idea',
-                    backgroundColor: errorColor.withValues(alpha: 0.1),
-                    foregroundColor: errorColor,
-                    height: 48,
-                    textSize: 14,
-                    onPressed: () => Navigator.of(sheetContext)
-                        .pop(_IdeaEditorMenuAction.deleteIdea),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    final action = await showIdeaEditorOptionsSheet(context);
 
     if (!mounted || action == null) {
       return;
     }
 
     switch (action) {
-      case _IdeaEditorMenuAction.exportForAI:
+      case IdeaEditorOptionsSheetAction.exportForAI:
         await _openExportScreen(ExportMode.aiExport);
         break;
-      case _IdeaEditorMenuAction.exportToPDF:
+      case IdeaEditorOptionsSheetAction.exportToPDF:
         await _openExportScreen(ExportMode.pdfExport);
         break;
-      case _IdeaEditorMenuAction.deleteIdea:
+      case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
         break;
     }
@@ -1469,12 +1386,6 @@ class _Header extends StatelessWidget {
       ],
     );
   }
-}
-
-enum _IdeaEditorMenuAction {
-  exportForAI,
-  exportToPDF,
-  deleteIdea,
 }
 
 class _SectionTabButton extends StatelessWidget {

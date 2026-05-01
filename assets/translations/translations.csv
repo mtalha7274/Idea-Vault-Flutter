@@ -74,3 +74,5 @@ exportToPdfSnackbarFailed,Failed to export PDF. Please try again.
 exportForAiSnackbarCopied,Copied! Paste into any AI chat.
 exportForAiClipboardIdeaLine,Idea: {title}
 exportForAiSectionNoContentYet,No content yet
+ideaEditorOptionsSheetTitle,Idea options
+ideaEditorOptionsDeleteIdea,Delete Idea

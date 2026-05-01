@@ -96,4 +96,9 @@ class ViewConstants {
       'exportForAiClipboardIdeaLine';
   static const String exportForAiSectionNoContentYet =
       'exportForAiSectionNoContentYet';
+
+  static const String ideaEditorOptionsSheetTitle =
+      'ideaEditorOptionsSheetTitle';
+  static const String ideaEditorOptionsDeleteIdea =
+      'ideaEditorOptionsDeleteIdea';
 }
