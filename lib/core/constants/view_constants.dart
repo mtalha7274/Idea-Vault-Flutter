@@ -42,4 +42,6 @@ class ViewConstants {
       'organizeSectionSheetConfirmButton';
 
   static const String organizeToolbarAiBadge = 'organizeToolbarAiBadge';
+
+  static const String brainstorm = 'brainstorm';
 }

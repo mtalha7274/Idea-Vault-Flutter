@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -22,6 +23,9 @@ import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
 import '../widgets/popups/idea_editor_section_sheet.dart';
 import '../widgets/popups/organise_section_sheet.dart';
+import '../core/constants/view_constants.dart';
+import '../widgets/translated_text.dart';
+import 'brainstorm_chat_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
 /// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
@@ -243,6 +247,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
             child: _Header(
               onClose: _onClosePressed,
+              onBrainstorm: () => AppRouter.push(
+                context,
+                const BrainstormChatScreen(),
+              ),
               isAutosaving: _isAutosaving,
               hasSaveFailed: _hasSaveFailed,
               isEditingExisting: widget.ideaId != null,
@@ -1267,15 +1275,19 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
+    required this.onBrainstorm,
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
+  final VoidCallback onBrainstorm;
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
+
+  static const Color _bulbColor = Color(0xFFFFC107);
 
   @override
   Widget build(BuildContext context) {
@@ -1301,6 +1313,39 @@ class _Header extends StatelessWidget {
               size: 22,
               weight: FontWeight.w800,
               height: 1.2,
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: onBrainstorm,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            key: const Key('idea-editor-brainstorm'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: _bulbColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.lightbulb_rounded,
+                  color: _bulbColor,
+                  size: 20.d,
+                ),
+                const SizedBox(width: 6),
+                TranslatedText(
+                  ViewConstants.brainstorm,
+                  style: ideaVaultLabel(
+                    context,
+                    size: 14.f,
+                    weight: FontWeight.w600,
+                    color: theme.primaryText,
+                    letterSpacing: 0.15,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

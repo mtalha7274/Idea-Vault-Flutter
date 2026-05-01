@@ -46,6 +46,7 @@ dependencies:
   firebase_core: ^4.7.0
   firebase_app_check: ^0.4.3
   cloud_functions: ^6.2.0
+  flutter_ai_toolkit: ^1.0.0
 
 dev_dependencies:
   flutter_test:
@@ -82,3 +83,6 @@ flutter:
     - family: Inter
       fonts:
       - asset: assets/fonts/Inter_18pt-Regular.ttf
+
+dependency_overrides:
+  google_fonts: ^8.0.2
