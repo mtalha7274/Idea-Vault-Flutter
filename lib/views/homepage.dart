@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
 
 import '../config/router/app_router.dart';
@@ -69,47 +70,96 @@ class _HomepageState extends State<Homepage> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 860),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Header(
-                    ideaCount: ideas.length,
-                    selectedCount: _selectedIdeaIds.length,
-                    onDeletePressed:
-                        _isSelectionMode ? _confirmDeleteSelection : null,
-                    onSortPressed: _isSelectionMode ? null : _showSortSheet,
+            child: NestedScrollView(
+              floatHeaderSlivers: true,
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                final handle =
+                    NestedScrollView.sliverOverlapAbsorberHandleFor(context);
+                return [
+                  SliverOverlapAbsorber(
+                    handle: handle,
+                    sliver: SliverPadding(
+                      padding: EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 0.h),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _Header(
+                              ideaCount: ideas.length,
+                              selectedCount: _selectedIdeaIds.length,
+                              onDeletePressed: _isSelectionMode
+                                  ? _confirmDeleteSelection
+                                  : null,
+                              onSortPressed:
+                                  _isSelectionMode ? null : _showSortSheet,
+                            ),
+                            const SizedBox(height: 18),
+                            _SearchField(
+                              controller: _searchController,
+                            ),
+                            const SizedBox(height: 22),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 18),
-                  _SearchField(
-                    controller: _searchController,
-                  ),
-                  const SizedBox(height: 22),
-                  Expanded(
-                    child: ideas.isEmpty
-                        ? const _EmptyIdeasState()
-                        : visibleIdeas.isEmpty
-                            ? const _NoSearchResultsState()
-                            : ListView.separated(
-                                padding: const EdgeInsets.only(bottom: 120),
-                                itemCount: visibleIdeas.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 16),
-                                itemBuilder: (context, index) {
-                                  final idea = visibleIdeas[index];
-                                  return _IdeaCard(
-                                    idea: idea,
-                                    isSelected:
-                                        _selectedIdeaIds.contains(idea.id),
-                                    onTap: () => _handleIdeaTap(idea),
-                                    onLongPress: () =>
-                                        _handleIdeaLongPress(idea),
-                                  );
-                                },
-                              ),
-                  ),
-                ],
+                ];
+              },
+              body: Builder(
+                builder: (context) {
+                  return CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverOverlapInjector(
+                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                            context),
+                      ),
+                      if (ideas.isEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          sliver: SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: const _EmptyIdeasState(),
+                          ),
+                        )
+                      else if (visibleIdeas.isEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          sliver: SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 120),
+                              child: const _NoSearchResultsState(),
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (index.isOdd) {
+                                  return const SizedBox(height: 16);
+                                }
+                                final ideaIndex = index ~/ 2;
+                                final idea = visibleIdeas[ideaIndex];
+                                return _IdeaCard(
+                                  idea: idea,
+                                  isSelected:
+                                      _selectedIdeaIds.contains(idea.id),
+                                  onTap: () => _handleIdeaTap(idea),
+                                  onLongPress: () => _handleIdeaLongPress(idea),
+                                );
+                              },
+                              childCount: visibleIdeas.length * 2 - 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -483,58 +533,56 @@ class _EmptyIdeasState extends StatelessWidget {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 120),
-      child: SizedBox.expand(
-        child: Center(
-          child: Container(
-            key: const Key('ideas-empty-state'),
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: theme.surface,
-              borderRadius: BorderRadius.circular(32),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  height: 78,
-                  width: 78,
-                  decoration: BoxDecoration(
-                    color: theme.accentTint,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.auto_awesome_outlined,
-                    size: 36,
-                    color: theme.primary,
-                  ),
+      child: Center(
+        child: Container(
+          key: const Key('ideas-empty-state'),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: theme.surface,
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                height: 78,
+                width: 78,
+                decoration: BoxDecoration(
+                  color: theme.accentTint,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 18),
-                Text(
-                  'Nothing saved yet',
-                  textAlign: TextAlign.center,
-                  style: ideaVaultHeadline(
-                    context,
-                    size: 24,
-                    weight: FontWeight.w800,
-                    height: 1.15,
-                  ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 36,
+                  color: theme.primary,
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Start with one fast idea, then break it into requirements, design notes, or any custom section you need.',
-                  textAlign: TextAlign.center,
-                  style: ideaVaultBody(
-                    context,
-                    size: 15,
-                    weight: FontWeight.w500,
-                    color: theme.textMuted,
-                    height: 1.55,
-                  ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Nothing saved yet',
+                textAlign: TextAlign.center,
+                style: ideaVaultHeadline(
+                  context,
+                  size: 24,
+                  weight: FontWeight.w800,
+                  height: 1.15,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Start with one fast idea, then break it into requirements, design notes, or any custom section you need.',
+                textAlign: TextAlign.center,
+                style: ideaVaultBody(
+                  context,
+                  size: 15,
+                  weight: FontWeight.w500,
+                  color: theme.textMuted,
+                  height: 1.55,
+                ),
+              ),
+            ],
           ),
         ),
       ),
