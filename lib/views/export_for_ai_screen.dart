@@ -94,25 +94,25 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ColoredBox(
-              color: theme.background,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 18.h),
-                child: TranslatedText(
-                  subtitleKey,
-                  style: ideaVaultBody(
-                    context,
-                    size: 15,
-                    weight: FontWeight.w500,
-                    color: theme.textMuted,
-                    height: 1.45,
-                  ),
-                ),
-              ),
-            ),
             Expanded(
               child: ReorderableListView.builder(
                 padding: EdgeInsets.only(bottom: 8.h),
+                header: ColoredBox(
+                  color: theme.background,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 18.h),
+                    child: TranslatedText(
+                      subtitleKey,
+                      style: ideaVaultBody(
+                        context,
+                        size: 15,
+                        weight: FontWeight.w500,
+                        color: theme.textMuted,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ),
                 buildDefaultDragHandles: false,
                 proxyDecorator: (child, index, animation) => Material(
                   color: Colors.transparent,
