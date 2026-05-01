@@ -1100,6 +1100,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                   ),
                   const SizedBox(height: 10),
                   IdeaVaultActionButton(
+                    label: 'Export to PDF',
+                    backgroundColor: sheetTheme.surfaceLow,
+                    foregroundColor: sheetTheme.primary,
+                    height: 48,
+                    textSize: 14,
+                    onPressed: () => Navigator.of(sheetContext)
+                        .pop(_IdeaEditorMenuAction.exportToPDF),
+                  ),
+                  const SizedBox(height: 10),
+                  IdeaVaultActionButton(
                     label: 'Delete Idea',
                     backgroundColor: errorColor.withValues(alpha: 0.1),
                     foregroundColor: errorColor,
@@ -1122,7 +1132,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     switch (action) {
       case _IdeaEditorMenuAction.exportForAI:
-        await _openExportForAI();
+        await _openExportScreen(ExportMode.aiExport);
+        break;
+      case _IdeaEditorMenuAction.exportToPDF:
+        await _openExportScreen(ExportMode.pdfExport);
         break;
       case _IdeaEditorMenuAction.deleteIdea:
         await _confirmDeleteIdea();
@@ -1130,7 +1143,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
   }
 
-  Future<void> _openExportForAI() async {
+  Future<void> _openExportScreen(ExportMode mode) async {
     await _flushAutosave();
     if (!mounted) {
       return;
@@ -1141,6 +1154,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       ExportForAIScreen(
         ideaTitle: _autosaveTitle,
         sections: _sectionsToSave(),
+        mode: mode,
       ),
     );
   }
@@ -1459,6 +1473,7 @@ class _Header extends StatelessWidget {
 
 enum _IdeaEditorMenuAction {
   exportForAI,
+  exportToPDF,
   deleteIdea,
 }
 

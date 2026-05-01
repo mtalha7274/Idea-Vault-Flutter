@@ -63,9 +63,14 @@ paywallRestorePurchases,Restore Purchases
 paywallTermsOfService,Terms of Service
 paywallFooterDot,•
 exportForAiScreenTitle,Export for AI
-exportForAiScreenSubtitle,"Choose sections to include, then paste the copy into any AI chat for context."
+exportToPdfScreenTitle,Export to PDF
+exportForAiScreenSubtitle,"Select the sections you want, copy, and paste into ChatGPT, Claude, or any AI to brainstorm with full context."
+exportToPdfScreenSubtitle,Select and arrange the sections you want to include in your PDF export.
 exportForAiCopyToClipboardButton,Copy to Clipboard
+exportToPdfButton,Export to PDF
 exportForAiSnackbarSelectSection,Select at least one section to copy.
+exportToPdfSnackbarSelectSection,Select at least one section to export.
+exportToPdfSnackbarFailed,Failed to export PDF. Please try again.
 exportForAiSnackbarCopied,Copied! Paste into any AI chat.
 exportForAiClipboardIdeaLine,Idea: {title}
 exportForAiSectionNoContentYet,No content yet

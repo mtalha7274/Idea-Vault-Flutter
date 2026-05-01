@@ -33,7 +33,8 @@ class ViewConstants {
   static const String requestTimeout = "requestTimeout";
 
   /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiSoftCharacterLimit]).
-  static const String organizeOverLimitDialogBody = 'organizeOverLimitDialogBody';
+  static const String organizeOverLimitDialogBody =
+      'organizeOverLimitDialogBody';
 
   static const String organizeSectionSheetTitle = 'organizeSectionSheetTitle';
   static const String organizeSectionSheetDescription =
@@ -53,8 +54,7 @@ class ViewConstants {
   static const String paywallProUnlocks = 'paywallProUnlocks';
   static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
   static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
-  static const String paywallFeatureSpeechToText =
-      'paywallFeatureSpeechToText';
+  static const String paywallFeatureSpeechToText = 'paywallFeatureSpeechToText';
   static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
   static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
   static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';
@@ -80,11 +80,17 @@ class ViewConstants {
   static const String paywallFooterDot = 'paywallFooterDot';
 
   static const String exportForAiScreenTitle = 'exportForAiScreenTitle';
+  static const String exportToPdfScreenTitle = 'exportToPdfScreenTitle';
   static const String exportForAiScreenSubtitle = 'exportForAiScreenSubtitle';
+  static const String exportToPdfScreenSubtitle = 'exportToPdfScreenSubtitle';
   static const String exportForAiCopyToClipboardButton =
       'exportForAiCopyToClipboardButton';
+  static const String exportToPdfButton = 'exportToPdfButton';
   static const String exportForAiSnackbarSelectSection =
       'exportForAiSnackbarSelectSection';
+  static const String exportToPdfSnackbarSelectSection =
+      'exportToPdfSnackbarSelectSection';
+  static const String exportToPdfSnackbarFailed = 'exportToPdfSnackbarFailed';
   static const String exportForAiSnackbarCopied = 'exportForAiSnackbarCopied';
   static const String exportForAiClipboardIdeaLine =
       'exportForAiClipboardIdeaLine';

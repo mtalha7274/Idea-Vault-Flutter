@@ -15,9 +15,9 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showStartupPaywall();
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _showStartupPaywall();
+    // });
   }
 
   Future<void> _showStartupPaywall() async {

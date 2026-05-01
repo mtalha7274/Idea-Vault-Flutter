@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../models/idea.dart';
@@ -11,15 +14,22 @@ import '../widgets/idea_vault_action_button.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
+enum ExportMode {
+  aiExport,
+  pdfExport,
+}
+
 class ExportForAIScreen extends StatefulWidget {
   const ExportForAIScreen({
     super.key,
     required this.ideaTitle,
     required this.sections,
+    required this.mode,
   });
 
   final String ideaTitle;
   final List<IdeaSection> sections;
+  final ExportMode mode;
 
   @override
   State<ExportForAIScreen> createState() => _ExportForAIScreenState();
@@ -39,6 +49,18 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final titleKey = switch (widget.mode) {
+      ExportMode.aiExport => ViewConstants.exportForAiScreenTitle,
+      ExportMode.pdfExport => ViewConstants.exportToPdfScreenTitle,
+    };
+    final subtitleKey = switch (widget.mode) {
+      ExportMode.aiExport => ViewConstants.exportForAiScreenSubtitle,
+      ExportMode.pdfExport => ViewConstants.exportToPdfScreenSubtitle,
+    };
+    final buttonLabelKey = switch (widget.mode) {
+      ExportMode.aiExport => ViewConstants.exportForAiCopyToClipboardButton,
+      ExportMode.pdfExport => ViewConstants.exportToPdfButton,
+    };
     return Scaffold(
       backgroundColor: theme.background,
       appBar: AppBar(
@@ -60,7 +82,7 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
           visualDensity: VisualDensity.compact,
         ),
         title: TranslatedText(
-          ViewConstants.exportForAiScreenTitle,
+          titleKey,
           style: ideaVaultHeadline(
             context,
             size: 20,
@@ -75,10 +97,9 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
             ColoredBox(
               color: theme.background,
               child: Padding(
-                padding:
-                    EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 18.h),
+                padding: EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 18.h),
                 child: TranslatedText(
-                  ViewConstants.exportForAiScreenSubtitle,
+                  subtitleKey,
                   style: ideaVaultBody(
                     context,
                     size: 15,
@@ -113,16 +134,15 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
               ),
             ),
             Padding(
-              padding:
-                  EdgeInsets.fromLTRB(24.w, 14.h, 24.w, 12.h),
+              padding: EdgeInsets.fromLTRB(24.w, 14.h, 24.w, 12.h),
               child: IdeaVaultActionButton(
                 key: const Key('export-ai-copy'),
-                label: ViewConstants.exportForAiCopyToClipboardButton,
+                label: buttonLabelKey,
                 useTranslatedLabel: true,
                 backgroundColor: theme.primary,
                 foregroundColor: Colors.white,
                 height: 56.h,
-                onPressed: _copySelectedSections,
+                onPressed: _handlePrimaryAction,
               ),
             ),
           ],
@@ -139,6 +159,17 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
       final section = _sections.removeAt(oldIndex);
       _sections.insert(newIndex, section);
     });
+  }
+
+  Future<void> _handlePrimaryAction() async {
+    switch (widget.mode) {
+      case ExportMode.aiExport:
+        await _copySelectedSections();
+        break;
+      case ExportMode.pdfExport:
+        await _exportSelectedSectionsToPdf();
+        break;
+    }
   }
 
   void _toggleSection(String sectionId) {
@@ -184,6 +215,68 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
     _showMessageKey(ViewConstants.exportForAiSnackbarCopied);
   }
 
+  Future<void> _exportSelectedSectionsToPdf() async {
+    final selectedSections = _sections
+        .where((section) => _selectedSectionIds.contains(section.id))
+        .toList(growable: false);
+
+    if (selectedSections.isEmpty) {
+      _showMessageKey(ViewConstants.exportToPdfSnackbarSelectSection);
+      return;
+    }
+
+    try {
+      final markdownContent = _buildPdfMarkdown(selectedSections);
+      final html = md.markdownToHtml(markdownContent);
+      final styledHtml = '''
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; }
+  h1 { font-size: 24px; margin-bottom: 8px; }
+  h2 { font-size: 18px; margin-top: 24px; margin-bottom: 4px; }
+  p { font-size: 14px; line-height: 1.6; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 8px; }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>$html</body>
+</html>
+''';
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async {
+          // ignore: deprecated_member_use
+          return await Printing.convertHtml(
+            format: format,
+            html: styledHtml,
+          );
+        },
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showMessageKey(ViewConstants.exportToPdfSnackbarFailed);
+    }
+  }
+
+  String _buildPdfMarkdown(List<IdeaSection> selectedSections) {
+    final buffer = StringBuffer()..writeln('# ${widget.ideaTitle}');
+    for (final section in selectedSections) {
+      buffer
+        ..writeln()
+        ..writeln('## ${section.name}')
+        ..write(section.content);
+      if (!section.content.endsWith('\n')) {
+        buffer.writeln();
+      }
+    }
+    return buffer.toString().trimRight();
+  }
+
   void _showMessageKey(String key, {Map<String, String>? namedArgs}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -221,8 +314,7 @@ class _ExportSectionTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding:
-              EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+          padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
           child: Row(
             children: [
               Checkbox(
