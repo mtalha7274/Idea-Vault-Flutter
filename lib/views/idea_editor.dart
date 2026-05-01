@@ -20,7 +20,8 @@ import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
-import '../widgets/popups/organize_over_limit_popup.dart';
+import '../widgets/popups/idea_editor_section_sheet.dart';
+import '../widgets/popups/organise_section_sheet.dart';
 import 'ideas/idea_vault_theme.dart';
 
 /// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
@@ -902,7 +903,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showAddSectionSheet() async {
-    final result = await _showSectionSheet();
+    final result = await showIdeaEditorSectionSheet(
+      context,
+      sectionCount: _sections.length,
+    );
     if (!mounted || result == null || result.name == null) {
       return;
     }
@@ -935,7 +939,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showEditSectionSheet(IdeaSection section) async {
-    final result = await _showSectionSheet(section: section);
+    final result = await showIdeaEditorSectionSheet(
+      context,
+      section: section,
+      sectionCount: _sections.length,
+    );
     if (!mounted || result == null) {
       return;
     }
@@ -975,145 +983,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
     _scheduleAutosave();
     _persistEditorState();
-  }
-
-  Future<_SectionSheetResult?> _showSectionSheet({
-    IdeaSection? section,
-  }) async {
-    final nameController = TextEditingController();
-    nameController.text = section?.name ?? '';
-    nameController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: nameController.text.length,
-    );
-
-    final sheetSurface = context.read<ThemeProvider>().baseTheme.surface;
-    final result = await showModalBottomSheet<_SectionSheetResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: sheetSurface,
-      builder: (sheetContext) {
-        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
-        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
-        final isEditing = section != null;
-        final canDelete = isEditing && _sections.length > 1;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isEditing ? 'Edit section' : 'Add section',
-                style: ideaVaultHeadline(
-                  sheetContext,
-                  size: 24,
-                  weight: FontWeight.w800,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                isEditing
-                    ? 'Rename this section or remove it from this idea.'
-                    : 'Create another space for this idea.',
-                style: ideaVaultBody(
-                  sheetContext,
-                  size: 15,
-                  weight: FontWeight.w500,
-                  color: sheetTheme.textMuted,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                key: const Key('idea-editor-section-name'),
-                controller: nameController,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Section name',
-                  filled: true,
-                  fillColor: sheetTheme.surfaceLow,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: ideaVaultLabel(
-                        sheetContext,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: sheetTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                  if (canDelete) ...[
-                    TextButton(
-                      key: const Key('idea-editor-delete-section'),
-                      onPressed: () => Navigator.of(sheetContext).pop(
-                        const _SectionSheetResult.delete(),
-                      ),
-                      child: Text(
-                        'Delete',
-                        style: ideaVaultLabel(
-                          sheetContext,
-                          size: 14,
-                          weight: FontWeight.w700,
-                          color: Theme.of(sheetContext).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  FilledButton(
-                    key: const Key('idea-editor-create-section'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: sheetTheme.primary,
-                      foregroundColor: sheetTheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                    ),
-                    onPressed: () {
-                      final nextName = nameController.text.trim();
-                      if (nextName.isEmpty) {
-                        return;
-                      }
-                      Navigator.of(sheetContext).pop(
-                        _SectionSheetResult.rename(nextName),
-                      );
-                    },
-                    child: Text(
-                      isEditing ? 'Save' : 'Add',
-                      style: ideaVaultLabel(
-                        sheetContext,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: sheetTheme.onPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
-    return result;
   }
 
   void _deleteSection(String sectionId) {
@@ -1500,15 +1369,4 @@ class _SectionTabButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SectionSheetResult {
-  const _SectionSheetResult.rename(this.name) : shouldDelete = false;
-
-  const _SectionSheetResult.delete()
-      : name = null,
-        shouldDelete = true;
-
-  final String? name;
-  final bool shouldDelete;
 }
