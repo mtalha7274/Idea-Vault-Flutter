@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -243,18 +244,15 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
-            child: _Header(
-              onClose: _onClosePressed,
-              onBrainstorm: () => AppRouter.push(
-                context,
-                const BrainstormChatScreen(),
-              ),
-              isAutosaving: _isAutosaving,
-              hasSaveFailed: _hasSaveFailed,
-              isEditingExisting: widget.ideaId != null,
+          _Header(
+            onClose: _onClosePressed,
+            onBrainstorm: () => AppRouter.push(
+              context,
+              const BrainstormChatScreen(),
             ),
+            isAutosaving: _isAutosaving,
+            hasSaveFailed: _hasSaveFailed,
+            isEditingExisting: widget.ideaId != null,
           ),
           Align(
             alignment: Alignment.topCenter,
@@ -266,7 +264,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          Gap(12.h)
         ],
       ),
     );
@@ -1287,68 +1285,38 @@ class _Header extends StatelessWidget {
   final bool hasSaveFailed;
   final bool isEditingExisting;
 
-  static const Color _bulbColor = Color(0xFFFFC107);
-
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
     return Row(
       children: [
+        Gap(10.w),
         IconButton(
           key: const Key('idea-editor-close'),
           onPressed: onClose,
-          style: IconButton.styleFrom(
-            backgroundColor: theme.surfaceLow,
-            foregroundColor: theme.primary,
-            padding: const EdgeInsets.all(14),
-          ),
           icon: const Icon(Icons.close_rounded),
+          padding: EdgeInsets.all(10.d),
         ),
-        const SizedBox(width: 14),
+        Gap(10.w),
         Expanded(
-          child: Text(
-            isEditingExisting ? 'Edit Idea' : 'New Idea',
+          child: TranslatedText(
+            isEditingExisting
+                ? ViewConstants.ideaEditorTitleEdit
+                : ViewConstants.ideaEditorTitleNew,
             style: ideaVaultHeadline(
               context,
-              size: 22,
+              size: 22.f,
               weight: FontWeight.w800,
               height: 1.2,
             ),
           ),
         ),
-        GestureDetector(
-          onTap: onBrainstorm,
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            key: const Key('idea-editor-brainstorm'),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: _bulbColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lightbulb_rounded,
-                  color: _bulbColor,
-                  size: 20.d,
-                ),
-                const SizedBox(width: 6),
-                TranslatedText(
-                  ViewConstants.brainstorm,
-                  style: ideaVaultLabel(
-                    context,
-                    size: 14.f,
-                    weight: FontWeight.w600,
-                    color: theme.primaryText,
-                    letterSpacing: 0.15,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        IconButton(
+          key: const Key('idea-editor-menu'),
+          onPressed: () {},
+          icon: const Icon(Icons.more_vert),
+          padding: EdgeInsets.all(10.d),
         ),
+        Gap(10.w),
       ],
     );
   }

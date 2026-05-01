@@ -45,6 +45,9 @@ class ViewConstants {
 
   static const String brainstorm = 'brainstorm';
 
+  static const String ideaEditorTitleEdit = 'ideaEditorTitleEdit';
+  static const String ideaEditorTitleNew = 'ideaEditorTitleNew';
+
   static const String paywallTitle = 'paywallTitle';
   static const String paywallSubtitle = 'paywallSubtitle';
   static const String paywallProUnlocks = 'paywallProUnlocks';
