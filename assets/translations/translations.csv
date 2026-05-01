@@ -62,3 +62,10 @@ paywallComingSoon,Coming soon
 paywallRestorePurchases,Restore Purchases
 paywallTermsOfService,Terms of Service
 paywallFooterDot,•
+exportForAiScreenTitle,Export for AI
+exportForAiScreenSubtitle,"Choose sections to include, then paste the copy into any AI chat for context."
+exportForAiCopyToClipboardButton,Copy to Clipboard
+exportForAiSnackbarSelectSection,Select at least one section to copy.
+exportForAiSnackbarCopied,Copied! Paste into any AI chat.
+exportForAiClipboardIdeaLine,Idea: {title}
+exportForAiSectionNoContentYet,No content yet

@@ -78,4 +78,16 @@ class ViewConstants {
   static const String paywallRestorePurchases = 'paywallRestorePurchases';
   static const String paywallTermsOfService = 'paywallTermsOfService';
   static const String paywallFooterDot = 'paywallFooterDot';
+
+  static const String exportForAiScreenTitle = 'exportForAiScreenTitle';
+  static const String exportForAiScreenSubtitle = 'exportForAiScreenSubtitle';
+  static const String exportForAiCopyToClipboardButton =
+      'exportForAiCopyToClipboardButton';
+  static const String exportForAiSnackbarSelectSection =
+      'exportForAiSnackbarSelectSection';
+  static const String exportForAiSnackbarCopied = 'exportForAiSnackbarCopied';
+  static const String exportForAiClipboardIdeaLine =
+      'exportForAiClipboardIdeaLine';
+  static const String exportForAiSectionNoContentYet =
+      'exportForAiSectionNoContentYet';
 }

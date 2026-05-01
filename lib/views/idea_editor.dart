@@ -21,12 +21,14 @@ import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
+import '../widgets/idea_vault_action_button.dart';
 import '../widgets/idea_markdown_editor.dart';
+import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/popups/idea_editor_section_sheet.dart';
 import '../widgets/popups/organise_section_sheet.dart';
 import '../core/constants/view_constants.dart';
 import '../widgets/translated_text.dart';
-import 'brainstorm_chat_screen.dart';
+import 'export_for_ai_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
 /// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
@@ -246,10 +248,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         children: [
           _Header(
             onClose: _onClosePressed,
-            onBrainstorm: () => AppRouter.push(
-              context,
-              const BrainstormChatScreen(),
-            ),
+            onMenuPressed: _showMoreOptionsSheet,
             isAutosaving: _isAutosaving,
             hasSaveFailed: _hasSaveFailed,
             isEditingExisting: widget.ideaId != null,
@@ -1041,6 +1040,142 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     await _closeEditor();
   }
 
+  Future<void> _showMoreOptionsSheet() async {
+    final action = await showModalBottomSheet<_IdeaEditorMenuAction>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      builder: (sheetContext) {
+        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
+        final errorColor = Theme.of(sheetContext).colorScheme.error;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: sheetTheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(
+                color: sheetTheme.outline.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: sheetTheme.outline.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Idea options',
+                    style: ideaVaultHeadline(
+                      sheetContext,
+                      size: 22,
+                      weight: FontWeight.w800,
+                      height: 1.2,
+                      color: sheetTheme.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  IdeaVaultActionButton(
+                    label: 'Export for AI',
+                    backgroundColor: sheetTheme.surfaceLow,
+                    foregroundColor: sheetTheme.primary,
+                    height: 48,
+                    textSize: 14,
+                    onPressed: () => Navigator.of(sheetContext)
+                        .pop(_IdeaEditorMenuAction.exportForAI),
+                  ),
+                  const SizedBox(height: 10),
+                  IdeaVaultActionButton(
+                    label: 'Delete Idea',
+                    backgroundColor: errorColor.withValues(alpha: 0.1),
+                    foregroundColor: errorColor,
+                    height: 48,
+                    textSize: 14,
+                    onPressed: () => Navigator.of(sheetContext)
+                        .pop(_IdeaEditorMenuAction.deleteIdea),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case _IdeaEditorMenuAction.exportForAI:
+        await _openExportForAI();
+        break;
+      case _IdeaEditorMenuAction.deleteIdea:
+        await _confirmDeleteIdea();
+        break;
+    }
+  }
+
+  Future<void> _openExportForAI() async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    await AppRouter.push(
+      context,
+      ExportForAIScreen(
+        ideaTitle: _autosaveTitle,
+        sections: _sectionsToSave(),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteIdea() async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+
+    final shouldDelete = await showDeleteIdeasConfirmationDialog(
+      context,
+      selectedCount: 1,
+    );
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    _autosaveTimer?.cancel();
+    await _ideasProvider.deleteIdeas([ideaId]);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _allowPop = true;
+    });
+    AppRouter.pop(context);
+  }
+
   void _scheduleAutosave() {
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(_autosaveDelay, () {
@@ -1273,14 +1408,14 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
-    required this.onBrainstorm,
+    required this.onMenuPressed,
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
-  final VoidCallback onBrainstorm;
+  final VoidCallback onMenuPressed;
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
@@ -1312,7 +1447,7 @@ class _Header extends StatelessWidget {
         ),
         IconButton(
           key: const Key('idea-editor-menu'),
-          onPressed: () {},
+          onPressed: onMenuPressed,
           icon: const Icon(Icons.more_vert),
           padding: EdgeInsets.all(10.d),
         ),
@@ -1320,6 +1455,11 @@ class _Header extends StatelessWidget {
       ],
     );
   }
+}
+
+enum _IdeaEditorMenuAction {
+  exportForAI,
+  deleteIdea,
 }
 
 class _SectionTabButton extends StatelessWidget {
