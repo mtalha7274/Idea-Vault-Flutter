@@ -1,4 +1,4 @@
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 
 class TranslatedText extends StatelessWidget {
@@ -19,9 +19,13 @@ class TranslatedText extends StatelessWidget {
     this.textWidthBasis,
     this.textHeightBehavior,
     this.selectionColor,
+    this.namedArgs,
   });
 
   final String data;
+
+  /// Placeholders for `'key'.tr(namedArgs: ...)` — e.g. `{ 'limit': '2,000' }`.
+  final Map<String, String>? namedArgs;
   final TextStyle? style;
   final StrutStyle? strutStyle;
   final TextAlign? textAlign;
@@ -40,11 +44,12 @@ class TranslatedText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      data,
+      _resolvedText(),
       key: key,
       style: style,
       strutStyle: strutStyle,
       textAlign: textAlign,
+      textDirection: textDirection,
       locale: locale,
       softWrap: softWrap,
       overflow: overflow,
@@ -54,6 +59,14 @@ class TranslatedText extends StatelessWidget {
       textWidthBasis: textWidthBasis,
       textHeightBehavior: textHeightBehavior,
       selectionColor: selectionColor,
-    ).tr();
+    );
+  }
+
+  String _resolvedText() {
+    final args = namedArgs;
+    if (args != null && args.isNotEmpty) {
+      return data.tr(namedArgs: args);
+    }
+    return data.tr();
   }
 }

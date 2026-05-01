@@ -15,7 +15,7 @@ abstract class BaseTheme {
   Color get textMuted;
   Color get accentTint;
   Color get outlineSoft;
-
+  Color get warning;
   SettingsColors get settings;
   BottomNavBarColors get bottomNavBar;
 

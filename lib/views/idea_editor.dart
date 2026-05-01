@@ -20,7 +20,12 @@ import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
+import '../widgets/popups/idea_editor_section_sheet.dart';
+import '../widgets/popups/organise_section_sheet.dart';
 import 'ideas/idea_vault_theme.dart';
+
+/// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
+const int ideaSectionAiSoftCharacterLimit = 2000;
 
 class IdeaEditorScreen extends StatefulWidget {
   const IdeaEditorScreen({
@@ -202,6 +207,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         focusNode: _contentFocusNode,
                         isPreviewMode: _isPreviewMode,
                         onPreviewToggle: _togglePreviewMode,
+                        onOrganize: () =>
+                            unawaited(_onOrganizeToolbarPressed()),
+                        organizeEnabled: !_isOrganizing,
+                        exceedsAiCharacterLimit:
+                            _sectionExceedsAiSoftCharacterLimit,
                       ),
                     ),
                   ),
@@ -233,7 +243,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
             child: _Header(
               onClose: _onClosePressed,
-              onOrganize: _handleOrganize,
               isAutosaving: _isAutosaving,
               hasSaveFailed: _hasSaveFailed,
               isEditingExisting: widget.ideaId != null,
@@ -268,10 +277,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 860),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: _buildSectionTabs(context),
-            ),
+            child: _buildSectionTabs(context),
           ),
         ),
       ),
@@ -428,7 +434,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Widget _buildOrganizingOverlay(BuildContext context) {
-    return const AiLoadingOverlay();
+    return Material(
+      type: MaterialType.transparency,
+      child: const AiLoadingOverlay(),
+    );
   }
 
   Widget _buildAddSectionTab() {
@@ -458,6 +467,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  const SizedBox(width: 24),
                   for (var i = 0; i < _sections.length; i++) ...[
                     if (i > 0) const SizedBox(width: 10),
                     _SectionTabButton(
@@ -470,6 +480,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                   ],
                   const SizedBox(width: 10),
                   _buildAddSectionTab(),
+                  const SizedBox(width: 24),
                 ],
               ),
             ),
@@ -550,6 +561,36 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   void _handleEditorContentChanged() {
     _updateActiveSectionContent(_contentController.text);
+  }
+
+  bool get _sectionExceedsAiSoftCharacterLimit =>
+      _contentPlainTextForEditing().length > ideaSectionAiSoftCharacterLimit;
+
+  String _contentPlainTextForEditing() {
+    var plain = _contentController.text;
+    if (plain.endsWith('\n')) {
+      plain = plain.substring(0, plain.length - 1);
+    }
+    return plain;
+  }
+
+  Future<void> _onOrganizeToolbarPressed() async {
+    if (_contentPlainTextForEditing().trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing to organize')),
+      );
+      return;
+    }
+
+    final proceed = await showOrganizeSectionSheet(
+      context,
+      characterLimit: ideaSectionAiSoftCharacterLimit,
+      exceedsCharacterLimit: _sectionExceedsAiSoftCharacterLimit,
+    );
+
+    if (proceed && mounted) {
+      await _handleOrganize();
+    }
   }
 
   void _replaceEditorContent(String content) {
@@ -862,7 +903,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showAddSectionSheet() async {
-    final result = await _showSectionSheet();
+    final result = await showIdeaEditorSectionSheet(
+      context,
+      sectionCount: _sections.length,
+    );
     if (!mounted || result == null || result.name == null) {
       return;
     }
@@ -895,7 +939,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showEditSectionSheet(IdeaSection section) async {
-    final result = await _showSectionSheet(section: section);
+    final result = await showIdeaEditorSectionSheet(
+      context,
+      section: section,
+      sectionCount: _sections.length,
+    );
     if (!mounted || result == null) {
       return;
     }
@@ -935,145 +983,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
     _scheduleAutosave();
     _persistEditorState();
-  }
-
-  Future<_SectionSheetResult?> _showSectionSheet({
-    IdeaSection? section,
-  }) async {
-    final nameController = TextEditingController();
-    nameController.text = section?.name ?? '';
-    nameController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: nameController.text.length,
-    );
-
-    final sheetSurface = context.read<ThemeProvider>().baseTheme.surface;
-    final result = await showModalBottomSheet<_SectionSheetResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: sheetSurface,
-      builder: (sheetContext) {
-        final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
-        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
-        final isEditing = section != null;
-        final canDelete = isEditing && _sections.length > 1;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isEditing ? 'Edit section' : 'Add section',
-                style: ideaVaultHeadline(
-                  sheetContext,
-                  size: 24,
-                  weight: FontWeight.w800,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                isEditing
-                    ? 'Rename this section or remove it from this idea.'
-                    : 'Create another space for this idea.',
-                style: ideaVaultBody(
-                  sheetContext,
-                  size: 15,
-                  weight: FontWeight.w500,
-                  color: sheetTheme.textMuted,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                key: const Key('idea-editor-section-name'),
-                controller: nameController,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Section name',
-                  filled: true,
-                  fillColor: sheetTheme.surfaceLow,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: ideaVaultLabel(
-                        sheetContext,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: sheetTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                  if (canDelete) ...[
-                    TextButton(
-                      key: const Key('idea-editor-delete-section'),
-                      onPressed: () => Navigator.of(sheetContext).pop(
-                        const _SectionSheetResult.delete(),
-                      ),
-                      child: Text(
-                        'Delete',
-                        style: ideaVaultLabel(
-                          sheetContext,
-                          size: 14,
-                          weight: FontWeight.w700,
-                          color: Theme.of(sheetContext).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  FilledButton(
-                    key: const Key('idea-editor-create-section'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: sheetTheme.primary,
-                      foregroundColor: sheetTheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                    ),
-                    onPressed: () {
-                      final nextName = nameController.text.trim();
-                      if (nextName.isEmpty) {
-                        return;
-                      }
-                      Navigator.of(sheetContext).pop(
-                        _SectionSheetResult.rename(nextName),
-                      );
-                    },
-                    child: Text(
-                      isEditing ? 'Save' : 'Add',
-                      style: ideaVaultLabel(
-                        sheetContext,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: sheetTheme.onPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
-    return result;
   }
 
   void _deleteSection(String sectionId) {
@@ -1252,18 +1161,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _handleOrganize() async {
-    final currentText = _contentController.text.trim();
+    final currentText = _contentPlainTextForEditing().trim();
 
     if (currentText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nothing to organize')),
-      );
-      return;
-    }
-
-    if (currentText.length > 2000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Idea is too long (max 2000 chars)')),
       );
       return;
     }
@@ -1365,14 +1267,12 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
-    required this.onOrganize,
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
-  final VoidCallback onOrganize;
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
@@ -1402,31 +1302,6 @@ class _Header extends StatelessWidget {
               weight: FontWeight.w800,
               height: 1.2,
             ),
-          ),
-        ),
-        IconButton(
-          key: const Key('idea-editor-organize'),
-          onPressed: onOrganize,
-          style: IconButton.styleFrom(
-            backgroundColor: theme.surfaceLow,
-            foregroundColor: theme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-          icon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.auto_awesome, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Organize',
-                style: ideaVaultLabel(
-                  context,
-                  size: 13,
-                  weight: FontWeight.w700,
-                  color: theme.primary,
-                ),
-              ),
-            ],
           ),
         ),
       ],
@@ -1494,15 +1369,4 @@ class _SectionTabButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SectionSheetResult {
-  const _SectionSheetResult.rename(this.name) : shouldDelete = false;
-
-  const _SectionSheetResult.delete()
-      : name = null,
-        shouldDelete = true;
-
-  final String? name;
-  final bool shouldDelete;
 }
