@@ -76,7 +76,7 @@ class _OrganizeSectionSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      Icons.auto_awesome_rounded,
+                      Icons.auto_fix_high_rounded,
                       size: 28,
                       color: theme.primary,
                     ),
@@ -167,7 +167,7 @@ class _OrganizeSectionSheet extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.auto_awesome_rounded,
+                              Icons.auto_fix_high_rounded,
                               size: 18,
                               color: theme.primary,
                             ),

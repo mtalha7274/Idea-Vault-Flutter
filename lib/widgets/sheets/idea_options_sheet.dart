@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/view_constants.dart';
 import '../../viewmodels/providers/theme_provider.dart';
 import '../../views/ideas/idea_vault_theme.dart';
-import '../idea_vault_action_button.dart';
 import '../translated_text.dart';
 
 Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
@@ -19,6 +19,8 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
     builder: (sheetContext) {
       final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
       final errorColor = Theme.of(sheetContext).colorScheme.error;
+      final groupBorder = sheetTheme.outline.withValues(alpha: 0.12);
+      final dividerColor = sheetTheme.outline.withValues(alpha: 0.1);
       return DecoratedBox(
         decoration: BoxDecoration(
           color: sheetTheme.surface,
@@ -59,42 +61,57 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
                   ),
                 ),
                 const Gap(20),
-                IdeaVaultActionButton(
-                  key: const Key('idea-editor-option-export-ai'),
-                  label: ViewConstants.exportForAiScreenTitle,
-                  useTranslatedLabel: true,
-                  backgroundColor: sheetTheme.surfaceLow,
-                  foregroundColor: sheetTheme.primary,
-                  height: 48,
-                  textSize: 14,
-                  onPressed: () => Navigator.of(sheetContext).pop(
-                    IdeaEditorOptionsSheetAction.exportForAI,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: sheetTheme.surfaceLow,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: groupBorder),
                   ),
-                ),
-                const Gap(10),
-                IdeaVaultActionButton(
-                  key: const Key('idea-editor-option-export-pdf'),
-                  label: ViewConstants.exportToPdfButton,
-                  useTranslatedLabel: true,
-                  backgroundColor: sheetTheme.surfaceLow,
-                  foregroundColor: sheetTheme.primary,
-                  height: 48,
-                  textSize: 14,
-                  onPressed: () => Navigator.of(sheetContext).pop(
-                    IdeaEditorOptionsSheetAction.exportToPDF,
-                  ),
-                ),
-                const Gap(10),
-                IdeaVaultActionButton(
-                  key: const Key('idea-editor-option-delete-idea'),
-                  label: ViewConstants.ideaEditorOptionsDeleteIdea,
-                  useTranslatedLabel: true,
-                  backgroundColor: errorColor.withValues(alpha: 0.1),
-                  foregroundColor: errorColor,
-                  height: 48,
-                  textSize: 14,
-                  onPressed: () => Navigator.of(sheetContext).pop(
-                    IdeaEditorOptionsSheetAction.deleteIdea,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _SheetOptionRow(
+                          key: const Key('idea-editor-option-export-ai'),
+                          icon: Icons.auto_awesome_rounded,
+                          labelKey: ViewConstants.exportForAiScreenTitle,
+                          iconBackgroundColor:
+                              sheetTheme.primary.withValues(alpha: 0.12),
+                          iconColor: sheetTheme.primary,
+                          labelColor: sheetTheme.primaryText,
+                          onTap: () => Navigator.of(sheetContext).pop(
+                            IdeaEditorOptionsSheetAction.exportForAI,
+                          ),
+                        ),
+                        Divider(height: 1, thickness: 1, color: dividerColor),
+                        _SheetOptionRow(
+                          key: const Key('idea-editor-option-export-pdf'),
+                          icon: Icons.picture_as_pdf_rounded,
+                          labelKey: ViewConstants.exportToPdfButton,
+                          iconBackgroundColor:
+                              sheetTheme.primary.withValues(alpha: 0.12),
+                          iconColor: sheetTheme.primary,
+                          labelColor: sheetTheme.primaryText,
+                          onTap: () => Navigator.of(sheetContext).pop(
+                            IdeaEditorOptionsSheetAction.exportToPDF,
+                          ),
+                        ),
+                        Divider(height: 1, thickness: 1, color: dividerColor),
+                        _SheetOptionRow(
+                          key: const Key('idea-editor-option-delete-idea'),
+                          icon: Icons.delete_outline_rounded,
+                          labelKey: ViewConstants.ideaEditorOptionsDeleteIdea,
+                          iconBackgroundColor:
+                              errorColor.withValues(alpha: 0.12),
+                          iconColor: errorColor,
+                          labelColor: errorColor,
+                          onTap: () => Navigator.of(sheetContext).pop(
+                            IdeaEditorOptionsSheetAction.deleteIdea,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -110,4 +127,58 @@ enum IdeaEditorOptionsSheetAction {
   exportForAI,
   exportToPDF,
   deleteIdea,
+}
+
+class _SheetOptionRow extends StatelessWidget {
+  const _SheetOptionRow({
+    super.key,
+    required this.icon,
+    required this.labelKey,
+    required this.iconBackgroundColor,
+    required this.iconColor,
+    required this.labelColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String labelKey;
+  final Color iconBackgroundColor;
+  final Color iconColor;
+  final Color labelColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 38.d,
+                height: 38.d,
+                child: Icon(icon, size: 20.d, color: iconColor),
+              ),
+              Gap(2.d),
+              Expanded(
+                child: TranslatedText(
+                  labelKey,
+                  style: ideaVaultBody(
+                    context,
+                    size: 15.f,
+                    weight: FontWeight.w600,
+                    height: 1.3,
+                    color: labelColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
