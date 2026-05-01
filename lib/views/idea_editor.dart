@@ -276,10 +276,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 860),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: _buildSectionTabs(context),
-            ),
+            child: _buildSectionTabs(context),
           ),
         ),
       ),
@@ -469,6 +466,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  const SizedBox(width: 24),
                   for (var i = 0; i < _sections.length; i++) ...[
                     if (i > 0) const SizedBox(width: 10),
                     _SectionTabButton(
@@ -481,6 +479,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                   ],
                   const SizedBox(width: 10),
                   _buildAddSectionTab(),
+                  const SizedBox(width: 24),
                 ],
               ),
             ),
