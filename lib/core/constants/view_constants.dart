@@ -40,4 +40,6 @@ class ViewConstants {
       'organizeSectionSheetDescription';
   static const String organizeSectionSheetConfirmButton =
       'organizeSectionSheetConfirmButton';
+
+  static const String organizeToolbarAiBadge = 'organizeToolbarAiBadge';
 }
