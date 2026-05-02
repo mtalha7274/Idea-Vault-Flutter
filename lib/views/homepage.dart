@@ -8,6 +8,7 @@ import '../injection_container.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -253,31 +254,9 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final title =
-            selectedCount == 1 ? 'Delete selected idea?' : 'Delete ideas?';
-        final body = selectedCount == 1
-            ? 'This idea will be removed from your vault.'
-            : '$selectedCount ideas will be removed from your vault.';
-
-        return AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const Key('ideas-delete-confirm'),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+    final shouldDelete = await showDeleteIdeasConfirmationDialog(
+      context,
+      selectedCount: selectedCount,
     );
 
     if (shouldDelete != true || !mounted) {

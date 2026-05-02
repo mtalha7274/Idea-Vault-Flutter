@@ -509,7 +509,7 @@ class _ToolbarOrganizeButton extends StatelessWidget {
               icon: Icon(
                 overLimit
                     ? Icons.warning_amber_rounded
-                    : Icons.auto_awesome_rounded,
+                    : Icons.auto_fix_high_rounded,
                 size: _toolbarOrganizeIconSize,
               ),
             ),

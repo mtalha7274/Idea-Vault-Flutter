@@ -31,3 +31,48 @@ organizeSectionSheetTitle,Organise section
 organizeSectionSheetDescription,The text in this section will be restructured and clarified with AI. Other sections stay as they are.
 organizeSectionSheetConfirmButton,Organise
 organizeToolbarAiBadge,AI
+brainstorm,Brainstorm
+ideaEditorTitleEdit,Edit Idea
+ideaEditorTitleNew,New Idea
+paywallTitle,Idea Vault Pro
+paywallSubtitle,Unlock the full power of Idea Vault.
+paywallProUnlocks,Pro unlocks
+paywallFeatureAiOrganize,Extended AI Organize
+paywallFeatureAiBrainstorm,Idea Export for any AI
+paywallFeatureSpeechToText,Speech to text dictation
+paywallFeatureCloudBackup,Cloud backup
+paywallFeatureExportPdf,Export to PDF
+paywallFeatureEarlyAccess,Early access to new features
+paywallFeaturePrioritySupport,Priority support
+paywallPlanYearly,Yearly
+paywallYearlyPriceLine,$1.67 / month
+paywallYearlySubtitle,$19.99 per year
+paywallTrialLabel,3-day free trial
+paywallBadgeSave,Save 44%
+paywallBadgeMostPopular,Most popular
+paywallPlanMonthly,Monthly
+paywallMonthlyPriceLine,$2.99 / month
+paywallMonthlySubtitle,Billed monthly
+paywallFooterYearly,"Try free for 3 days, then $19.99 per year"
+paywallFooterMonthly,Get Idea Vault Pro for $2.99 per month
+paywallCtaStartTrial,Start Free Trial
+paywallCtaGetMonthly,Get Pro Monthly
+paywallCloseTooltip,Close
+paywallComingSoon,Coming soon
+paywallRestorePurchases,Restore Purchases
+paywallTermsOfService,Terms of Service
+paywallFooterDot,•
+exportForAiScreenTitle,Export for AI
+exportToPdfScreenTitle,Export to PDF
+exportForAiScreenSubtitle,"Select the sections you want, copy, and paste into ChatGPT, Claude, or any AI to brainstorm with full context."
+exportToPdfScreenSubtitle,Select and arrange the sections you want to include in your PDF export.
+exportForAiCopyToClipboardButton,Copy to Clipboard
+exportToPdfButton,Export to PDF
+exportForAiSnackbarSelectSection,Select at least one section to copy.
+exportToPdfSnackbarSelectSection,Select at least one section to export.
+exportToPdfSnackbarFailed,Failed to export PDF. Please try again.
+exportForAiSnackbarCopied,Copied! Paste into any AI chat.
+exportForAiClipboardIdeaLine,Idea: {title}
+exportForAiSectionNoContentYet,No content yet
+ideaEditorOptionsSheetTitle,Idea options
+ideaEditorOptionsDeleteIdea,Delete Idea

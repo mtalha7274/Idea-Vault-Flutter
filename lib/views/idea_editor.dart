@@ -5,6 +5,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gap/gap.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -20,8 +22,13 @@ import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
-import '../widgets/popups/idea_editor_section_sheet.dart';
-import '../widgets/popups/organise_section_sheet.dart';
+import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
+import '../widgets/sheets/idea_editor_section_sheet.dart';
+import '../widgets/sheets/idea_options_sheet.dart';
+import '../widgets/sheets/organise_section_sheet.dart';
+import '../core/constants/view_constants.dart';
+import '../widgets/translated_text.dart';
+import 'export_for_ai_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
 /// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
@@ -239,14 +246,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
-            child: _Header(
-              onClose: _onClosePressed,
-              isAutosaving: _isAutosaving,
-              hasSaveFailed: _hasSaveFailed,
-              isEditingExisting: widget.ideaId != null,
-            ),
+          _Header(
+            onClose: _onClosePressed,
+            onMenuPressed: _showMoreOptionsSheet,
+            isAutosaving: _isAutosaving,
+            hasSaveFailed: _hasSaveFailed,
+            isEditingExisting: widget.ideaId != null,
           ),
           Align(
             alignment: Alignment.topCenter,
@@ -258,7 +263,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          Gap(12.h)
         ],
       ),
     );
@@ -1035,6 +1040,73 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     await _closeEditor();
   }
 
+  Future<void> _showMoreOptionsSheet() async {
+    final action = await showIdeaEditorOptionsSheet(context);
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case IdeaEditorOptionsSheetAction.exportForAI:
+        await _openExportScreen(ExportMode.aiExport);
+        break;
+      case IdeaEditorOptionsSheetAction.exportToPDF:
+        await _openExportScreen(ExportMode.pdfExport);
+        break;
+      case IdeaEditorOptionsSheetAction.deleteIdea:
+        await _confirmDeleteIdea();
+        break;
+    }
+  }
+
+  Future<void> _openExportScreen(ExportMode mode) async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    await AppRouter.push(
+      context,
+      ExportForAIScreen(
+        ideaTitle: _autosaveTitle,
+        sections: _sectionsToSave(),
+        mode: mode,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteIdea() async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+
+    final shouldDelete = await showDeleteIdeasConfirmationDialog(
+      context,
+      selectedCount: 1,
+    );
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    _autosaveTimer?.cancel();
+    await _ideasProvider.deleteIdeas([ideaId]);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _allowPop = true;
+    });
+    AppRouter.pop(context);
+  }
+
   void _scheduleAutosave() {
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(_autosaveDelay, () {
@@ -1267,43 +1339,50 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
+    required this.onMenuPressed,
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
   });
 
   final VoidCallback onClose;
+  final VoidCallback onMenuPressed;
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
     return Row(
       children: [
+        Gap(10.w),
         IconButton(
           key: const Key('idea-editor-close'),
           onPressed: onClose,
-          style: IconButton.styleFrom(
-            backgroundColor: theme.surfaceLow,
-            foregroundColor: theme.primary,
-            padding: const EdgeInsets.all(14),
-          ),
           icon: const Icon(Icons.close_rounded),
+          padding: EdgeInsets.all(10.d),
         ),
-        const SizedBox(width: 14),
+        Gap(10.w),
         Expanded(
-          child: Text(
-            isEditingExisting ? 'Edit Idea' : 'New Idea',
+          child: TranslatedText(
+            isEditingExisting
+                ? ViewConstants.ideaEditorTitleEdit
+                : ViewConstants.ideaEditorTitleNew,
             style: ideaVaultHeadline(
               context,
-              size: 22,
+              size: 22.f,
               weight: FontWeight.w800,
               height: 1.2,
             ),
           ),
         ),
+        IconButton(
+          key: const Key('idea-editor-menu'),
+          onPressed: onMenuPressed,
+          icon: const Icon(Icons.more_vert),
+          padding: EdgeInsets.all(10.d),
+        ),
+        Gap(10.w),
       ],
     );
   }
