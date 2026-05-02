@@ -49,16 +49,16 @@ paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
 paywallFeaturePrioritySupport,Priority support
 paywallPlanYearly,Yearly
-paywallYearlyPriceLine,$1.67 / month
-paywallYearlySubtitle,$19.99 per year
-paywallTrialLabel,3-day free trial
-paywallBadgeSave,Save 44%
+paywallYearlyPriceLine,{monthlyPrice} / month
+paywallYearlySubtitle,{yearlyPrice} per year
+paywallTrialLabel,{days}-day free trial
+paywallBadgeSave,Save {percent}%
 paywallBadgeMostPopular,Most popular
 paywallPlanMonthly,Monthly
-paywallMonthlyPriceLine,$2.99 / month
+paywallMonthlyPriceLine,{monthlyPrice} / month
 paywallMonthlySubtitle,Billed monthly
-paywallFooterYearly,"Try free for 3 days, then $19.99 per year"
-paywallFooterMonthly,Get Idea Vault Pro for $2.99 per month
+paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice} per year"
+paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice} per month
 paywallCtaStartTrial,Start Free Trial
 paywallCtaGetMonthly,Get Pro Monthly
 paywallCloseTooltip,Close
@@ -90,9 +90,7 @@ backupRestoreChangeAccount,Change
 backupRestoreAutoBackup,Auto Backup
 backupRestoreAutoBackupDescription,We back up your ideas every 24 hours.
 backupRestoreLastBackup,Last Backup
-backupRestoreLastBackupStatusSample,"Today, 3:42 AM"
 backupRestoreBackupSize,Backup Size
-backupRestoreBackupSizeSample,124 KB
 backupRestoreBackUpNow,Back Up Now
 backupRestoreSectionRestore,RESTORE
 backupRestoreRestoreFromBackup,Restore from Backup

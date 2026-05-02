@@ -41,6 +41,12 @@ class PaywallScreen extends StatefulWidget {
 class _PaywallScreenState extends State<PaywallScreen> {
   _PaywallPlan _selectedPlan = _PaywallPlan.yearly;
 
+  static const String _yearlyMonthlyEquivalent = r'$1.67';
+  static const String _yearlyPrice = r'$19.99';
+  static const String _monthlyPrice = r'$2.99';
+  static const String _trialDays = '3';
+  static const String _savePercent = '44';
+
   static const List<String> _proFeatureKeys = [
     ViewConstants.paywallFeatureAiOrganize,
     ViewConstants.paywallFeatureAiBrainstorm,
@@ -111,6 +117,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             badgeKey: ViewConstants.paywallBadgeSave,
                             leadingBadgeKey:
                                 ViewConstants.paywallBadgeMostPopular,
+                            priceNamedArgs: const {
+                              'monthlyPrice': _yearlyMonthlyEquivalent,
+                            },
+                            subtitleNamedArgs: const {
+                              'yearlyPrice': _yearlyPrice,
+                            },
+                            trialNamedArgs: const {'days': _trialDays},
+                            badgeNamedArgs: const {'percent': _savePercent},
                             isSelected: _selectedPlan == _PaywallPlan.yearly,
                             onTap: () => _selectPlan(_PaywallPlan.yearly),
                           ),
@@ -119,28 +133,47 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             titleKey: ViewConstants.paywallPlanMonthly,
                             priceKey: ViewConstants.paywallMonthlyPriceLine,
                             subtitleKey: ViewConstants.paywallMonthlySubtitle,
+                            priceNamedArgs: const {
+                              'monthlyPrice': _monthlyPrice,
+                            },
                             isSelected: _selectedPlan == _PaywallPlan.monthly,
                             onTap: () => _selectPlan(_PaywallPlan.monthly),
                           ),
                           Gap(14.h),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
-                            child: TranslatedText(
-                              _isYearlySelected
-                                  ? ViewConstants.paywallFooterYearly
-                                  : ViewConstants.paywallFooterMonthly,
-                              key: ValueKey(_selectedPlan),
-                              textAlign: TextAlign.center,
-                              style: ideaVaultLabel(
-                                context,
-                                size: 13.f,
-                                weight: FontWeight.w700,
-                                color: _isYearlySelected
-                                    ? _PaywallColors.accentGreenDark
-                                    : theme.textMuted,
-                                height: 1.35,
-                              ),
-                            ),
+                            child: _isYearlySelected
+                                ? TranslatedText(
+                                    ViewConstants.paywallFooterYearly,
+                                    key: const ValueKey('footer-yearly'),
+                                    namedArgs: const {
+                                      'trialDays': _trialDays,
+                                      'yearlyPrice': _yearlyPrice,
+                                    },
+                                    textAlign: TextAlign.center,
+                                    style: ideaVaultLabel(
+                                      context,
+                                      size: 13.f,
+                                      weight: FontWeight.w700,
+                                      color: _PaywallColors.accentGreenDark,
+                                      height: 1.35,
+                                    ),
+                                  )
+                                : TranslatedText(
+                                    ViewConstants.paywallFooterMonthly,
+                                    key: const ValueKey('footer-monthly'),
+                                    namedArgs: const {
+                                      'monthlyPrice': _monthlyPrice,
+                                    },
+                                    textAlign: TextAlign.center,
+                                    style: ideaVaultLabel(
+                                      context,
+                                      size: 13.f,
+                                      weight: FontWeight.w700,
+                                      color: theme.textMuted,
+                                      height: 1.35,
+                                    ),
+                                  ),
                           ),
                           Gap(14.h),
                           SizedBox(
@@ -410,6 +443,10 @@ class _PlanOption extends StatelessWidget {
     this.trialLabelKey,
     this.badgeKey,
     this.leadingBadgeKey,
+    this.priceNamedArgs,
+    this.subtitleNamedArgs,
+    this.trialNamedArgs,
+    this.badgeNamedArgs,
   });
 
   final String titleKey;
@@ -418,6 +455,10 @@ class _PlanOption extends StatelessWidget {
   final String? trialLabelKey;
   final String? badgeKey;
   final String? leadingBadgeKey;
+  final Map<String, String>? priceNamedArgs;
+  final Map<String, String>? subtitleNamedArgs;
+  final Map<String, String>? trialNamedArgs;
+  final Map<String, String>? badgeNamedArgs;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -496,7 +537,10 @@ class _PlanOption extends StatelessWidget {
                             ),
                             if (badgeKey != null) ...[
                               Gap(8.w),
-                              _Badge(labelKey: badgeKey!),
+                              _Badge(
+                                labelKey: badgeKey!,
+                                namedArgs: badgeNamedArgs,
+                              ),
                             ],
                           ],
                         ),
@@ -504,6 +548,7 @@ class _PlanOption extends StatelessWidget {
                           Gap(6.h),
                           TranslatedText(
                             trialLabelKey!,
+                            namedArgs: trialNamedArgs,
                             style: ideaVaultLabel(
                               context,
                               size: 12.f,
@@ -516,6 +561,7 @@ class _PlanOption extends StatelessWidget {
                         Gap(6.h),
                         TranslatedText(
                           subtitleKey,
+                          namedArgs: subtitleNamedArgs,
                           style: ideaVaultLabel(
                             context,
                             size: 12.f,
@@ -530,6 +576,7 @@ class _PlanOption extends StatelessWidget {
                   Gap(12.w),
                   TranslatedText(
                     priceKey,
+                    namedArgs: priceNamedArgs,
                     textAlign: TextAlign.right,
                     style: ideaVaultHeadline(
                       context,
@@ -562,10 +609,12 @@ class _Badge extends StatelessWidget {
   const _Badge({
     required this.labelKey,
     this.isPrimary = false,
+    this.namedArgs,
   });
 
   final String labelKey;
   final bool isPrimary;
+  final Map<String, String>? namedArgs;
 
   @override
   Widget build(BuildContext context) {
@@ -578,6 +627,7 @@ class _Badge extends StatelessWidget {
       ),
       child: TranslatedText(
         labelKey,
+        namedArgs: namedArgs,
         style: ideaVaultLabel(
           context,
           size: 10.f,

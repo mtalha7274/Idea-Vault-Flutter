@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 import 'package:idea_vault/config/theme/base.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -20,6 +21,8 @@ class BackupRestoreScreen extends StatefulWidget {
 
 class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   static const String _previewGoogleEmail = 'talha@gmail.com';
+  static final DateTime _previewLastBackupAt = DateTime(2026, 5, 2, 3, 42);
+  static const String _previewBackupSizeLabel = '124 KB';
 
   bool _cloudBackupEnabled = false;
   bool _autoBackupEnabled = true;
@@ -28,6 +31,9 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final cloudOffOverlayColor = theme.background.withValues(alpha: 0.78);
+    final lastBackupFormatted = DateFormat.yMMMd(
+      Localizations.localeOf(context).toString(),
+    ).add_jm().format(_previewLastBackupAt);
 
     return Scaffold(
       backgroundColor: theme.background,
@@ -166,8 +172,16 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                 context,
                                 theme,
                                 labelKey: ViewConstants.backupRestoreLastBackup,
-                                valueKey: ViewConstants
-                                    .backupRestoreLastBackupStatusSample,
+                                value: Text(
+                                  lastBackupFormatted,
+                                  textAlign: TextAlign.end,
+                                  style: ideaVaultBody(
+                                    context,
+                                    size: 15,
+                                    weight: FontWeight.w600,
+                                    color: theme.textMuted,
+                                  ),
+                                ),
                                 trailing: Icon(
                                   Icons.check_circle_rounded,
                                   size: 22.d,
@@ -179,8 +193,16 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                 context,
                                 theme,
                                 labelKey: ViewConstants.backupRestoreBackupSize,
-                                valueKey:
-                                    ViewConstants.backupRestoreBackupSizeSample,
+                                value: Text(
+                                  _previewBackupSizeLabel,
+                                  textAlign: TextAlign.end,
+                                  style: ideaVaultBody(
+                                    context,
+                                    size: 15,
+                                    weight: FontWeight.w600,
+                                    color: theme.textMuted,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -339,7 +361,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     BuildContext context,
     BaseTheme theme, {
     required String labelKey,
-    required String valueKey,
+    required Widget value,
     Widget? trailing,
   }) {
     return Row(
@@ -361,16 +383,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
-                child: TranslatedText(
-                  valueKey,
-                  textAlign: TextAlign.end,
-                  style: ideaVaultBody(
-                    context,
-                    size: 15,
-                    weight: FontWeight.w600,
-                    color: theme.textMuted,
-                  ),
-                ),
+                child: value,
               ),
               if (trailing != null) ...[
                 Gap(8.w),

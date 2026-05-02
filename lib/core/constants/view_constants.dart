@@ -121,11 +121,7 @@ class ViewConstants {
   static const String backupRestoreAutoBackupDescription =
       'backupRestoreAutoBackupDescription';
   static const String backupRestoreLastBackup = 'backupRestoreLastBackup';
-  static const String backupRestoreLastBackupStatusSample =
-      'backupRestoreLastBackupStatusSample';
   static const String backupRestoreBackupSize = 'backupRestoreBackupSize';
-  static const String backupRestoreBackupSizeSample =
-      'backupRestoreBackupSizeSample';
   static const String backupRestoreBackUpNow = 'backupRestoreBackUpNow';
   static const String backupRestoreSectionRestore =
       'backupRestoreSectionRestore';
