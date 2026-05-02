@@ -26,6 +26,10 @@ class ViewConstants {
   static const String shareApp = "shareApp";
   static const String contactUs = "contactUs";
   static const String settings = "settings";
+  static const String settingsAppearance = "settingsAppearance";
+  static const String settingsThemeLight = "settingsThemeLight";
+  static const String settingsThemeDark = "settingsThemeDark";
+  static const String settingsThemeDescription = "settingsThemeDescription";
   static const String home = "home";
   static const String search = "search";
   static const String more = "more";

@@ -18,6 +18,10 @@ rateApp,Rate App
 shareApp,Share App
 contactUs,Contact Us
 settings,Settings
+settingsAppearance,Appearance
+settingsThemeLight,Light
+settingsThemeDark,Dark
+settingsThemeDescription,Choose light or dark colors across the app.
 home,Home
 search,Search
 more,More

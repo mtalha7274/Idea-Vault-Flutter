@@ -6,7 +6,6 @@ class Config {
 // Themes
   static const String light = 'light';
   static const String dark = 'dark';
-  static const String defaultTheme = light;
 
   // Config
   static const String fontFamily = 'Inter';

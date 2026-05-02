@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:idea_vault/core/extensions/double.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -18,6 +17,8 @@ import '../core/constants/view_constants.dart';
 import '../core/utils/helpers.dart';
 import '../main.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/idea_vault_subpage_app_bar.dart';
+import '../widgets/idea_vault_theme_mode_slider.dart';
 import '../widgets/translated_text.dart';
 
 class Settings extends StatefulWidget {
@@ -35,6 +36,10 @@ class _SettingsState extends State<Settings> {
     final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
+      backgroundColor: themeProvider.baseTheme.background,
+      appBar: IdeaVaultSubpageAppBar(
+        titleKey: ViewConstants.settings,
+      ),
       body: SafeArea(
           child: Padding(
         padding: EdgeInsets.only(
@@ -42,14 +47,13 @@ class _SettingsState extends State<Settings> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Gap(AppConstants.gap18Px + 1),
-            title(themeProvider),
-            const Gap(AppConstants.gap18Px + 1),
+            Gap(AppConstants.gap18Px + 1),
             Expanded(
               child: SingleChildScrollView(
                 child: Wrap(
                   runSpacing: AppConstants.gap10Px,
                   children: [
+                    appearanceTile(themeProvider),
                     actionTile(themeProvider, ViewConstants.privacyPolicy,
                         AppAssets.privacyPolicy,
                         size: 18.0, onTap: privacyPolicy),
@@ -72,6 +76,87 @@ class _SettingsState extends State<Settings> {
           ],
         ),
       )),
+    );
+  }
+
+  Widget appearanceTile(ThemeProvider themeProvider) {
+    final base = themeProvider.baseTheme;
+    final isDark = themeProvider.themeType == Config.dark;
+    return Container(
+      padding: EdgeInsets.only(
+        left: (AppConstants.gap14Px + 1).w,
+        right: (AppConstants.gap14Px + 1).w,
+        top: (AppConstants.gap12Px + 1).h,
+        bottom: AppConstants.gap12Px,
+      ),
+      decoration: BoxDecoration(
+        color: base.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 31.h,
+                width: 31.4.w,
+                decoration: BoxDecoration(
+                  color: base.settings.iconBackground,
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                ),
+                alignment: Alignment.center,
+                child: SvgPicture.asset(
+                  isDark ? AppAssets.moon : AppAssets.sun,
+                  height: 17.h,
+                  width: 17.w,
+                  colorFilter: ColorFilter.mode(
+                    base.settings.icon,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+              Gap((AppConstants.gap10Px + 1.6).w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TranslatedText(
+                      ViewConstants.settingsAppearance,
+                      style: TextStyle(
+                        color: base.settings.tileTitle,
+                        fontSize: AppConstants.font14Px,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Gap(4.h),
+                    TranslatedText(
+                      ViewConstants.settingsThemeDescription,
+                      style: TextStyle(
+                        color: base.textMuted,
+                        fontSize: AppConstants.font12Px,
+                        fontWeight: FontWeight.w400,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Gap((AppConstants.gap12Px + 1).h),
+          IdeaVaultThemeModeSlider(
+            base: base,
+            isDark: isDark,
+            onChanged: (dark) {
+              themeProvider.setTheme(
+                theme: dark ? Config.dark : Config.light,
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -101,7 +186,10 @@ class _SettingsState extends State<Settings> {
                 icon,
                 height: size.h,
                 width: size.w,
-                color: themeProvider.baseTheme.settings.icon,
+                colorFilter: ColorFilter.mode(
+                  themeProvider.baseTheme.settings.icon,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
             Gap((AppConstants.gap10Px + 1.6).w),
@@ -115,25 +203,6 @@ class _SettingsState extends State<Settings> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget title(ThemeProvider themeProvider) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        TranslatedText(
-          ViewConstants.settings,
-          style: TextStyle(
-              color: themeProvider.baseTheme.primaryText,
-              fontSize: AppConstants.font20Px,
-              fontWeight: FontWeight.w600),
-        ),
-        CupertinoSwitch(
-          value: themeProvider.themeType == Config.dark,
-          onChanged: (val) => onThemeChange(val, themeProvider),
-        ),
-      ],
     );
   }
 
@@ -176,9 +245,5 @@ class _SettingsState extends State<Settings> {
     } catch (e) {
       printLog(e.toString());
     }
-  }
-
-  void onThemeChange(bool val, ThemeProvider themeProvider) {
-    themeProvider.setTheme(theme: val ? Config.dark : Config.light);
   }
 }
