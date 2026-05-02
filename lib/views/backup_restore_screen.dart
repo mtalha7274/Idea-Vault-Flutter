@@ -27,6 +27,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final cloudOffOverlayColor = theme.background.withValues(alpha: 0.78);
 
     return Scaffold(
       backgroundColor: theme.background,
@@ -54,178 +55,229 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                         onChanged: (v) =>
                             setState(() => _cloudBackupEnabled = v),
                       ),
-                      Gap(20.h),
-                      TranslatedText(
-                        ViewConstants.backupRestoreGoogleAccount,
-                        style: ideaVaultLabel(
-                          context,
-                          size: 13,
-                          weight: FontWeight.w700,
-                          color: theme.textMuted,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      Gap(8.h),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                    ],
+                  ),
+                  Gap(12.h),
+                  Stack(
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: Text(
-                              _previewGoogleEmail,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ideaVaultBody(
+                          _settingsCard(
+                            theme,
+                            children: [
+                              TranslatedText(
+                                ViewConstants.backupRestoreGoogleAccount,
+                                style: ideaVaultLabel(
+                                  context,
+                                  size: 13,
+                                  weight: FontWeight.w700,
+                                  color: theme.textMuted,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              Gap(8.h),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _previewGoogleEmail,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: ideaVaultBody(
+                                        context,
+                                        size: 16,
+                                        weight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Gap(12.w),
+                                  TextButton(
+                                    onPressed: () {},
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: theme.primary,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8.w,
+                                        vertical: 6.h,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: TranslatedText(
+                                      ViewConstants.backupRestoreChangeAccount,
+                                      style: ideaVaultLabel(
+                                        context,
+                                        size: 14,
+                                        weight: FontWeight.w800,
+                                        color: theme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Gap(20.h),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        TranslatedText(
+                                          ViewConstants.backupRestoreAutoBackup,
+                                          style: ideaVaultBody(
+                                            context,
+                                            size: 16,
+                                            weight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Gap(4.h),
+                                        TranslatedText(
+                                          ViewConstants
+                                              .backupRestoreAutoBackupDescription,
+                                          style: ideaVaultBody(
+                                            context,
+                                            size: 14,
+                                            weight: FontWeight.w500,
+                                            color: theme.textMuted,
+                                            height: 1.45,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Gap(16.w),
+                                  CupertinoSwitch(
+                                    value: _autoBackupEnabled,
+                                    onChanged: (v) => setState(
+                                      () => _autoBackupEnabled = v,
+                                    ),
+                                    activeTrackColor: theme.primary,
+                                    thumbColor: theme.settings.switchThumb,
+                                  ),
+                                ],
+                              ),
+                              Gap(20.h),
+                              _valueRow(
                                 context,
-                                size: 16,
-                                weight: FontWeight.w600,
+                                theme,
+                                labelKey: ViewConstants.backupRestoreLastBackup,
+                                valueKey: ViewConstants
+                                    .backupRestoreLastBackupStatusSample,
+                                trailing: Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 22.d,
+                                  color: theme.primary,
+                                ),
+                              ),
+                              Gap(16.h),
+                              _valueRow(
+                                context,
+                                theme,
+                                labelKey: ViewConstants.backupRestoreBackupSize,
+                                valueKey:
+                                    ViewConstants.backupRestoreBackupSizeSample,
+                              ),
+                            ],
+                          ),
+                          Gap(22.h),
+                          SizedBox(
+                            height: 56.h,
+                            child: FilledButton(
+                              onPressed: () {},
+                              style: FilledButton.styleFrom(
+                                backgroundColor: theme.primary,
+                                foregroundColor: theme.onPrimary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              ),
+                              child: TranslatedText(
+                                ViewConstants.backupRestoreBackUpNow,
+                                style: ideaVaultLabel(
+                                  context,
+                                  size: 15,
+                                  weight: FontWeight.w800,
+                                  color: theme.onPrimary,
+                                ),
                               ),
                             ),
                           ),
-                          Gap(12.w),
-                          TextButton(
-                            onPressed: () {},
-                            style: TextButton.styleFrom(
-                              foregroundColor: theme.primary,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 8.w,
-                                vertical: 6.h,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          Gap(28.h),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: theme.outlineSoft,
+                          ),
+                          Gap(20.h),
+                          TranslatedText(
+                            ViewConstants.backupRestoreSectionRestore,
+                            style: ideaVaultLabel(
+                              context,
+                              size: 12,
+                              weight: FontWeight.w800,
+                              color: theme.textMuted,
+                              letterSpacing: 1.2,
                             ),
-                            child: TranslatedText(
-                              ViewConstants.backupRestoreChangeAccount,
-                              style: ideaVaultLabel(
-                                context,
-                                size: 14,
-                                weight: FontWeight.w800,
-                                color: theme.primary,
+                          ),
+                          Gap(14.h),
+                          SizedBox(
+                            height: 56.h,
+                            child: OutlinedButton(
+                              onPressed: () {},
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: theme.primaryText,
+                                side: BorderSide(
+                                  color: theme.outline.withValues(alpha: 0.55),
+                                  width: 1.5,
+                                ),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
                               ),
+                              child: TranslatedText(
+                                ViewConstants.backupRestoreRestoreFromBackup,
+                                style: ideaVaultLabel(
+                                  context,
+                                  size: 15,
+                                  weight: FontWeight.w800,
+                                  color: theme.primaryText,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Gap(12.h),
+                          TranslatedText(
+                            ViewConstants.backupRestoreRestoreWarning,
+                            textAlign: TextAlign.center,
+                            style: ideaVaultBody(
+                              context,
+                              size: 13,
+                              weight: FontWeight.w500,
+                              color: theme.textMuted,
+                              height: 1.4,
                             ),
                           ),
                         ],
                       ),
-                      Gap(20.h),
-                      _toggleRow(
-                        context,
-                        theme,
-                        labelKey: ViewConstants.backupRestoreAutoBackup,
-                        value: _autoBackupEnabled,
-                        onChanged: (v) =>
-                            setState(() => _autoBackupEnabled = v),
-                      ),
-                      Gap(8.h),
-                      TranslatedText(
-                        ViewConstants.backupRestoreAutoBackupDescription,
-                        style: ideaVaultBody(
-                          context,
-                          size: 14,
-                          weight: FontWeight.w500,
-                          color: theme.textMuted,
-                          height: 1.45,
+                      if (!_cloudBackupEnabled)
+                        Positioned.fill(
+                          child: AbsorbPointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cloudOffOverlayColor,
+                                borderRadius: BorderRadius.circular(20.r),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      Gap(20.h),
-                      _valueRow(
-                        context,
-                        theme,
-                        labelKey: ViewConstants.backupRestoreLastBackup,
-                        valueKey:
-                            ViewConstants.backupRestoreLastBackupStatusSample,
-                        trailing: Icon(
-                          Icons.check_circle_rounded,
-                          size: 22.d,
-                          color: theme.primary,
-                        ),
-                      ),
-                      Gap(16.h),
-                      _valueRow(
-                        context,
-                        theme,
-                        labelKey: ViewConstants.backupRestoreBackupSize,
-                        valueKey: ViewConstants.backupRestoreBackupSizeSample,
-                      ),
                     ],
-                  ),
-                  Gap(22.h),
-                  SizedBox(
-                    height: 56.h,
-                    child: FilledButton(
-                      onPressed: () {},
-                      style: FilledButton.styleFrom(
-                        backgroundColor: theme.primary,
-                        foregroundColor: theme.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      child: TranslatedText(
-                        ViewConstants.backupRestoreBackUpNow,
-                        style: ideaVaultLabel(
-                          context,
-                          size: 15,
-                          weight: FontWeight.w800,
-                          color: theme.onPrimary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Gap(28.h),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: theme.outlineSoft,
-                  ),
-                  Gap(20.h),
-                  TranslatedText(
-                    ViewConstants.backupRestoreSectionRestore,
-                    style: ideaVaultLabel(
-                      context,
-                      size: 12,
-                      weight: FontWeight.w800,
-                      color: theme.textMuted,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  Gap(14.h),
-                  SizedBox(
-                    height: 56.h,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: theme.primaryText,
-                        side: BorderSide(
-                          color: theme.outline.withValues(alpha: 0.55),
-                          width: 1.5,
-                        ),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      child: TranslatedText(
-                        ViewConstants.backupRestoreRestoreFromBackup,
-                        style: ideaVaultLabel(
-                          context,
-                          size: 15,
-                          weight: FontWeight.w800,
-                          color: theme.primaryText,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Gap(12.h),
-                  TranslatedText(
-                    ViewConstants.backupRestoreRestoreWarning,
-                    textAlign: TextAlign.center,
-                    style: ideaVaultBody(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w500,
-                      color: theme.textMuted,
-                      height: 1.4,
-                    ),
                   ),
                 ],
               ),
@@ -240,7 +292,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.surface,
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(24.r),
         border: Border.all(color: theme.outlineSoft),
       ),
       child: Padding(

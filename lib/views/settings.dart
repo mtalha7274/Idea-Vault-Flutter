@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/config.dart';
+import '../config/theme/base.dart';
 import '../core/constants/app_assets.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/view_constants.dart';
@@ -18,7 +19,6 @@ import '../core/utils/helpers.dart';
 import '../main.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
-import '../widgets/idea_vault_theme_mode_slider.dart';
 import '../widgets/translated_text.dart';
 
 class Settings extends StatefulWidget {
@@ -83,79 +83,138 @@ class _SettingsState extends State<Settings> {
     final base = themeProvider.baseTheme;
     final isDark = themeProvider.themeType == Config.dark;
     return Container(
-      padding: EdgeInsets.only(
-        left: (AppConstants.gap14Px + 1).w,
-        right: (AppConstants.gap14Px + 1).w,
-        top: (AppConstants.gap12Px + 1).h,
-        bottom: AppConstants.gap12Px,
+      padding: EdgeInsets.symmetric(
+        horizontal: (AppConstants.gap14Px).w,
+        vertical: (AppConstants.gap12Px).h,
       ),
       decoration: BoxDecoration(
         color: base.surface,
         borderRadius: const BorderRadius.all(Radius.circular(10)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 31.h,
-                width: 31.4.w,
-                decoration: BoxDecoration(
-                  color: base.settings.iconBackground,
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                ),
-                alignment: Alignment.center,
-                child: SvgPicture.asset(
-                  isDark ? AppAssets.moon : AppAssets.sun,
-                  height: 17.h,
-                  width: 17.w,
-                  colorFilter: ColorFilter.mode(
-                    base.settings.icon,
-                    BlendMode.srcIn,
+          Container(
+            height: 31.h,
+            width: 31.4.w,
+            decoration: BoxDecoration(
+              color: base.settings.iconBackground,
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
+            ),
+            alignment: Alignment.center,
+            child: SvgPicture.asset(
+              isDark ? AppAssets.moon : AppAssets.sun,
+              height: 17.h,
+              width: 17.w,
+              colorFilter: ColorFilter.mode(
+                base.settings.icon,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+          Gap((AppConstants.gap10Px + 1.6).w),
+          Expanded(
+            child: TranslatedText(
+              ViewConstants.settingsAppearance,
+              style: TextStyle(
+                color: base.settings.tileTitle,
+                fontSize: AppConstants.font14Px,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          _appearanceThemeToggle(themeProvider, base, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _appearanceThemeToggle(
+    ThemeProvider themeProvider,
+    BaseTheme base,
+    bool isDark,
+  ) {
+    final hintColor = base.textMuted.withValues(alpha: 0.75);
+    return GestureDetector(
+      onTap: () {
+        themeProvider.setTheme(
+          theme: isDark ? Config.light : Config.dark,
+        );
+      },
+      child: SizedBox(
+        width: 58.w,
+        height: 38.h,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: base.surfaceLow,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: base.outlineSoft, width: 1),
+              ),
+              child: SizedBox(width: 58.w, height: 38.h),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SvgPicture.asset(
+                    AppAssets.sun,
+                    width: 15,
+                    height: 15,
+                    colorFilter: ColorFilter.mode(
+                      hintColor,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  SvgPicture.asset(
+                    AppAssets.moon,
+                    width: 14,
+                    height: 14,
+                    colorFilter: ColorFilter.mode(
+                      hintColor,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              alignment: isDark ? Alignment.centerRight : Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 2.5.w),
+                child: Container(
+                  width: 30.d,
+                  height: 30.d,
+                  decoration: BoxDecoration(
+                    color: isDark ? base.primary : base.settings.switchThumb,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: base.overlay.withValues(alpha: 0.35),
+                        blurRadius: 5,
+                        offset: Offset(0, 2.h),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: SvgPicture.asset(
+                    isDark ? AppAssets.moon : AppAssets.sun,
+                    width: 15,
+                    height: 15,
+                    colorFilter: ColorFilter.mode(
+                      isDark ? base.onPrimary : base.primary,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               ),
-              Gap((AppConstants.gap10Px + 1.6).w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TranslatedText(
-                      ViewConstants.settingsAppearance,
-                      style: TextStyle(
-                        color: base.settings.tileTitle,
-                        fontSize: AppConstants.font14Px,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Gap(4.h),
-                    TranslatedText(
-                      ViewConstants.settingsThemeDescription,
-                      style: TextStyle(
-                        color: base.textMuted,
-                        fontSize: AppConstants.font12Px,
-                        fontWeight: FontWeight.w400,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Gap((AppConstants.gap12Px + 1).h),
-          IdeaVaultThemeModeSlider(
-            base: base,
-            isDark: isDark,
-            onChanged: (dark) {
-              themeProvider.setTheme(
-                theme: dark ? Config.dark : Config.light,
-              );
-            },
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
