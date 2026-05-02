@@ -101,4 +101,32 @@ class ViewConstants {
       'ideaEditorOptionsSheetTitle';
   static const String ideaEditorOptionsDeleteIdea =
       'ideaEditorOptionsDeleteIdea';
+
+  static const String homepageSavedIdeasTooltipOne =
+      'homepageSavedIdeasTooltipOne';
+  static const String homepageSavedIdeasTooltipMany =
+      'homepageSavedIdeasTooltipMany';
+
+  static const String homepageTitle = 'homepageTitle';
+
+  static const String backupRestoreScreenTitle = 'backupRestoreScreenTitle';
+  static const String backupRestoreCloudBackup = 'backupRestoreCloudBackup';
+  static const String backupRestoreGoogleAccount = 'backupRestoreGoogleAccount';
+  static const String backupRestoreChangeAccount = 'backupRestoreChangeAccount';
+  static const String backupRestoreAutoBackup = 'backupRestoreAutoBackup';
+  static const String backupRestoreAutoBackupDescription =
+      'backupRestoreAutoBackupDescription';
+  static const String backupRestoreLastBackup = 'backupRestoreLastBackup';
+  static const String backupRestoreLastBackupStatusSample =
+      'backupRestoreLastBackupStatusSample';
+  static const String backupRestoreBackupSize = 'backupRestoreBackupSize';
+  static const String backupRestoreBackupSizeSample =
+      'backupRestoreBackupSizeSample';
+  static const String backupRestoreBackUpNow = 'backupRestoreBackUpNow';
+  static const String backupRestoreSectionRestore =
+      'backupRestoreSectionRestore';
+  static const String backupRestoreRestoreFromBackup =
+      'backupRestoreRestoreFromBackup';
+  static const String backupRestoreRestoreWarning =
+      'backupRestoreRestoreWarning';
 }

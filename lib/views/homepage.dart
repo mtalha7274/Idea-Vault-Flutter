@@ -1,4 +1,7 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
 
@@ -9,8 +12,11 @@ import '../models/idea.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
+import '../widgets/translated_text.dart';
+import 'backup_restore_screen.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
+import 'settings.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({
@@ -25,6 +31,7 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _searchController;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
@@ -64,7 +71,9 @@ class _HomepageState extends State<Homepage> {
     final visibleIdeas = _visibleIdeas(ideas);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: theme.background,
+      drawer: const _HomeDrawer(),
       body: SafeArea(
         bottom: false,
         child: Align(
@@ -79,29 +88,32 @@ class _HomepageState extends State<Homepage> {
                 return [
                   SliverOverlapAbsorber(
                     handle: handle,
-                    sliver: SliverPadding(
-                      padding: EdgeInsets.fromLTRB(24.w, 8.h, 24.w, 0.h),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _Header(
-                              ideaCount: ideas.length,
-                              selectedCount: _selectedIdeaIds.length,
-                              onDeletePressed: _isSelectionMode
-                                  ? _confirmDeleteSelection
-                                  : null,
-                              onSortPressed:
-                                  _isSelectionMode ? null : _showSortSheet,
-                            ),
-                            const SizedBox(height: 18),
-                            _SearchField(
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Gap(8.h),
+                          _Header(
+                            ideaCount: ideas.length,
+                            selectedCount: _selectedIdeaIds.length,
+                            onMenuPressed: () =>
+                                _scaffoldKey.currentState?.openDrawer(),
+                            onDeletePressed: _isSelectionMode
+                                ? _confirmDeleteSelection
+                                : null,
+                            onSortPressed:
+                                _isSelectionMode ? null : _showSortSheet,
+                          ),
+                          SizedBox(height: 18.h),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w),
+                            child: _SearchField(
                               controller: _searchController,
                             ),
-                            const SizedBox(height: 22),
-                          ],
-                        ),
+                          ),
+                          SizedBox(height: 22.h),
+                        ],
                       ),
                     ),
                   ),
@@ -394,37 +406,111 @@ class _HomepageState extends State<Homepage> {
   }
 }
 
+class _HomeDrawer extends StatelessWidget {
+  const _HomeDrawer();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Drawer(
+      backgroundColor: theme.surface,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: Icon(
+                Icons.cloud_sync_rounded,
+                color: theme.primary,
+              ),
+              title: TranslatedText(
+                ViewConstants.backupRestoreScreenTitle,
+                style: ideaVaultBody(
+                  context,
+                  size: 16,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                AppRouter.push(
+                  context,
+                  const BackupRestoreScreen(),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.settings_rounded,
+                color: theme.primary,
+              ),
+              title: TranslatedText(
+                ViewConstants.settings,
+                style: ideaVaultBody(
+                  context,
+                  size: 16,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                AppRouter.push(
+                  context,
+                  const Settings(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.ideaCount,
     required this.selectedCount,
+    required this.onMenuPressed,
     required this.onDeletePressed,
     required this.onSortPressed,
   });
 
   final int ideaCount;
   final int selectedCount;
+  final VoidCallback onMenuPressed;
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSortPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final label = ideaCount == 1 ? '1 saved idea' : '$ideaCount saved ideas';
-    final selectionLabel =
-        selectedCount == 1 ? '1 selected' : '$selectedCount selected';
+
+    final menuStyle = IconButton.styleFrom(
+      backgroundColor: theme.surfaceLow,
+      foregroundColor: theme.primary,
+      padding: const EdgeInsets.all(12),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
+            Gap(16.w),
+            IconButton(
+              key: const Key('ideas-menu-button'),
+              onPressed: onMenuPressed,
+              icon: const Icon(Icons.menu_rounded),
+              padding: EdgeInsets.all(10.d),
+            ),
+            Gap(10.w),
             Expanded(
-              child: Text(
-                'Idea Vault',
+              child: TranslatedText(
+                ViewConstants.homepageTitle,
                 style: ideaVaultHeadline(
                   context,
-                  size: 34,
+                  size: 34.f,
                   weight: FontWeight.w800,
                   height: 1.06,
                   letterSpacing: -0.9,
@@ -432,74 +518,118 @@ class _Header extends StatelessWidget {
               ),
             ),
             if (selectedCount > 0) ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.surfaceLow,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  selectionLabel,
-                  style: ideaVaultLabel(
-                    context,
-                    size: 12,
-                    weight: FontWeight.w700,
-                    color: theme.textMuted,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
               IconButton(
                 key: const Key('ideas-delete-button'),
                 onPressed: onDeletePressed,
                 style: IconButton.styleFrom(
                   backgroundColor: theme.surfaceLow,
                   foregroundColor: theme.primary,
-                  padding: const EdgeInsets.all(12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
-                icon: const Icon(Icons.delete_outline_rounded),
-              ),
-            ] else
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.surfaceLow,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      label,
+                icon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$selectedCount',
                       style: ideaVaultLabel(
                         context,
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: theme.textMuted,
+                        size: 14,
+                        weight: FontWeight.w800,
+                        color: theme.primary,
                         letterSpacing: 0.2,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    key: const Key('ideas-sort-button'),
-                    onPressed: onSortPressed,
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.surfaceLow,
-                      foregroundColor: theme.primary,
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    icon: const Icon(Icons.swap_vert_rounded),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    const Icon(Icons.delete_outline_rounded, size: 22),
+                  ],
+                ),
               ),
+            ] else ...[
+              _SavedIdeasCountTipButton(
+                ideaCount: ideaCount,
+                menuStyle: menuStyle,
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                key: const Key('ideas-sort-button'),
+                onPressed: onSortPressed,
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.surfaceLow,
+                  foregroundColor: theme.primary,
+                  padding: const EdgeInsets.all(12),
+                ),
+                icon: const Icon(Icons.swap_vert_rounded),
+              ),
+            ],
+            Gap(16.w),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _SavedIdeasCountTipButton extends StatefulWidget {
+  const _SavedIdeasCountTipButton({
+    required this.ideaCount,
+    required this.menuStyle,
+  });
+
+  final int ideaCount;
+  final ButtonStyle menuStyle;
+
+  @override
+  State<_SavedIdeasCountTipButton> createState() =>
+      _SavedIdeasCountTipButtonState();
+}
+
+class _SavedIdeasCountTipButtonState extends State<_SavedIdeasCountTipButton> {
+  final GlobalKey<TooltipState> _tooltipKey = GlobalKey<TooltipState>();
+
+  String _tooltipMessage() {
+    final n = widget.ideaCount;
+    if (n == 1) {
+      return ViewConstants.homepageSavedIdeasTooltipOne.tr();
+    }
+    return ViewConstants.homepageSavedIdeasTooltipMany
+        .tr(namedArgs: {'count': '$n'});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Tooltip(
+      key: _tooltipKey,
+      message: _tooltipMessage(),
+      triggerMode: TooltipTriggerMode.manual,
+      showDuration: const Duration(seconds: 2),
+      child: IconButton(
+        key: const Key('ideas-count-button'),
+        onPressed: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+        style: widget.menuStyle,
+        icon: Badge(
+          backgroundColor: theme.primary,
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.ideaCount > 9 ? 5 : 6,
+            vertical: 2,
+          ),
+          label: Text(
+            '${widget.ideaCount}',
+            style: ideaVaultLabel(
+              context,
+              size: 10,
+              weight: FontWeight.w800,
+              color: theme.onPrimary,
+            ),
+          ),
+          child: Icon(
+            Icons.inventory_2_outlined,
+            size: 22,
+            color: theme.primary,
+          ),
+        ),
+      ),
     );
   }
 }

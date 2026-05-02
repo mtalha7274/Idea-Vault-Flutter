@@ -18,7 +18,6 @@ import '../core/constants/view_constants.dart';
 import '../core/utils/helpers.dart';
 import '../main.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import '../widgets/custom_modal_progress_hud.dart';
 import '../widgets/translated_text.dart';
 
 class Settings extends StatefulWidget {
@@ -37,47 +36,40 @@ class _SettingsState extends State<Settings> {
 
     return Scaffold(
       body: SafeArea(
-          child: CustomModalProgressHUD(
-        inAsyncCall: inAsyncCall,
-        child: Padding(
-          padding: EdgeInsets.only(
-              left: AppConstants.gap20Px.w,
-              right: (AppConstants.gap18Px + 1).w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Gap(AppConstants.gap18Px + 1),
-              title(themeProvider),
-              const Gap(AppConstants.gap18Px + 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Wrap(
-                    runSpacing: AppConstants.gap10Px,
-                    children: [
-                      actionTile(themeProvider, ViewConstants.privacyPolicy,
-                          AppAssets.privacyPolicy,
-                          size: 18.0, onTap: privacyPolicy),
-                      actionTile(
-                          themeProvider,
-                          ViewConstants.termsAndConditions,
-                          AppAssets.termsAndConditions,
-                          size: 16.0,
-                          onTap: termsAndConditions),
-                      actionTile(themeProvider, ViewConstants.rateApp,
-                          AppAssets.rateApp,
-                          onTap: rateApp),
-                      actionTile(themeProvider, ViewConstants.shareApp,
-                          AppAssets.shareApp,
-                          onTap: shareApp),
-                      actionTile(themeProvider, ViewConstants.contactUs,
-                          AppAssets.contactUs,
-                          onTap: contactUs),
-                    ],
-                  ),
+          child: Padding(
+        padding: EdgeInsets.only(
+            left: AppConstants.gap20Px.w, right: (AppConstants.gap18Px + 1).w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Gap(AppConstants.gap18Px + 1),
+            title(themeProvider),
+            const Gap(AppConstants.gap18Px + 1),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Wrap(
+                  runSpacing: AppConstants.gap10Px,
+                  children: [
+                    actionTile(themeProvider, ViewConstants.privacyPolicy,
+                        AppAssets.privacyPolicy,
+                        size: 18.0, onTap: privacyPolicy),
+                    actionTile(themeProvider, ViewConstants.termsAndConditions,
+                        AppAssets.termsAndConditions,
+                        size: 16.0, onTap: termsAndConditions),
+                    actionTile(
+                        themeProvider, ViewConstants.rateApp, AppAssets.rateApp,
+                        onTap: rateApp),
+                    actionTile(themeProvider, ViewConstants.shareApp,
+                        AppAssets.shareApp,
+                        onTap: shareApp),
+                    actionTile(themeProvider, ViewConstants.contactUs,
+                        AppAssets.contactUs,
+                        onTap: contactUs),
+                  ],
                 ),
-              )
-            ],
-          ),
+              ),
+            )
+          ],
         ),
       )),
     );
