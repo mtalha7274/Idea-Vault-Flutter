@@ -15,13 +15,17 @@ import 'data/managers/remote/dio_api_manager.dart';
 import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/ideas.dart';
+import 'data/repositories/local/cloud_backup_settings.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
+import 'core/services/backup/cloud_backup_scheduler.dart';
+import 'core/services/backup/cloud_backup_service.dart';
 import 'data/repositories/remote/idea_organization_repository.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
+import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
 
@@ -49,6 +53,8 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<LocalStorageManager>(
       SharedPreferenceManager(sl<SharedPreferences>()));
   sl.registerSingleton<IdeasDatabaseManager>(IdeasDatabaseManager());
+  sl.registerSingleton<CloudBackupService>(CloudBackupService());
+  sl.registerSingleton<CloudBackupScheduler>(const CloudBackupScheduler());
 
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
@@ -59,6 +65,8 @@ Future<void> initializeDependencies() async {
   // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<CloudBackupSettingsRepo>(
+      CloudBackupSettingsRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
@@ -72,6 +80,11 @@ Future<void> initializeDependencies() async {
   // Providers
   sl.registerFactory<IdeasProvider>(
       () => IdeasProvider(sl<IdeasRepo>(), sl<IdeaEditorStateRepo>()));
+  sl.registerFactory<CloudBackupProvider>(() => CloudBackupProvider(
+        sl<CloudBackupSettingsRepo>(),
+        sl<CloudBackupService>(),
+        sl<CloudBackupScheduler>(),
+      ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
       () => LanguageProvider(sl<LanguageRepo>()));

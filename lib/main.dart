@@ -8,11 +8,13 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'config/config.dart';
 import 'config/languages/language_config.dart';
+import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
 import 'firebase_options.dart';
 import 'injection_container.dart';
 import 'viewmodels/providers/language_provider.dart';
+import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
@@ -43,6 +45,7 @@ void main() async {
   );
 
   await initializeDependencies();
+  await CloudBackupBackgroundTask.initialize();
   await switchToPortraitMode();
 
   try {
@@ -65,6 +68,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(providers: [
       ChangeNotifierProvider<IdeasProvider>(create: (_) => sl()),
+      ChangeNotifierProvider<CloudBackupProvider>(create: (_) => sl()),
       ChangeNotifierProvider<ThemeProvider>(create: (_) => sl()),
       ChangeNotifierProvider<LanguageProvider>(create: (_) => sl()),
       ChangeNotifierProvider<InfoProvider>(create: (_) => sl(), lazy: false),

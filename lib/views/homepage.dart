@@ -9,9 +9,11 @@ import '../config/router/app_router.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
+import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
+import '../widgets/backup_restore_prompt_banner.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
 import 'idea_editor.dart';
@@ -52,6 +54,7 @@ class _HomepageState extends State<Homepage> {
       ..addListener(_handleSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resumeEditorIfNeeded();
+      _checkFreshInstallBackup();
     });
   }
 
@@ -113,6 +116,8 @@ class _HomepageState extends State<Homepage> {
                             ),
                           ),
                           SizedBox(height: 22.h),
+                          if (_hasCloudBackupProvider(context))
+                            const BackupRestorePromptBanner(),
                         ],
                       ),
                     ),
@@ -230,6 +235,36 @@ class _HomepageState extends State<Homepage> {
       context,
       IdeaEditorScreen(ideaId: idea.id),
     );
+  }
+
+  Future<void> _checkFreshInstallBackup() async {
+    if (!mounted) {
+      return;
+    }
+    final ideasProvider = context.read<IdeasProvider>();
+    await ideasProvider.ensureLoaded();
+    if (!mounted) {
+      return;
+    }
+    final backupProvider = _maybeCloudBackupProvider(context);
+    if (backupProvider == null) {
+      return;
+    }
+    await backupProvider.checkForFreshInstallBackup(
+      hasLocalIdeas: ideasProvider.ideas.isNotEmpty,
+    );
+  }
+
+  bool _hasCloudBackupProvider(BuildContext context) {
+    return _maybeCloudBackupProvider(context) != null;
+  }
+
+  CloudBackupProvider? _maybeCloudBackupProvider(BuildContext context) {
+    try {
+      return context.read<CloudBackupProvider>();
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 
   void _handleIdeaTap(Idea idea) {

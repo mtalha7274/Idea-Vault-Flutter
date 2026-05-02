@@ -125,6 +125,14 @@ class IdeasProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> replaceIdeas(List<Idea> ideas) async {
+    await ensureLoaded();
+    await _ideasRepo.saveIdeas(ideas);
+    _ideas = _sortIdeas(ideas);
+    await clearEditorState();
+    notifyListeners();
+  }
+
   Future<void> _loadIdeas() async {
     _isLoading = true;
     final loadedIdeas = await _ideasRepo.getIdeas();

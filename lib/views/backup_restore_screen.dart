@@ -5,8 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:idea_vault/config/theme/base.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:idea_vault/core/utils/helpers.dart';
 import 'package:provider/provider.dart';
 
+import '../viewmodels/providers/backup/cloud_backup_provider.dart';
+import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
@@ -20,20 +23,23 @@ class BackupRestoreScreen extends StatefulWidget {
 }
 
 class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
-  static const String _previewGoogleEmail = 'talha@gmail.com';
-  static final DateTime _previewLastBackupAt = DateTime(2026, 5, 2, 3, 42);
-  static const String _previewBackupSizeLabel = '124 KB';
-
-  bool _cloudBackupEnabled = false;
-  bool _autoBackupEnabled = true;
+  static const String _generalCloudBackupErrorMessage =
+      'Cloud backup could not be updated. Please try again.';
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final backupProvider = context.watch<CloudBackupProvider>();
+    final backupState = backupProvider.state;
     final cloudOffOverlayColor = theme.background.withValues(alpha: 0.78);
-    final lastBackupFormatted = DateFormat.yMMMd(
-      Localizations.localeOf(context).toString(),
-    ).add_jm().format(_previewLastBackupAt);
+    final lastBackupFormatted = backupState.lastBackupAt == null
+        ? 'Never'
+        : DateFormat.yMMMd(
+            Localizations.localeOf(context).toString(),
+          ).add_jm().format(backupState.lastBackupAt!);
+    final backupSizeLabel = backupState.lastBackupSizeBytes == null
+        ? 'No backup yet'
+        : _formatBytes(backupState.lastBackupSizeBytes!);
 
     return Scaffold(
       backgroundColor: theme.background,
@@ -57,9 +63,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                         context,
                         theme,
                         labelKey: ViewConstants.backupRestoreCloudBackup,
-                        value: _cloudBackupEnabled,
-                        onChanged: (v) =>
-                            setState(() => _cloudBackupEnabled = v),
+                        value: backupState.enabled,
+                        onChanged: backupState.isBusy
+                            ? (_) {}
+                            : (v) => _setCloudBackupEnabled(v),
                       ),
                     ],
                   ),
@@ -89,7 +96,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      _previewGoogleEmail,
+                                      backupState.email ?? 'iCloud',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: ideaVaultBody(
@@ -101,7 +108,9 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   ),
                                   Gap(12.w),
                                   TextButton(
-                                    onPressed: () {},
+                                    onPressed: backupState.isBusy
+                                        ? null
+                                        : _changeAccount,
                                     style: TextButton.styleFrom(
                                       foregroundColor: theme.primary,
                                       padding: EdgeInsets.symmetric(
@@ -158,10 +167,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   ),
                                   Gap(16.w),
                                   CupertinoSwitch(
-                                    value: _autoBackupEnabled,
-                                    onChanged: (v) => setState(
-                                      () => _autoBackupEnabled = v,
-                                    ),
+                                    value: backupState.autoBackupEnabled,
+                                    onChanged: backupState.isBusy
+                                        ? null
+                                        : _setAutoBackupEnabled,
                                     activeTrackColor: theme.primary,
                                     thumbColor: theme.settings.switchThumb,
                                   ),
@@ -182,11 +191,13 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                     color: theme.textMuted,
                                   ),
                                 ),
-                                trailing: Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 22.d,
-                                  color: theme.primary,
-                                ),
+                                trailing: backupState.lastBackupAt == null
+                                    ? null
+                                    : Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 22.d,
+                                        color: theme.primary,
+                                      ),
                               ),
                               Gap(16.h),
                               _valueRow(
@@ -194,7 +205,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                 theme,
                                 labelKey: ViewConstants.backupRestoreBackupSize,
                                 value: Text(
-                                  _previewBackupSizeLabel,
+                                  backupSizeLabel,
                                   textAlign: TextAlign.end,
                                   style: ideaVaultBody(
                                     context,
@@ -210,7 +221,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                           SizedBox(
                             height: 56.h,
                             child: FilledButton(
-                              onPressed: () {},
+                              onPressed: backupState.isBusy ? null : _backUpNow,
                               style: FilledButton.styleFrom(
                                 backgroundColor: theme.primary,
                                 foregroundColor: theme.onPrimary,
@@ -251,7 +262,9 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                           SizedBox(
                             height: 56.h,
                             child: OutlinedButton(
-                              onPressed: () {},
+                              onPressed: backupState.isBusy
+                                  ? null
+                                  : _confirmRestoreFromBackup,
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: theme.primaryText,
                                 side: BorderSide(
@@ -288,7 +301,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                           ),
                         ],
                       ),
-                      if (!_cloudBackupEnabled)
+                      if (!backupState.enabled)
                         Positioned.fill(
                           child: AbsorbPointer(
                             child: DecoratedBox(
@@ -393,6 +406,119 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _setCloudBackupEnabled(bool enabled) async {
+    final backupProvider = context.read<CloudBackupProvider>();
+    try {
+      if (enabled) {
+        await backupProvider.enableCloudBackup();
+      } else {
+        await backupProvider.disableCloudBackup();
+      }
+    } catch (error, stackTrace) {
+      printLog('Cloud backup toggle failed: $error\n$stackTrace');
+      _showMessage(_generalCloudBackupErrorMessage);
+    }
+  }
+
+  Future<void> _changeAccount() async {
+    try {
+      await context.read<CloudBackupProvider>().changeAccount();
+    } catch (error, stackTrace) {
+      printLog('Cloud backup account change failed: $error\n$stackTrace');
+      _showMessage(_generalCloudBackupErrorMessage);
+    }
+  }
+
+  Future<void> _setAutoBackupEnabled(bool enabled) async {
+    try {
+      await context.read<CloudBackupProvider>().setAutoBackupEnabled(enabled);
+    } catch (_) {
+      _showMessage('Auto Backup could not be updated.');
+    }
+  }
+
+  Future<void> _backUpNow() async {
+    try {
+      final ideasProvider = context.read<IdeasProvider>();
+      final backupProvider = context.read<CloudBackupProvider>();
+      await ideasProvider.ensureLoaded();
+      await backupProvider.backUpNow(ideasProvider.ideas);
+      _showMessage('Backup complete.');
+    } catch (error, stackTrace) {
+      printLog('Manual cloud backup failed: $error\n$stackTrace');
+      _showMessage(_generalCloudBackupErrorMessage);
+    }
+  }
+
+  Future<void> _confirmRestoreFromBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Restore from Backup?'),
+          content: const Text(
+            'All current data will be replaced with the ideas in your cloud backup.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Restore'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      final backupProvider = context.read<CloudBackupProvider>();
+      final ideasProvider = context.read<IdeasProvider>();
+      final snapshot = await backupProvider.fetchRestoreSnapshot();
+      if (snapshot == null) {
+        _showMessage('No cloud backup was found.');
+        return;
+      }
+      await ideasProvider.replaceIdeas(snapshot.ideas);
+      if (!mounted) {
+        return;
+      }
+      backupProvider.dismissRestorePrompt();
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      _showMessage('Backup restored.');
+    } catch (error, stackTrace) {
+      printLog('Cloud backup restore failed: $error\n$stackTrace');
+      _showMessage(_generalCloudBackupErrorMessage);
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    final kb = bytes / 1024;
+    if (kb < 1024) {
+      return '${kb.toStringAsFixed(kb < 10 ? 1 : 0)} KB';
+    }
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(mb < 10 ? 1 : 0)} MB';
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
