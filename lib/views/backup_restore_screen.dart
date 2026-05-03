@@ -62,10 +62,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (isManualActionRunning) ...[
-                    _manualProgressBar(theme),
-                    Gap(12.h),
-                  ],
                   _settingsCard(
                     theme,
                     children: [
@@ -239,15 +235,26 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   borderRadius: BorderRadius.circular(99),
                                 ),
                               ),
-                              child: TranslatedText(
-                                ViewConstants.backupRestoreBackUpNow,
-                                style: ideaVaultLabel(
-                                  context,
-                                  size: 15,
-                                  weight: FontWeight.w800,
-                                  color: theme.onPrimary,
-                                ),
-                              ),
+                              child: _activeBackupAction ==
+                                      _BackupRestoreAction.backup
+                                  ? Text(
+                                      'Backing up...',
+                                      style: ideaVaultLabel(
+                                        context,
+                                        size: 15,
+                                        weight: FontWeight.w800,
+                                        color: theme.onPrimary,
+                                      ),
+                                    )
+                                  : TranslatedText(
+                                      ViewConstants.backupRestoreBackUpNow,
+                                      style: ideaVaultLabel(
+                                        context,
+                                        size: 15,
+                                        weight: FontWeight.w800,
+                                        color: theme.onPrimary,
+                                      ),
+                                    ),
                             ),
                           ),
                           Gap(28.h),
@@ -285,15 +292,27 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   borderRadius: BorderRadius.circular(99),
                                 ),
                               ),
-                              child: TranslatedText(
-                                ViewConstants.backupRestoreRestoreFromBackup,
-                                style: ideaVaultLabel(
-                                  context,
-                                  size: 15,
-                                  weight: FontWeight.w800,
-                                  color: theme.primaryText,
-                                ),
-                              ),
+                              child: _activeBackupAction ==
+                                      _BackupRestoreAction.restore
+                                  ? Text(
+                                      'Restoring...',
+                                      style: ideaVaultLabel(
+                                        context,
+                                        size: 15,
+                                        weight: FontWeight.w800,
+                                        color: theme.primaryText,
+                                      ),
+                                    )
+                                  : TranslatedText(
+                                      ViewConstants
+                                          .backupRestoreRestoreFromBackup,
+                                      style: ideaVaultLabel(
+                                        context,
+                                        size: 15,
+                                        weight: FontWeight.w800,
+                                        color: theme.primaryText,
+                                      ),
+                                    ),
                             ),
                           ),
                           Gap(12.h),
@@ -328,17 +347,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _manualProgressBar(BaseTheme theme) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(99),
-      child: LinearProgressIndicator(
-        minHeight: 4.h,
-        color: theme.primary,
-        backgroundColor: theme.outlineSoft,
       ),
     );
   }
