@@ -15,6 +15,8 @@ import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
+enum _BackupRestoreAction { backup, restore }
+
 class BackupRestoreScreen extends StatefulWidget {
   const BackupRestoreScreen({super.key});
 
@@ -26,11 +28,15 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   static const String _generalCloudBackupErrorMessage =
       'Cloud backup could not be updated. Please try again.';
 
+  _BackupRestoreAction? _activeBackupAction;
+
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final backupProvider = context.watch<CloudBackupProvider>();
     final backupState = backupProvider.state;
+    final isManualActionRunning = _activeBackupAction != null;
+    final isBackupBusy = backupState.isBusy || isManualActionRunning;
     final cloudOffOverlayColor = theme.background.withValues(alpha: 0.78);
     final lastBackupFormatted = backupState.lastBackupAt == null
         ? 'Never'
@@ -56,6 +62,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (isManualActionRunning) ...[
+                    _manualProgressBar(theme),
+                    Gap(12.h),
+                  ],
                   _settingsCard(
                     theme,
                     children: [
@@ -64,7 +74,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                         theme,
                         labelKey: ViewConstants.backupRestoreCloudBackup,
                         value: backupState.enabled,
-                        onChanged: backupState.isBusy
+                        onChanged: isBackupBusy
                             ? (_) {}
                             : (v) => _setCloudBackupEnabled(v),
                       ),
@@ -108,9 +118,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   ),
                                   Gap(12.w),
                                   TextButton(
-                                    onPressed: backupState.isBusy
-                                        ? null
-                                        : _changeAccount,
+                                    onPressed:
+                                        isBackupBusy ? null : _changeAccount,
                                     style: TextButton.styleFrom(
                                       foregroundColor: theme.primary,
                                       padding: EdgeInsets.symmetric(
@@ -168,7 +177,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                   Gap(16.w),
                                   CupertinoSwitch(
                                     value: backupState.autoBackupEnabled,
-                                    onChanged: backupState.isBusy
+                                    onChanged: isBackupBusy
                                         ? null
                                         : _setAutoBackupEnabled,
                                     activeTrackColor: theme.primary,
@@ -221,7 +230,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                           SizedBox(
                             height: 56.h,
                             child: FilledButton(
-                              onPressed: backupState.isBusy ? null : _backUpNow,
+                              onPressed: isBackupBusy ? null : _backUpNow,
                               style: FilledButton.styleFrom(
                                 backgroundColor: theme.primary,
                                 foregroundColor: theme.onPrimary,
@@ -262,7 +271,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                           SizedBox(
                             height: 56.h,
                             child: OutlinedButton(
-                              onPressed: backupState.isBusy
+                              onPressed: isBackupBusy
                                   ? null
                                   : _confirmRestoreFromBackup,
                               style: OutlinedButton.styleFrom(
@@ -319,6 +328,17 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _manualProgressBar(BaseTheme theme) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: LinearProgressIndicator(
+        minHeight: 4.h,
+        color: theme.primary,
+        backgroundColor: theme.outlineSoft,
       ),
     );
   }
@@ -441,6 +461,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   Future<void> _backUpNow() async {
+    _setActiveBackupAction(_BackupRestoreAction.backup);
     try {
       final ideasProvider = context.read<IdeasProvider>();
       final backupProvider = context.read<CloudBackupProvider>();
@@ -450,6 +471,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     } catch (error, stackTrace) {
       printLog('Manual cloud backup failed: $error\n$stackTrace');
       _showMessage(_generalCloudBackupErrorMessage);
+    } finally {
+      _setActiveBackupAction(null);
     }
   }
 
@@ -480,6 +503,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       return;
     }
 
+    _setActiveBackupAction(_BackupRestoreAction.restore);
     try {
       final backupProvider = context.read<CloudBackupProvider>();
       final ideasProvider = context.read<IdeasProvider>();
@@ -498,7 +522,18 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     } catch (error, stackTrace) {
       printLog('Cloud backup restore failed: $error\n$stackTrace');
       _showMessage(_generalCloudBackupErrorMessage);
+    } finally {
+      _setActiveBackupAction(null);
     }
+  }
+
+  void _setActiveBackupAction(_BackupRestoreAction? action) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _activeBackupAction = action;
+    });
   }
 
   String _formatBytes(int bytes) {

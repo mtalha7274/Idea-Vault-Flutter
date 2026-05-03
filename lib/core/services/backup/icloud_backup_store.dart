@@ -19,6 +19,7 @@ class ICloudBackupStore implements CloudBackupStore {
   @override
   Future<CloudBackupAccount?> connect(
       {required bool forceAccountPicker}) async {
+    await ICloudStorage.gather(containerId: containerId);
     return const CloudBackupAccount(email: 'iCloud', provider: 'icloud');
   }
 
