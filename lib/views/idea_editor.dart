@@ -18,7 +18,9 @@ import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
+import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
@@ -580,6 +582,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _onOrganizeToolbarPressed() async {
+    final hasAccess = await _ensurePremiumAccess(PremiumFeature.aiOrganize);
+    if (!hasAccess || !mounted) {
+      return;
+    }
+
     if (_contentPlainTextForEditing().trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nothing to organize')),
@@ -615,6 +622,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Future<void> _handleMicLongPress() async {
     if (_isListening) {
+      return;
+    }
+
+    final hasAccess = await _ensurePremiumAccess(PremiumFeature.speechToText);
+    if (!hasAccess || !mounted) {
       return;
     }
 
@@ -1049,10 +1061,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     switch (action) {
       case IdeaEditorOptionsSheetAction.exportForAI:
-        await _openExportScreen(ExportMode.aiExport);
+        if (await _ensurePremiumAccess(PremiumFeature.exportForAi)) {
+          await _openExportScreen(ExportMode.aiExport);
+        }
         break;
       case IdeaEditorOptionsSheetAction.exportToPDF:
-        await _openExportScreen(ExportMode.pdfExport);
+        if (await _ensurePremiumAccess(PremiumFeature.exportPdf)) {
+          await _openExportScreen(ExportMode.pdfExport);
+        }
         break;
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
@@ -1074,6 +1090,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         mode: mode,
       ),
     );
+  }
+
+  Future<bool> _ensurePremiumAccess(PremiumFeature feature) async {
+    try {
+      return context.read<PaywallViewModel>().ensureAccess(context, feature);
+    } on ProviderNotFoundException {
+      return true;
+    }
   }
 
   Future<void> _confirmDeleteIdea() async {

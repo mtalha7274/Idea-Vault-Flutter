@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../config/theme/base.dart';
 import '../core/constants/view_constants.dart';
+import '../models/premium/paywall_offering.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
@@ -26,11 +28,6 @@ abstract final class _PaywallColors {
   static const Color inverse = Color(0xFF000000);
 }
 
-enum _PaywallPlan {
-  yearly,
-  monthly,
-}
-
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
 
@@ -39,8 +36,6 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> {
-  _PaywallPlan _selectedPlan = _PaywallPlan.yearly;
-
   static const String _yearlyMonthlyEquivalent = r'$1.67';
   static const String _yearlyPrice = r'$19.99';
   static const String _monthlyPrice = r'$2.99';
@@ -60,11 +55,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
   static const _termsUrl = '';
   static const _privacyUrl = '';
 
-  bool get _isYearlySelected => _selectedPlan == _PaywallPlan.yearly;
-
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final paywall = context.watch<PaywallViewModel>();
+    final isYearlySelected = paywall.selectedPlan == PaywallPlan.yearly;
+    final yearlyPackage = paywall.offering?.yearly;
+    final monthlyPackage = paywall.offering?.monthly;
 
     return Scaffold(
       backgroundColor: _PaywallColors.scaffoldBackground,
@@ -112,8 +109,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           _PlanOption(
                             titleKey: ViewConstants.paywallPlanYearly,
                             priceKey: ViewConstants.paywallYearlyPriceLine,
+                            priceText: yearlyPackage?.priceLabel,
                             subtitleKey: ViewConstants.paywallYearlySubtitle,
                             trialLabelKey: ViewConstants.paywallTrialLabel,
+                            trialLabelText: yearlyPackage?.trialLabel,
                             badgeKey: ViewConstants.paywallBadgeSave,
                             leadingBadgeKey:
                                 ViewConstants.paywallBadgeMostPopular,
@@ -125,24 +124,28 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             },
                             trialNamedArgs: const {'days': _trialDays},
                             badgeNamedArgs: const {'percent': _savePercent},
-                            isSelected: _selectedPlan == _PaywallPlan.yearly,
-                            onTap: () => _selectPlan(_PaywallPlan.yearly),
+                            isSelected:
+                                paywall.selectedPlan == PaywallPlan.yearly,
+                            onTap: () => paywall.selectPlan(PaywallPlan.yearly),
                           ),
                           Gap(10.h),
                           _PlanOption(
                             titleKey: ViewConstants.paywallPlanMonthly,
                             priceKey: ViewConstants.paywallMonthlyPriceLine,
+                            priceText: monthlyPackage?.priceLabel,
                             subtitleKey: ViewConstants.paywallMonthlySubtitle,
                             priceNamedArgs: const {
                               'monthlyPrice': _monthlyPrice,
                             },
-                            isSelected: _selectedPlan == _PaywallPlan.monthly,
-                            onTap: () => _selectPlan(_PaywallPlan.monthly),
+                            isSelected:
+                                paywall.selectedPlan == PaywallPlan.monthly,
+                            onTap: () =>
+                                paywall.selectPlan(PaywallPlan.monthly),
                           ),
                           Gap(14.h),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
-                            child: _isYearlySelected
+                            child: isYearlySelected
                                 ? TranslatedText(
                                     ViewConstants.paywallFooterYearly,
                                     key: const ValueKey('footer-yearly'),
@@ -179,7 +182,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           SizedBox(
                             height: 56.h,
                             child: FilledButton(
-                              onPressed: _showComingSoon,
+                              onPressed: paywall.isPurchasing
+                                  ? null
+                                  : _handlePurchasePressed,
                               style: FilledButton.styleFrom(
                                 backgroundColor: _PaywallColors.accentGreenDark,
                                 foregroundColor: _PaywallColors.onDark,
@@ -189,7 +194,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 ),
                               ),
                               child: TranslatedText(
-                                _isYearlySelected
+                                isYearlySelected
                                     ? ViewConstants.paywallCtaStartTrial
                                     : ViewConstants.paywallCtaGetMonthly,
                                 style: ideaVaultLabel(
@@ -203,7 +208,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           ),
                           Gap(16.h),
                           _LegalLinks(
-                            onRestorePressed: _showComingSoon,
+                            onRestorePressed: paywall.isPurchasing
+                                ? null
+                                : _handleRestorePressed,
                             onTermsPressed: _handleTermsPressed,
                             onPrivacyPressed: _handlePrivacyPressed,
                           ),
@@ -239,12 +246,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
     );
   }
 
-  void _selectPlan(_PaywallPlan plan) {
-    setState(() {
-      _selectedPlan = plan;
-    });
-  }
-
   void _showComingSoon() {
     debugPrint('Coming soon');
     ScaffoldMessenger.of(context).showSnackBar(
@@ -262,6 +263,40 @@ class _PaywallScreenState extends State<PaywallScreen> {
   void _handlePrivacyPressed() {
     debugPrint('Privacy Policy tapped: $_privacyUrl');
     _showComingSoon();
+  }
+
+  Future<void> _handlePurchasePressed() async {
+    final paywall = context.read<PaywallViewModel>();
+    final didBecomePro = await paywall.purchaseSelectedPlan();
+    if (!mounted) {
+      return;
+    }
+    if (didBecomePro) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    _showPurchaseUnavailableMessage();
+  }
+
+  Future<void> _handleRestorePressed() async {
+    final paywall = context.read<PaywallViewModel>();
+    final didBecomePro = await paywall.restorePurchases();
+    if (!mounted) {
+      return;
+    }
+    if (didBecomePro) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    _showPurchaseUnavailableMessage();
+  }
+
+  void _showPurchaseUnavailableMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Purchase is unavailable. Please try again.'),
+      ),
+    );
   }
 }
 
@@ -440,6 +475,8 @@ class _PlanOption extends StatelessWidget {
     required this.subtitleKey,
     required this.isSelected,
     required this.onTap,
+    this.priceText,
+    this.trialLabelText,
     this.trialLabelKey,
     this.badgeKey,
     this.leadingBadgeKey,
@@ -452,6 +489,8 @@ class _PlanOption extends StatelessWidget {
   final String titleKey;
   final String priceKey;
   final String subtitleKey;
+  final String? priceText;
+  final String? trialLabelText;
   final String? trialLabelKey;
   final String? badgeKey;
   final String? leadingBadgeKey;
@@ -465,9 +504,8 @@ class _PlanOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final cardColor = isSelected
-        ? _PaywallColors.selectedTint
-        : _PaywallColors.surface;
+    final cardColor =
+        isSelected ? _PaywallColors.selectedTint : _PaywallColors.surface;
     final borderColor =
         isSelected ? _PaywallColors.accentGreen : _PaywallColors.borderSubtle;
     final borderWidth = isSelected ? 1.4 : 1.0;
@@ -544,19 +582,32 @@ class _PlanOption extends StatelessWidget {
                             ],
                           ],
                         ),
-                        if (trialLabelKey != null) ...[
+                        if (trialLabelText != null ||
+                            trialLabelKey != null) ...[
                           Gap(6.h),
-                          TranslatedText(
-                            trialLabelKey!,
-                            namedArgs: trialNamedArgs,
-                            style: ideaVaultLabel(
-                              context,
-                              size: 12.f,
-                              weight: FontWeight.w800,
-                              color: _PaywallColors.accentGreenDark,
-                              height: 1.2,
+                          if (trialLabelText != null)
+                            Text(
+                              trialLabelText!,
+                              style: ideaVaultLabel(
+                                context,
+                                size: 12.f,
+                                weight: FontWeight.w800,
+                                color: _PaywallColors.accentGreenDark,
+                                height: 1.2,
+                              ),
+                            )
+                          else
+                            TranslatedText(
+                              trialLabelKey!,
+                              namedArgs: trialNamedArgs,
+                              style: ideaVaultLabel(
+                                context,
+                                size: 12.f,
+                                weight: FontWeight.w800,
+                                color: _PaywallColors.accentGreenDark,
+                                height: 1.2,
+                              ),
                             ),
-                          ),
                         ],
                         Gap(6.h),
                         TranslatedText(
@@ -574,18 +625,31 @@ class _PlanOption extends StatelessWidget {
                     ),
                   ),
                   Gap(12.w),
-                  TranslatedText(
-                    priceKey,
-                    namedArgs: priceNamedArgs,
-                    textAlign: TextAlign.right,
-                    style: ideaVaultHeadline(
-                      context,
-                      size: 18.f,
-                      weight: FontWeight.w900,
-                      color: theme.primaryText,
-                      height: 1.1,
+                  if (priceText != null)
+                    Text(
+                      priceText!,
+                      textAlign: TextAlign.right,
+                      style: ideaVaultHeadline(
+                        context,
+                        size: 18.f,
+                        weight: FontWeight.w900,
+                        color: theme.primaryText,
+                        height: 1.1,
+                      ),
+                    )
+                  else
+                    TranslatedText(
+                      priceKey,
+                      namedArgs: priceNamedArgs,
+                      textAlign: TextAlign.right,
+                      style: ideaVaultHeadline(
+                        context,
+                        size: 18.f,
+                        weight: FontWeight.w900,
+                        color: theme.primaryText,
+                        height: 1.1,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -621,8 +685,9 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
       decoration: BoxDecoration(
-        color:
-            isPrimary ? _PaywallColors.inverse : _PaywallColors.secondaryBadgeBackground,
+        color: isPrimary
+            ? _PaywallColors.inverse
+            : _PaywallColors.secondaryBadgeBackground,
         borderRadius: BorderRadius.circular(99),
       ),
       child: TranslatedText(
@@ -648,7 +713,7 @@ class _LegalLinks extends StatelessWidget {
     required this.onPrivacyPressed,
   });
 
-  final VoidCallback onRestorePressed;
+  final VoidCallback? onRestorePressed;
   final VoidCallback onTermsPressed;
   final VoidCallback onPrivacyPressed;
 
@@ -713,7 +778,7 @@ class _LegalLink extends StatelessWidget {
   });
 
   final String labelKey;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final Color color;
 
   @override

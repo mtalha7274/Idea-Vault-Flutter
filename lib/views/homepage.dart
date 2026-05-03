@@ -9,8 +9,10 @@ import '../config/router/app_router.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
+import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
@@ -76,7 +78,7 @@ class _HomepageState extends State<Homepage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: theme.background,
-      drawer: const _HomeDrawer(),
+      drawer: _HomeDrawer(hostContext: context),
       body: SafeArea(
         bottom: false,
         child: Align(
@@ -442,17 +444,44 @@ class _HomepageState extends State<Homepage> {
 }
 
 class _HomeDrawer extends StatelessWidget {
-  const _HomeDrawer();
+  const _HomeDrawer({
+    required this.hostContext,
+  });
+
+  final BuildContext hostContext;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final paywall = _maybePaywallViewModel(context);
     return Drawer(
       backgroundColor: theme.surface,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (paywall != null && !paywall.isPro)
+              ListTile(
+                leading: Icon(
+                  Icons.workspace_premium_rounded,
+                  color: theme.primary,
+                ),
+                title: Text(
+                  'Get Idea Vault Pro',
+                  style: ideaVaultBody(
+                    context,
+                    size: 16,
+                    weight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  if (!hostContext.mounted) {
+                    return;
+                  }
+                  AppRouter.showPaywall(hostContext);
+                },
+              ),
             ListTile(
               leading: Icon(
                 Icons.cloud_sync_rounded,
@@ -466,10 +495,19 @@ class _HomeDrawer extends StatelessWidget {
                   weight: FontWeight.w600,
                 ),
               ),
-              onTap: () {
+              onTap: () async {
                 Navigator.of(context).pop();
+                if (paywall != null) {
+                  final hasAccess = await paywall.ensureAccess(
+                    hostContext,
+                    PremiumFeature.cloudBackup,
+                  );
+                  if (!hasAccess || !hostContext.mounted) {
+                    return;
+                  }
+                }
                 AppRouter.push(
-                  context,
+                  hostContext,
                   const BackupRestoreScreen(),
                 );
               },
@@ -489,8 +527,11 @@ class _HomeDrawer extends StatelessWidget {
               ),
               onTap: () {
                 Navigator.of(context).pop();
+                if (!hostContext.mounted) {
+                  return;
+                }
                 AppRouter.push(
-                  context,
+                  hostContext,
                   const Settings(),
                 );
               },
@@ -499,6 +540,14 @@ class _HomeDrawer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  PaywallViewModel? _maybePaywallViewModel(BuildContext context) {
+    try {
+      return context.watch<PaywallViewModel>();
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 }
 
@@ -520,6 +569,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final paywall = _maybePaywallViewModel(context);
 
     final menuStyle = IconButton.styleFrom(
       backgroundColor: theme.surfaceLow,
@@ -541,15 +591,30 @@ class _Header extends StatelessWidget {
             ),
             Gap(10.w),
             Expanded(
-              child: TranslatedText(
-                ViewConstants.homepageTitle,
-                style: ideaVaultHeadline(
-                  context,
-                  size: 34.f,
-                  weight: FontWeight.w800,
-                  height: 1.06,
-                  letterSpacing: -0.9,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: TranslatedText(
+                      ViewConstants.homepageTitle,
+                      style: ideaVaultHeadline(
+                        context,
+                        size: 34.f,
+                        weight: FontWeight.w800,
+                        height: 1.06,
+                        letterSpacing: -0.9,
+                      ),
+                    ),
+                  ),
+                  if (paywall?.isPro == true) ...[
+                    Gap(8.w),
+                    Icon(
+                      Icons.workspace_premium_rounded,
+                      color: theme.primary,
+                      size: 24.d,
+                    ),
+                  ],
+                ],
               ),
             ),
             if (selectedCount > 0) ...[
@@ -602,6 +667,14 @@ class _Header extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  PaywallViewModel? _maybePaywallViewModel(BuildContext context) {
+    try {
+      return context.watch<PaywallViewModel>();
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 }
 

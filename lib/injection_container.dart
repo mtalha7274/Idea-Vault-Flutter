@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,9 @@ import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
+import 'core/services/premium/paywall_provider.dart';
+import 'core/services/premium/revenuecat_subscription_service.dart';
+import 'core/services/premium/subscription_service.dart';
 import 'data/repositories/remote/idea_organization_repository.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
@@ -27,6 +31,7 @@ import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
+import 'viewmodels/providers/premium/paywall_view_model.dart';
 import 'viewmodels/providers/theme_provider.dart';
 
 final sl = GetIt.instance;
@@ -55,6 +60,8 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<IdeasDatabaseManager>(IdeasDatabaseManager());
   sl.registerSingleton<CloudBackupService>(CloudBackupService());
   sl.registerSingleton<CloudBackupScheduler>(const CloudBackupScheduler());
+  sl.registerSingleton<SubscriptionService>(_buildSubscriptionService());
+  sl.registerSingleton<PaywallProvider>(_buildPaywallProvider());
 
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
@@ -85,9 +92,39 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
       ));
+  sl.registerFactory<PaywallViewModel>(() => PaywallViewModel(
+        sl<SubscriptionService>(),
+        sl<PaywallProvider>(),
+        sl<CloudBackupSettingsRepo>(),
+        sl<CloudBackupScheduler>(),
+      ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
       () => LanguageProvider(sl<LanguageRepo>()));
   sl.registerFactory<InfoProvider>(
       () => InfoProvider(sl<CountryRepo>(), sl<LocalStorageManager>()));
+}
+
+SubscriptionService _buildSubscriptionService() {
+  final provider = dotenv.env['SUBSCRIPTION_PROVIDER']?.trim().toLowerCase();
+  switch (provider) {
+    case 'revenuecat':
+    case null:
+    case '':
+      return RevenueCatSubscriptionService();
+    default:
+      return RevenueCatSubscriptionService();
+  }
+}
+
+PaywallProvider _buildPaywallProvider() {
+  final provider = dotenv.env['PAYWALL_PROVIDER']?.trim().toLowerCase();
+  switch (provider) {
+    case 'local':
+    case null:
+    case '':
+      return LocalPaywallProvider(sl<SubscriptionService>());
+    default:
+      return LocalPaywallProvider(sl<SubscriptionService>());
+  }
 }

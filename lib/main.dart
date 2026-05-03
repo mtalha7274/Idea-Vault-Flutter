@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization_loader/easy_localization_loader.dart';
@@ -17,6 +19,7 @@ import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
+import 'viewmodels/providers/premium/paywall_view_model.dart';
 import 'viewmodels/providers/theme_provider.dart';
 import 'core/utils/helpers.dart';
 
@@ -69,6 +72,10 @@ class MainApp extends StatelessWidget {
     return MultiProvider(providers: [
       ChangeNotifierProvider<IdeasProvider>(create: (_) => sl()),
       ChangeNotifierProvider<CloudBackupProvider>(create: (_) => sl()),
+      ChangeNotifierProvider<PaywallViewModel>(
+        create: (_) => sl<PaywallViewModel>()..initialize(),
+        lazy: false,
+      ),
       ChangeNotifierProvider<ThemeProvider>(create: (_) => sl()),
       ChangeNotifierProvider<LanguageProvider>(create: (_) => sl()),
       ChangeNotifierProvider<InfoProvider>(create: (_) => sl(), lazy: false),
@@ -85,7 +92,26 @@ class BaseApp extends StatefulWidget {
   State<BaseApp> createState() => _BaseAppState();
 }
 
-class _BaseAppState extends State<BaseApp> {
+class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(context.read<PaywallViewModel>().refreshSubscription());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();

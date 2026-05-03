@@ -54,6 +54,7 @@ dependencies:
   http: ^1.4.0
   icloud_storage: ^2.2.0
   workmanager: ^0.9.0+3
+  purchases_flutter: ^10.0.1
 
 dev_dependencies:
   flutter_test:
