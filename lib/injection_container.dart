@@ -21,6 +21,7 @@ import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
+import 'core/services/premium/bypass_paywall_subscription_service.dart';
 import 'core/services/premium/paywall_provider.dart';
 import 'core/services/premium/revenuecat_subscription_service.dart';
 import 'core/services/premium/subscription_service.dart';
@@ -107,14 +108,17 @@ Future<void> initializeDependencies() async {
 
 SubscriptionService _buildSubscriptionService() {
   final provider = dotenv.env['SUBSCRIPTION_PROVIDER']?.trim().toLowerCase();
+  final SubscriptionService inner;
   switch (provider) {
     case 'revenuecat':
     case null:
     case '':
-      return RevenueCatSubscriptionService();
+      inner = RevenueCatSubscriptionService();
+      break;
     default:
-      return RevenueCatSubscriptionService();
+      inner = RevenueCatSubscriptionService();
   }
+  return BypassPaywallSubscriptionService(inner);
 }
 
 PaywallProvider _buildPaywallProvider() {

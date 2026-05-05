@@ -3,7 +3,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class Config {
   static final bool debug = dotenv.env['DEBUG'] == 'true';
 
-// Themes
+  static const bool bypassPaywall = true;
+
+  // Themes
   static const String light = 'light';
   static const String dark = 'dark';
 
