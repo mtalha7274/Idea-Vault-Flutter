@@ -293,8 +293,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   void _showPurchaseUnavailableMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Purchase is unavailable. Please try again.'),
+      SnackBar(
+        content: TranslatedText(ViewConstants.paywallPurchaseUnavailable),
       ),
     );
   }

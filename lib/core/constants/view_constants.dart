@@ -129,4 +129,83 @@ class ViewConstants {
       'backupRestoreRestoreFromBackup';
   static const String backupRestoreRestoreWarning =
       'backupRestoreRestoreWarning';
+
+  static const String homepageFabNewIdea = 'homepageFabNewIdea';
+  static const String homepageSortSheetTitle = 'homepageSortSheetTitle';
+  static const String homepageSortSheetSubtitle = 'homepageSortSheetSubtitle';
+  static const String homepageSortNewestFirst = 'homepageSortNewestFirst';
+  static const String homepageSortOldestFirst = 'homepageSortOldestFirst';
+  static const String homepageSortMostSections = 'homepageSortMostSections';
+  static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
+  static const String homepageEmptyTitle = 'homepageEmptyTitle';
+  static const String homepageEmptySubtitle = 'homepageEmptySubtitle';
+  static const String homepageIdeaCardOneSection = 'homepageIdeaCardOneSection';
+  static const String homepageIdeaCardSectionsMany =
+      'homepageIdeaCardSectionsMany';
+  static const String homepageIdeaCardUpdatedToday =
+      'homepageIdeaCardUpdatedToday';
+  static const String homepageIdeaCardUpdatedYesterday =
+      'homepageIdeaCardUpdatedYesterday';
+  static const String homepageIdeaCardUpdatedOnDate =
+      'homepageIdeaCardUpdatedOnDate';
+  static const String homepageSearchHint = 'homepageSearchHint';
+  static const String homepageNoSearchResults = 'homepageNoSearchResults';
+  static const String homepageIdeaCardPreviewPlaceholder =
+      'homepageIdeaCardPreviewPlaceholder';
+
+  static const String ideaEditorUntitledIdea = 'ideaEditorUntitledIdea';
+  static const String ideaEditorTitleHint = 'ideaEditorTitleHint';
+  static const String ideaEditorListening = 'ideaEditorListening';
+  static const String ideaEditorAddSectionTooltip =
+      'ideaEditorAddSectionTooltip';
+  static const String ideaEditorPlaceholderDefaultSection =
+      'ideaEditorPlaceholderDefaultSection';
+  static const String ideaEditorPlaceholderNamedSection =
+      'ideaEditorPlaceholderNamedSection';
+  static const String ideaEditorSnackbarNothingToOrganize =
+      'ideaEditorSnackbarNothingToOrganize';
+  static const String ideaEditorSnackbarOrganizeFailed =
+      'ideaEditorSnackbarOrganizeFailed';
+  static const String ideaEditorSnackbarSpeechStopped =
+      'ideaEditorSnackbarSpeechStopped';
+  static const String ideaEditorSnackbarSpeechUnavailable =
+      'ideaEditorSnackbarSpeechUnavailable';
+  static const String ideaEditorSnackbarDuplicateSection =
+      'ideaEditorSnackbarDuplicateSection';
+  static const String ideaEditorMicPermissionTitle =
+      'ideaEditorMicPermissionTitle';
+  static const String ideaEditorMicPermissionBody =
+      'ideaEditorMicPermissionBody';
+  static const String ideaEditorOpenSettings = 'ideaEditorOpenSettings';
+
+  static const String paywallPurchaseUnavailable = 'paywallPurchaseUnavailable';
+
+  static const String backupRestoreCloudUpdateFailed =
+      'backupRestoreCloudUpdateFailed';
+  static const String backupRestoreLastBackupNever =
+      'backupRestoreLastBackupNever';
+  static const String backupRestoreNoBackupYet = 'backupRestoreNoBackupYet';
+  static const String backupRestoreAccountPlaceholderIcloud =
+      'backupRestoreAccountPlaceholderIcloud';
+  static const String backupRestoreBackingUp = 'backupRestoreBackingUp';
+  static const String backupRestoreRestoring = 'backupRestoreRestoring';
+  static const String backupRestoreAutoBackupUpdateFailed =
+      'backupRestoreAutoBackupUpdateFailed';
+  static const String backupRestoreBackupComplete =
+      'backupRestoreBackupComplete';
+  static const String backupRestoreConfirmRestoreTitle =
+      'backupRestoreConfirmRestoreTitle';
+  static const String backupRestoreConfirmRestoreBody =
+      'backupRestoreConfirmRestoreBody';
+  static const String backupRestoreConfirmRestoreButton =
+      'backupRestoreConfirmRestoreButton';
+  static const String backupRestoreNoBackupFound =
+      'backupRestoreNoBackupFound';
+  static const String backupRestoreRestoredMessage =
+      'backupRestoreRestoredMessage';
+  static const String backupRestoreFormatBytesB = 'backupRestoreFormatBytesB';
+  static const String backupRestoreFormatBytesKb =
+      'backupRestoreFormatBytesKb';
+  static const String backupRestoreFormatBytesMb =
+      'backupRestoreFormatBytesMb';
 }

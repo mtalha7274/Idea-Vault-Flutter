@@ -1,7 +1,7 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:intl/intl.dart';
 import 'package:idea_vault/config/theme/base.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -25,9 +25,6 @@ class BackupRestoreScreen extends StatefulWidget {
 }
 
 class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
-  static const String _generalCloudBackupErrorMessage =
-      'Cloud backup could not be updated. Please try again.';
-
   _BackupRestoreAction? _activeBackupAction;
 
   @override
@@ -39,12 +36,12 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     final isBackupBusy = backupState.isBusy || isManualActionRunning;
     final cloudOffOverlayColor = theme.background.withValues(alpha: 0.78);
     final lastBackupFormatted = backupState.lastBackupAt == null
-        ? 'Never'
+        ? ViewConstants.backupRestoreLastBackupNever.tr()
         : DateFormat.yMMMd(
             Localizations.localeOf(context).toString(),
           ).add_jm().format(backupState.lastBackupAt!);
     final backupSizeLabel = backupState.lastBackupSizeBytes == null
-        ? 'No backup yet'
+        ? ViewConstants.backupRestoreNoBackupYet.tr()
         : _formatBytes(backupState.lastBackupSizeBytes!);
 
     return Scaffold(
@@ -102,7 +99,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      backupState.email ?? 'iCloud',
+                                      backupState.email ??
+                                          ViewConstants
+                                              .backupRestoreAccountPlaceholderIcloud
+                                              .tr(),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: ideaVaultBody(
@@ -237,8 +237,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                               ),
                               child: _activeBackupAction ==
                                       _BackupRestoreAction.backup
-                                  ? Text(
-                                      'Backing up...',
+                                  ? TranslatedText(
+                                      ViewConstants.backupRestoreBackingUp,
                                       style: ideaVaultLabel(
                                         context,
                                         size: 15,
@@ -294,8 +294,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
                               ),
                               child: _activeBackupAction ==
                                       _BackupRestoreAction.restore
-                                  ? Text(
-                                      'Restoring...',
+                                  ? TranslatedText(
+                                      ViewConstants.backupRestoreRestoring,
                                       style: ideaVaultLabel(
                                         context,
                                         size: 15,
@@ -447,7 +447,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       }
     } catch (error, stackTrace) {
       printLog('Cloud backup toggle failed: $error\n$stackTrace');
-      _showMessage(_generalCloudBackupErrorMessage);
+      _showTranslatedSnackBar(ViewConstants.backupRestoreCloudUpdateFailed);
     }
   }
 
@@ -456,7 +456,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       await context.read<CloudBackupProvider>().changeAccount();
     } catch (error, stackTrace) {
       printLog('Cloud backup account change failed: $error\n$stackTrace');
-      _showMessage(_generalCloudBackupErrorMessage);
+      _showTranslatedSnackBar(ViewConstants.backupRestoreCloudUpdateFailed);
     }
   }
 
@@ -464,7 +464,9 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     try {
       await context.read<CloudBackupProvider>().setAutoBackupEnabled(enabled);
     } catch (_) {
-      _showMessage('Auto Backup could not be updated.');
+      _showTranslatedSnackBar(
+        ViewConstants.backupRestoreAutoBackupUpdateFailed,
+      );
     }
   }
 
@@ -475,10 +477,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       final backupProvider = context.read<CloudBackupProvider>();
       await ideasProvider.ensureLoaded();
       await backupProvider.backUpNow(ideasProvider.ideas);
-      _showMessage('Backup complete.');
+      _showTranslatedSnackBar(ViewConstants.backupRestoreBackupComplete);
     } catch (error, stackTrace) {
       printLog('Manual cloud backup failed: $error\n$stackTrace');
-      _showMessage(_generalCloudBackupErrorMessage);
+      _showTranslatedSnackBar(ViewConstants.backupRestoreCloudUpdateFailed);
     } finally {
       _setActiveBackupAction(null);
     }
@@ -489,18 +491,20 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Restore from Backup?'),
-          content: const Text(
-            'All current data will be replaced with the ideas in your cloud backup.',
+          title: TranslatedText(ViewConstants.backupRestoreConfirmRestoreTitle),
+          content: TranslatedText(
+            ViewConstants.backupRestoreConfirmRestoreBody,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
+              child: TranslatedText(ViewConstants.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Restore'),
+              child: TranslatedText(
+                ViewConstants.backupRestoreConfirmRestoreButton,
+              ),
             ),
           ],
         );
@@ -517,7 +521,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       final ideasProvider = context.read<IdeasProvider>();
       final snapshot = await backupProvider.fetchRestoreSnapshot();
       if (snapshot == null) {
-        _showMessage('No cloud backup was found.');
+        _showTranslatedSnackBar(ViewConstants.backupRestoreNoBackupFound);
         return;
       }
       await ideasProvider.replaceIdeas(snapshot.ideas);
@@ -526,10 +530,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       }
       backupProvider.dismissRestorePrompt();
       Navigator.of(context).popUntil((route) => route.isFirst);
-      _showMessage('Backup restored.');
+      _showTranslatedSnackBar(ViewConstants.backupRestoreRestoredMessage);
     } catch (error, stackTrace) {
       printLog('Cloud backup restore failed: $error\n$stackTrace');
-      _showMessage(_generalCloudBackupErrorMessage);
+      _showTranslatedSnackBar(ViewConstants.backupRestoreCloudUpdateFailed);
     } finally {
       _setActiveBackupAction(null);
     }
@@ -546,22 +550,27 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
   String _formatBytes(int bytes) {
     if (bytes < 1024) {
-      return '$bytes B';
+      return ViewConstants.backupRestoreFormatBytesB
+          .tr(namedArgs: {'bytes': '$bytes'});
     }
     final kb = bytes / 1024;
     if (kb < 1024) {
-      return '${kb.toStringAsFixed(kb < 10 ? 1 : 0)} KB';
+      final kbStr = kb.toStringAsFixed(kb < 10 ? 1 : 0);
+      return ViewConstants.backupRestoreFormatBytesKb
+          .tr(namedArgs: {'kb': kbStr});
     }
     final mb = kb / 1024;
-    return '${mb.toStringAsFixed(mb < 10 ? 1 : 0)} MB';
+    final mbStr = mb.toStringAsFixed(mb < 10 ? 1 : 0);
+    return ViewConstants.backupRestoreFormatBytesMb
+        .tr(namedArgs: {'mb': mbStr});
   }
 
-  void _showMessage(String message) {
+  void _showTranslatedSnackBar(String messageKey) {
     if (!mounted) {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(content: TranslatedText(messageKey)),
     );
   }
 }

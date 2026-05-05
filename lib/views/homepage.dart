@@ -196,8 +196,8 @@ class _HomepageState extends State<Homepage> {
               backgroundColor: theme.primary,
               foregroundColor: theme.onPrimary,
               icon: const Icon(Icons.add_rounded),
-              label: Text(
-                'New Idea',
+              label: TranslatedText(
+                ViewConstants.homepageFabNewIdea,
                 style: ideaVaultLabel(
                   context,
                   size: 14,
@@ -384,8 +384,8 @@ class _HomepageState extends State<Homepage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Sort ideas',
+              TranslatedText(
+                ViewConstants.homepageSortSheetTitle,
                 style: ideaVaultHeadline(
                   sheetContext,
                   size: 24,
@@ -394,8 +394,8 @@ class _HomepageState extends State<Homepage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Choose how your vault is arranged.',
+              TranslatedText(
+                ViewConstants.homepageSortSheetSubtitle,
                 style: ideaVaultBody(
                   sheetContext,
                   size: 15,
@@ -407,21 +407,21 @@ class _HomepageState extends State<Homepage> {
               const SizedBox(height: 18),
               _SortOptionTile(
                 key: const Key('ideas-sort-newest'),
-                title: 'Newest First',
+                titleKey: ViewConstants.homepageSortNewestFirst,
                 isSelected: _sortOption == IdeaSortOption.newestFirst,
                 onTap: () =>
                     Navigator.of(sheetContext).pop(IdeaSortOption.newestFirst),
               ),
               _SortOptionTile(
                 key: const Key('ideas-sort-oldest'),
-                title: 'Oldest First',
+                titleKey: ViewConstants.homepageSortOldestFirst,
                 isSelected: _sortOption == IdeaSortOption.oldestFirst,
                 onTap: () =>
                     Navigator.of(sheetContext).pop(IdeaSortOption.oldestFirst),
               ),
               _SortOptionTile(
                 key: const Key('ideas-sort-most-sections'),
-                title: 'Most Sections',
+                titleKey: ViewConstants.homepageSortMostSections,
                 isSelected: _sortOption == IdeaSortOption.mostSections,
                 onTap: () =>
                     Navigator.of(sheetContext).pop(IdeaSortOption.mostSections),
@@ -466,8 +466,8 @@ class _HomeDrawer extends StatelessWidget {
                   Icons.workspace_premium_rounded,
                   color: theme.primary,
                 ),
-                title: Text(
-                  'Get Idea Vault Pro',
+                title: TranslatedText(
+                  ViewConstants.homepageGetIdeaVaultPro,
                   style: ideaVaultBody(
                     context,
                     size: 16,
@@ -777,8 +777,8 @@ class _EmptyIdeasState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(
-                'Nothing saved yet',
+              TranslatedText(
+                ViewConstants.homepageEmptyTitle,
                 textAlign: TextAlign.center,
                 style: ideaVaultHeadline(
                   context,
@@ -788,8 +788,8 @@ class _EmptyIdeasState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                'Start with one fast idea, then break it into requirements, design notes, or any custom section you need.',
+              TranslatedText(
+                ViewConstants.homepageEmptySubtitle,
                 textAlign: TextAlign.center,
                 style: ideaVaultBody(
                   context,
@@ -871,8 +871,12 @@ class _IdeaCard extends StatelessWidget {
                     ),
                     child: Text(
                       idea.sections.length == 1
-                          ? '1 section'
-                          : '${idea.sections.length} sections',
+                          ? ViewConstants.homepageIdeaCardOneSection.tr()
+                          : ViewConstants.homepageIdeaCardSectionsMany.tr(
+                              namedArgs: {
+                                'count': '${idea.sections.length}',
+                              },
+                            ),
                       style: ideaVaultLabel(
                         context,
                         size: 12,
@@ -935,14 +939,23 @@ class _IdeaCard extends StatelessWidget {
     final difference = today.difference(updatedDay).inDays;
 
     if (difference == 0) {
-      return 'Updated today • ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}';
+      return ViewConstants.homepageIdeaCardUpdatedToday.tr(
+        namedArgs: {
+          'time': localizations
+              .formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt)),
+        },
+      );
     }
 
     if (difference == 1) {
-      return 'Updated yesterday';
+      return ViewConstants.homepageIdeaCardUpdatedYesterday.tr();
     }
 
-    return 'Updated ${localizations.formatMediumDate(updatedAt)}';
+    return ViewConstants.homepageIdeaCardUpdatedOnDate.tr(
+      namedArgs: {
+        'date': localizations.formatMediumDate(updatedAt),
+      },
+    );
   }
 }
 
@@ -961,7 +974,7 @@ class _SearchField extends StatelessWidget {
       controller: controller,
       textCapitalization: TextCapitalization.sentences,
       decoration: InputDecoration(
-        hintText: 'Search ideas',
+        hintText: ViewConstants.homepageSearchHint.tr(),
         prefixIcon: Icon(
           Icons.search_rounded,
           color: theme.textMuted,
@@ -995,8 +1008,8 @@ class _NoSearchResultsState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return Center(
-      child: Text(
-        'No ideas match your search',
+      child: TranslatedText(
+        ViewConstants.homepageNoSearchResults,
         textAlign: TextAlign.center,
         style: ideaVaultBody(
           context,
@@ -1013,12 +1026,12 @@ class _NoSearchResultsState extends StatelessWidget {
 class _SortOptionTile extends StatelessWidget {
   const _SortOptionTile({
     super.key,
-    required this.title,
+    required this.titleKey,
     required this.isSelected,
     required this.onTap,
   });
 
-  final String title;
+  final String titleKey;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -1027,8 +1040,8 @@ class _SortOptionTile extends StatelessWidget {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
+      title: TranslatedText(
+        titleKey,
         style: ideaVaultBody(
           context,
           size: 16,
@@ -1057,7 +1070,9 @@ String ideaPreviewText(
     }
   }
 
-  return fallbackIfEmpty ? 'Tap to keep building this idea.' : '';
+  return fallbackIfEmpty
+      ? ViewConstants.homepageIdeaCardPreviewPlaceholder.tr()
+      : '';
 }
 
 String plainPreviewText(String markdown) {

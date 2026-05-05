@@ -95,3 +95,51 @@ backupRestoreBackUpNow,Back Up Now
 backupRestoreSectionRestore,RESTORE
 backupRestoreRestoreFromBackup,Restore from Backup
 backupRestoreRestoreWarning,This will replace all current data.
+homepageFabNewIdea,New Idea
+homepageSortSheetTitle,Sort ideas
+homepageSortSheetSubtitle,Choose how your vault is arranged.
+homepageSortNewestFirst,Newest First
+homepageSortOldestFirst,Oldest First
+homepageSortMostSections,Most Sections
+homepageGetIdeaVaultPro,Get Idea Vault Pro
+homepageEmptyTitle,Nothing saved yet
+homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
+homepageIdeaCardOneSection,1 section
+homepageIdeaCardSectionsMany,{count} sections
+homepageIdeaCardUpdatedToday,Updated today • {time}
+homepageIdeaCardUpdatedYesterday,Updated yesterday
+homepageIdeaCardUpdatedOnDate,Updated {date}
+homepageSearchHint,Search ideas
+homepageNoSearchResults,No ideas match your search
+homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
+ideaEditorUntitledIdea,Untitled Idea
+ideaEditorTitleHint,Enter idea title...
+ideaEditorListening,Listening...
+ideaEditorAddSectionTooltip,Add section
+ideaEditorPlaceholderDefaultSection,Start articulating your vision here.
+ideaEditorPlaceholderNamedSection,Capture {section} here.
+ideaEditorSnackbarNothingToOrganize,Nothing to organize
+ideaEditorSnackbarOrganizeFailed,Failed to organize. Please try again.
+ideaEditorSnackbarSpeechStopped,Speech recognition stopped. Please try again.
+ideaEditorSnackbarSpeechUnavailable,Speech recognition is unavailable on this device.
+ideaEditorSnackbarDuplicateSection,That section already exists.
+ideaEditorMicPermissionTitle,Microphone Access Needed
+ideaEditorMicPermissionBody,To use speech to text, please enable microphone access in your device settings.
+ideaEditorOpenSettings,Open Settings
+paywallPurchaseUnavailable,Purchase is unavailable. Please try again.
+backupRestoreCloudUpdateFailed,Cloud backup could not be updated. Please try again.
+backupRestoreLastBackupNever,Never
+backupRestoreNoBackupYet,No backup yet
+backupRestoreAccountPlaceholderIcloud,iCloud
+backupRestoreBackingUp,Backing up...
+backupRestoreRestoring,Restoring...
+backupRestoreAutoBackupUpdateFailed,Auto Backup could not be updated.
+backupRestoreBackupComplete,Backup complete.
+backupRestoreConfirmRestoreTitle,Restore from Backup?
+backupRestoreConfirmRestoreBody,All current data will be replaced with the ideas in your cloud backup.
+backupRestoreConfirmRestoreButton,Restore
+backupRestoreNoBackupFound,No cloud backup was found.
+backupRestoreRestoredMessage,Backup restored.
+backupRestoreFormatBytesB,{bytes} B
+backupRestoreFormatBytesKb,{kb} KB
+backupRestoreFormatBytesMb,{mb} MB
