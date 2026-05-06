@@ -3,29 +3,127 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/config.dart';
 import '../config/theme/base.dart';
 import '../core/constants/view_constants.dart';
+import '../core/utils/helpers.dart';
 import '../models/premium/paywall_offering.dart';
 import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
-abstract final class _PaywallColors {
-  _PaywallColors._();
+class PaywallPalette {
+  const PaywallPalette({
+    required this.scaffoldBackground,
+    required this.surface,
+    required this.accentGreen,
+    required this.accentGreenDark,
+    required this.selectedTint,
+    required this.secondaryBadgeBackground,
+    required this.borderSubtle,
+    required this.borderNeutral,
+    required this.secondaryBadgeForeground,
+    required this.ctaForeground,
+    required this.featureCheckBackground,
+    required this.featureCheckForeground,
+    required this.mostPopularGradientStart,
+    required this.mostPopularGradientEnd,
+    required this.mostPopularShadow,
+    required this.mostPopularShadowOpacity,
+    required this.mostPopularStroke,
+    required this.mostPopularStrokeWidth,
+    required this.mostPopularLabel,
+    required this.mostPopularOuterGlow,
+    required this.mostPopularBadgePadH,
+    required this.mostPopularBadgePadV,
+    required this.mostPopularBadgeFontSize,
+    required this.mostPopularLetterSpacing,
+  });
 
-  static const Color scaffoldBackground = Color(0xFFFAFAF7);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color accentGreen = Color(0xFF5E7F6D);
-  static const Color accentGreenDark = Color(0xFF2F5544);
-  static const Color selectedTint = Color(0xFFEAF1EC);
-  static const Color secondaryBadgeBackground = Color(0xFFFFE8DD);
-  static const Color borderSubtle = Color(0xFFE9E7E1);
-  static const Color borderNeutral = Color(0xFFC9C6BE);
-  static const Color secondaryBadgeForeground = Color(0xFF8E4E33);
-  static const Color onDark = Color(0xFFFFFFFF);
-  static const Color inverse = Color(0xFF000000);
+  final Color scaffoldBackground;
+  final Color surface;
+  final Color accentGreen;
+  final Color accentGreenDark;
+  final Color selectedTint;
+  final Color secondaryBadgeBackground;
+  final Color borderSubtle;
+  final Color borderNeutral;
+  final Color secondaryBadgeForeground;
+  final Color ctaForeground;
+  final Color featureCheckBackground;
+  final Color featureCheckForeground;
+  final Color mostPopularGradientStart;
+  final Color mostPopularGradientEnd;
+  final Color mostPopularShadow;
+  final double mostPopularShadowOpacity;
+  final Color mostPopularStroke;
+  final double mostPopularStrokeWidth;
+  final Color mostPopularLabel;
+  final Color mostPopularOuterGlow;
+  final int mostPopularBadgePadH;
+  final int mostPopularBadgePadV;
+  final int mostPopularBadgeFontSize;
+  final double mostPopularLetterSpacing;
+
+  static PaywallPalette resolve(String themeType) =>
+      themeType == Config.dark ? dark : light;
+
+  static const PaywallPalette light = PaywallPalette(
+    scaffoldBackground: Color(0xFFFAFAF7),
+    surface: Color(0xFFFFFFFF),
+    accentGreen: Color(0xFF5E7F6D),
+    accentGreenDark: Color(0xFF2F5544),
+    selectedTint: Color(0xFFEAF1EC),
+    secondaryBadgeBackground: Color(0xFFFFE8DD),
+    borderSubtle: Color(0xFFE9E7E1),
+    borderNeutral: Color(0xFFC9C6BE),
+    secondaryBadgeForeground: Color(0xFF8E4E33),
+    ctaForeground: Color(0xFFFFFFFF),
+    featureCheckBackground: Color(0xFF1A1C1E),
+    featureCheckForeground: Color(0xFFFFFFFF),
+    mostPopularGradientStart: Color(0xFF18181B),
+    mostPopularGradientEnd: Color(0xFF3F3F46),
+    mostPopularShadow: Color(0xFF09090B),
+    mostPopularShadowOpacity: 0.32,
+    mostPopularStroke: Color(0x33FFFFFF),
+    mostPopularStrokeWidth: 1,
+    mostPopularLabel: Color(0xFFF4F4F5),
+    mostPopularOuterGlow: Color(0x6E18181B),
+    mostPopularBadgePadH: 8,
+    mostPopularBadgePadV: 4,
+    mostPopularBadgeFontSize: 10,
+    mostPopularLetterSpacing: 0.2,
+  );
+
+  static const PaywallPalette dark = PaywallPalette(
+    scaffoldBackground: Color(0xFF121416),
+    surface: Color(0xFF1C1F22),
+    accentGreen: Color(0xFF5F8F74),
+    accentGreenDark: Color(0xFF81B39C),
+    selectedTint: Color(0xFF242E2B),
+    secondaryBadgeBackground: Color(0xFF3D3028),
+    borderSubtle: Color(0xFF2D3236),
+    borderNeutral: Color(0xFF3D444A),
+    secondaryBadgeForeground: Color(0xFFFFCC80),
+    ctaForeground: Color(0xFF1A2421),
+    featureCheckBackground: Color(0xFF2D3236),
+    featureCheckForeground: Color(0xFF81B39C),
+    mostPopularGradientStart: Color(0xFFFFCA28),
+    mostPopularGradientEnd: Color(0xFFFF6D00),
+    mostPopularShadow: Color(0xFFFF7043),
+    mostPopularShadowOpacity: 0.45,
+    mostPopularStroke: Color(0x5CFFFFFF),
+    mostPopularStrokeWidth: 1.5,
+    mostPopularLabel: Color(0xFFFFFFFF),
+    mostPopularOuterGlow: Color(0x7AFFB74D),
+    mostPopularBadgePadH: 8,
+    mostPopularBadgePadV: 4,
+    mostPopularBadgeFontSize: 10,
+    mostPopularLetterSpacing: 0.2,
+  );
 }
 
 class PaywallScreen extends StatefulWidget {
@@ -36,12 +134,6 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> {
-  static const String _yearlyMonthlyEquivalent = r'$1.67';
-  static const String _yearlyPrice = r'$19.99';
-  static const String _monthlyPrice = r'$2.99';
-  static const String _trialDays = '3';
-  static const String _savePercent = '44';
-
   static const List<String> _proFeatureKeys = [
     ViewConstants.paywallFeatureAiOrganize,
     ViewConstants.paywallFeatureAiBrainstorm,
@@ -52,19 +144,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
     ViewConstants.paywallFeaturePrioritySupport,
   ];
 
-  static const _termsUrl = '';
-  static const _privacyUrl = '';
-
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final palette =
+        PaywallPalette.resolve(context.watch<ThemeProvider>().themeType);
     final paywall = context.watch<PaywallViewModel>();
     final isYearlySelected = paywall.selectedPlan == PaywallPlan.yearly;
     final yearlyPackage = paywall.offering?.yearly;
     final monthlyPackage = paywall.offering?.monthly;
+    final yearlyTotalForCopy = yearlyPackage?.billingPeriodTotalLabel ??
+        yearlyPackage?.priceLabel ??
+        '—';
+    final monthlyPriceForCopy = monthlyPackage?.priceLabel ?? '—';
+    final yearlyTrialDays = yearlyPackage?.freeTrialDays;
+    final yearlyHasIntroTrial = yearlyTrialDays != null && yearlyTrialDays > 0;
+    final savingsPercent = yearlyPackage?.savingsPercentVsMonthly;
 
     return Scaffold(
-      backgroundColor: _PaywallColors.scaffoldBackground,
+      backgroundColor: palette.scaffoldBackground,
       body: Stack(
         children: [
           Column(
@@ -85,7 +183,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           children: [
                             _HeroHeader(theme: theme),
                             const Spacer(),
-                            _IncludedPanel(featureKeys: _proFeatureKeys),
+                            _IncludedPanel(
+                              featureKeys: _proFeatureKeys,
+                              palette: palette,
+                            ),
                             const Spacer(),
                           ],
                         ),
@@ -107,35 +208,45 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _PlanOption(
+                            palette: palette,
                             titleKey: ViewConstants.paywallPlanYearly,
                             priceKey: ViewConstants.paywallYearlyPriceLine,
                             priceText: yearlyPackage?.priceLabel,
                             subtitleKey: ViewConstants.paywallYearlySubtitle,
-                            trialLabelKey: ViewConstants.paywallTrialLabel,
+                            trialLabelKey: yearlyHasIntroTrial
+                                ? ViewConstants.paywallTrialLabel
+                                : null,
                             trialLabelText: yearlyPackage?.trialLabel,
-                            badgeKey: ViewConstants.paywallBadgeSave,
+                            trialNamedArgs: yearlyHasIntroTrial
+                                ? {'days': '$yearlyTrialDays'}
+                                : null,
+                            badgeKey: savingsPercent != null
+                                ? ViewConstants.paywallBadgeSave
+                                : null,
                             leadingBadgeKey:
                                 ViewConstants.paywallBadgeMostPopular,
-                            priceNamedArgs: const {
-                              'monthlyPrice': _yearlyMonthlyEquivalent,
+                            priceNamedArgs: {
+                              'monthlyPrice': yearlyPackage?.priceLabel ?? '—',
                             },
-                            subtitleNamedArgs: const {
-                              'yearlyPrice': _yearlyPrice,
+                            subtitleNamedArgs: {
+                              'yearlyPrice': yearlyTotalForCopy,
                             },
-                            trialNamedArgs: const {'days': _trialDays},
-                            badgeNamedArgs: const {'percent': _savePercent},
+                            badgeNamedArgs: savingsPercent != null
+                                ? {'percent': '$savingsPercent'}
+                                : null,
                             isSelected:
                                 paywall.selectedPlan == PaywallPlan.yearly,
                             onTap: () => paywall.selectPlan(PaywallPlan.yearly),
                           ),
                           Gap(10.h),
                           _PlanOption(
+                            palette: palette,
                             titleKey: ViewConstants.paywallPlanMonthly,
                             priceKey: ViewConstants.paywallMonthlyPriceLine,
                             priceText: monthlyPackage?.priceLabel,
                             subtitleKey: ViewConstants.paywallMonthlySubtitle,
-                            priceNamedArgs: const {
-                              'monthlyPrice': _monthlyPrice,
+                            priceNamedArgs: {
+                              'monthlyPrice': monthlyPriceForCopy,
                             },
                             isSelected:
                                 paywall.selectedPlan == PaywallPlan.monthly,
@@ -146,27 +257,48 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
                             child: isYearlySelected
-                                ? TranslatedText(
-                                    ViewConstants.paywallFooterYearly,
-                                    key: const ValueKey('footer-yearly'),
-                                    namedArgs: const {
-                                      'trialDays': _trialDays,
-                                      'yearlyPrice': _yearlyPrice,
-                                    },
-                                    textAlign: TextAlign.center,
-                                    style: ideaVaultLabel(
-                                      context,
-                                      size: 13.f,
-                                      weight: FontWeight.w700,
-                                      color: _PaywallColors.accentGreenDark,
-                                      height: 1.35,
-                                    ),
-                                  )
+                                ? (yearlyHasIntroTrial
+                                    ? TranslatedText(
+                                        ViewConstants.paywallFooterYearly,
+                                        key: ValueKey(
+                                          'footer-yearly-trial-$yearlyTrialDays-$yearlyTotalForCopy',
+                                        ),
+                                        namedArgs: {
+                                          'trialDays': '$yearlyTrialDays',
+                                          'yearlyPrice': yearlyTotalForCopy,
+                                        },
+                                        textAlign: TextAlign.center,
+                                        style: ideaVaultLabel(
+                                          context,
+                                          size: 13.f,
+                                          weight: FontWeight.w700,
+                                          color: palette.accentGreenDark,
+                                          height: 1.35,
+                                        ),
+                                      )
+                                    : TranslatedText(
+                                        ViewConstants
+                                            .paywallFooterYearlyNoTrial,
+                                        key: ValueKey(
+                                          'footer-yearly-$yearlyTotalForCopy',
+                                        ),
+                                        namedArgs: {
+                                          'yearlyPrice': yearlyTotalForCopy,
+                                        },
+                                        textAlign: TextAlign.center,
+                                        style: ideaVaultLabel(
+                                          context,
+                                          size: 13.f,
+                                          weight: FontWeight.w700,
+                                          color: palette.accentGreenDark,
+                                          height: 1.35,
+                                        ),
+                                      ))
                                 : TranslatedText(
                                     ViewConstants.paywallFooterMonthly,
                                     key: const ValueKey('footer-monthly'),
-                                    namedArgs: const {
-                                      'monthlyPrice': _monthlyPrice,
+                                    namedArgs: {
+                                      'monthlyPrice': monthlyPriceForCopy,
                                     },
                                     textAlign: TextAlign.center,
                                     style: ideaVaultLabel(
@@ -186,8 +318,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   ? null
                                   : _handlePurchasePressed,
                               style: FilledButton.styleFrom(
-                                backgroundColor: _PaywallColors.accentGreenDark,
-                                foregroundColor: _PaywallColors.onDark,
+                                backgroundColor: palette.accentGreenDark,
+                                foregroundColor: palette.ctaForeground,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(99),
@@ -195,19 +327,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               ),
                               child: TranslatedText(
                                 isYearlySelected
-                                    ? ViewConstants.paywallCtaStartTrial
+                                    ? (yearlyHasIntroTrial
+                                        ? ViewConstants.paywallCtaStartTrial
+                                        : ViewConstants
+                                            .paywallCtaSubscribeYearly)
                                     : ViewConstants.paywallCtaGetMonthly,
                                 style: ideaVaultLabel(
                                   context,
                                   size: 16.f,
                                   weight: FontWeight.w800,
-                                  color: _PaywallColors.onDark,
+                                  color: palette.ctaForeground,
                                 ),
                               ),
                             ),
                           ),
                           Gap(16.h),
                           _LegalLinks(
+                            palette: palette,
                             onRestorePressed: paywall.isPurchasing
                                 ? null
                                 : _handleRestorePressed,
@@ -256,13 +392,45 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   void _handleTermsPressed() {
-    debugPrint('Terms of Service tapped: $_termsUrl');
-    _showComingSoon();
+    final url = Config.termsOfUseUrl.trim();
+    if (url.isEmpty) {
+      _showComingSoon();
+      return;
+    }
+    launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    ).then((launched) {
+      if (!launched && mounted) {
+        _showComingSoon();
+      }
+    }, onError: (Object e, StackTrace stackTrace) {
+      printLog('$e\n$stackTrace');
+      if (mounted) {
+        _showComingSoon();
+      }
+    });
   }
 
   void _handlePrivacyPressed() {
-    debugPrint('Privacy Policy tapped: $_privacyUrl');
-    _showComingSoon();
+    final url = Config.privacyPolicyUrl.trim();
+    if (url.isEmpty) {
+      _showComingSoon();
+      return;
+    }
+    launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    ).then((launched) {
+      if (!launched && mounted) {
+        _showComingSoon();
+      }
+    }, onError: (Object e, StackTrace stackTrace) {
+      printLog('$e\n$stackTrace');
+      if (mounted) {
+        _showComingSoon();
+      }
+    });
   }
 
   Future<void> _handlePurchasePressed() async {
@@ -342,18 +510,20 @@ class _HeroHeader extends StatelessWidget {
 class _IncludedPanel extends StatelessWidget {
   const _IncludedPanel({
     required this.featureKeys,
+    required this.palette,
   });
 
   final List<String> featureKeys;
+  final PaywallPalette palette;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(18.d),
       decoration: BoxDecoration(
-        color: _PaywallColors.surface,
+        color: palette.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _PaywallColors.borderSubtle),
+        border: Border.all(color: palette.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,8 +531,8 @@ class _IncludedPanel extends StatelessWidget {
           _FeatureGroup(
             titleKey: ViewConstants.paywallProUnlocks,
             featureKeys: featureKeys,
-            iconColor: _PaywallColors.onDark,
-            iconBackground: _PaywallColors.inverse,
+            iconColor: palette.featureCheckForeground,
+            iconBackground: palette.featureCheckBackground,
           ),
         ],
       ),
@@ -470,6 +640,7 @@ class _FeatureRow extends StatelessWidget {
 
 class _PlanOption extends StatelessWidget {
   const _PlanOption({
+    required this.palette,
     required this.titleKey,
     required this.priceKey,
     required this.subtitleKey,
@@ -486,6 +657,7 @@ class _PlanOption extends StatelessWidget {
     this.badgeNamedArgs,
   });
 
+  final PaywallPalette palette;
   final String titleKey;
   final String priceKey;
   final String subtitleKey;
@@ -505,9 +677,9 @@ class _PlanOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final cardColor =
-        isSelected ? _PaywallColors.selectedTint : _PaywallColors.surface;
+        isSelected ? palette.selectedTint : palette.surface;
     final borderColor =
-        isSelected ? _PaywallColors.accentGreen : _PaywallColors.borderSubtle;
+        isSelected ? palette.accentGreen : palette.borderSubtle;
     final borderWidth = isSelected ? 1.4 : 1.0;
 
     return Stack(
@@ -538,8 +710,8 @@ class _PlanOption extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected
-                            ? _PaywallColors.accentGreenDark
-                            : _PaywallColors.borderNeutral,
+                            ? palette.accentGreenDark
+                            : palette.borderNeutral,
                         width: 1.5,
                       ),
                     ),
@@ -548,8 +720,8 @@ class _PlanOption extends StatelessWidget {
                       scale: isSelected ? 1 : 0,
                       child: Container(
                         margin: EdgeInsets.all(4.d),
-                        decoration: const BoxDecoration(
-                          color: _PaywallColors.accentGreenDark,
+                        decoration: BoxDecoration(
+                          color: palette.accentGreenDark,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -576,6 +748,7 @@ class _PlanOption extends StatelessWidget {
                             if (badgeKey != null) ...[
                               Gap(8.w),
                               _Badge(
+                                palette: palette,
                                 labelKey: badgeKey!,
                                 namedArgs: badgeNamedArgs,
                               ),
@@ -592,7 +765,7 @@ class _PlanOption extends StatelessWidget {
                                 context,
                                 size: 12.f,
                                 weight: FontWeight.w800,
-                                color: _PaywallColors.accentGreenDark,
+                                color: palette.accentGreenDark,
                                 height: 1.2,
                               ),
                             )
@@ -604,7 +777,7 @@ class _PlanOption extends StatelessWidget {
                                 context,
                                 size: 12.f,
                                 weight: FontWeight.w800,
-                                color: _PaywallColors.accentGreenDark,
+                                color: palette.accentGreenDark,
                                 height: 1.2,
                               ),
                             ),
@@ -660,6 +833,7 @@ class _PlanOption extends StatelessWidget {
             top: -10.h,
             right: 16.w,
             child: _Badge(
+              palette: palette,
               labelKey: leadingBadgeKey!,
               isPrimary: true,
             ),
@@ -671,23 +845,87 @@ class _PlanOption extends StatelessWidget {
 
 class _Badge extends StatelessWidget {
   const _Badge({
+    required this.palette,
     required this.labelKey,
     this.isPrimary = false,
     this.namedArgs,
   });
 
+  final PaywallPalette palette;
   final String labelKey;
   final bool isPrimary;
   final Map<String, String>? namedArgs;
 
   @override
   Widget build(BuildContext context) {
+    if (isPrimary) {
+      final shadows = <BoxShadow>[
+        BoxShadow(
+          color: palette.mostPopularShadow
+              .withValues(alpha: palette.mostPopularShadowOpacity),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+        BoxShadow(
+          color: palette.mostPopularShadow.withValues(
+            alpha: palette.mostPopularShadowOpacity * 0.42,
+          ),
+          blurRadius: 24,
+          spreadRadius: -1,
+          offset: const Offset(0, 6),
+        ),
+      ];
+      if (palette.mostPopularOuterGlow.a > 0) {
+        shadows.add(
+          BoxShadow(
+            color: palette.mostPopularOuterGlow,
+            blurRadius: 28,
+            spreadRadius: 1,
+            offset: const Offset(0, 5),
+          ),
+        );
+      }
+
+      return Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: palette.mostPopularBadgePadH.w,
+          vertical: palette.mostPopularBadgePadV.h,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              palette.mostPopularGradientStart,
+              palette.mostPopularGradientEnd,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: palette.mostPopularStroke,
+            width: palette.mostPopularStrokeWidth,
+          ),
+          boxShadow: shadows,
+        ),
+        child: TranslatedText(
+          labelKey,
+          namedArgs: namedArgs,
+          style: ideaVaultLabel(
+            context,
+            size: palette.mostPopularBadgeFontSize.f,
+            weight: FontWeight.w900,
+            color: palette.mostPopularLabel,
+            height: 1,
+            letterSpacing: palette.mostPopularLetterSpacing,
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
       decoration: BoxDecoration(
-        color: isPrimary
-            ? _PaywallColors.inverse
-            : _PaywallColors.secondaryBadgeBackground,
+        color: palette.secondaryBadgeBackground,
         borderRadius: BorderRadius.circular(99),
       ),
       child: TranslatedText(
@@ -697,9 +935,7 @@ class _Badge extends StatelessWidget {
           context,
           size: 10.f,
           weight: FontWeight.w900,
-          color: isPrimary
-              ? _PaywallColors.onDark
-              : _PaywallColors.secondaryBadgeForeground,
+          color: palette.secondaryBadgeForeground,
         ),
       ),
     );
@@ -708,11 +944,13 @@ class _Badge extends StatelessWidget {
 
 class _LegalLinks extends StatelessWidget {
   const _LegalLinks({
+    required this.palette,
     required this.onRestorePressed,
     required this.onTermsPressed,
     required this.onPrivacyPressed,
   });
 
+  final PaywallPalette palette;
   final VoidCallback? onRestorePressed;
   final VoidCallback onTermsPressed;
   final VoidCallback onPrivacyPressed;
@@ -732,13 +970,13 @@ class _LegalLinks extends StatelessWidget {
           onPressed: onRestorePressed,
           color: theme.textMuted,
         ),
-        _FooterDot(color: _PaywallColors.borderNeutral),
+        _FooterDot(color: palette.borderNeutral),
         _LegalLink(
           labelKey: ViewConstants.privacyPolicy,
           onPressed: onPrivacyPressed,
           color: theme.textMuted,
         ),
-        _FooterDot(color: _PaywallColors.borderNeutral),
+        _FooterDot(color: palette.borderNeutral),
         _LegalLink(
           labelKey: ViewConstants.paywallTermsOfService,
           onPressed: onTermsPressed,

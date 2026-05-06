@@ -9,12 +9,23 @@ class PaywallPackage {
     required this.productId,
     required this.priceLabel,
     this.trialLabel,
+    this.billingPeriodTotalLabel,
+    this.freeTrialDays,
+    this.savingsPercentVsMonthly,
   });
 
   final String id;
   final String productId;
+
   final String priceLabel;
+
   final String? trialLabel;
+
+  final String? billingPeriodTotalLabel;
+
+  final int? freeTrialDays;
+
+  final int? savingsPercentVsMonthly;
 }
 
 class PaywallOffering {

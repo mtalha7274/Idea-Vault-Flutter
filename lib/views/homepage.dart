@@ -156,7 +156,7 @@ class _HomepageState extends State<Homepage> {
                         )
                       else
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
@@ -941,8 +941,8 @@ class _IdeaCard extends StatelessWidget {
     if (difference == 0) {
       return ViewConstants.homepageIdeaCardUpdatedToday.tr(
         namedArgs: {
-          'time': localizations
-              .formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt)),
+          'time':
+              localizations.formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt)),
         },
       );
     }

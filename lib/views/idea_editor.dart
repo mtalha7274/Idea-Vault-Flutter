@@ -76,6 +76,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _hasSaveFailed = false;
   bool _isListening = false;
   bool _isMicPressHeld = false;
+  final GlobalKey<TooltipState> _micTooltipKey = GlobalKey<TooltipState>();
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
   bool _isOrganizing = false;
@@ -384,49 +385,57 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               ),
             ),
             const SizedBox(height: 18),
-            GestureDetector(
-              key: const Key('idea-editor-mic-fab'),
-              behavior: HitTestBehavior.opaque,
-              onLongPress: _handleMicLongPress,
-              onLongPressEnd: (_) => _handleMicLongPressEnd(),
-              child: ScaleTransition(
-                scale: _micScaleAnimation,
-                child: AnimatedBuilder(
-                  animation: _micGlowController,
-                  builder: (context, child) {
-                    final glowOpacity =
-                        0.16 + (_micGlowController.value * 0.22);
-                    final glowRadius = 32.0 + (_micGlowController.value * 12.0);
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: _isListening
-                            ? [
-                                BoxShadow(
-                                  color: primaryColor.withValues(
-                                      alpha: glowOpacity),
-                                  blurRadius: glowRadius,
-                                  spreadRadius: 3,
-                                ),
-                              ]
-                            : const [],
-                      ),
-                      child: child,
-                    );
-                  },
-                  child: AbsorbPointer(
-                    child: FloatingActionButton(
-                      heroTag: 'idea-editor-mic-fab',
-                      onPressed: () {},
-                      elevation: _isListening ? 8 : 6,
-                      backgroundColor: primaryColor,
-                      foregroundColor: theme.onPrimary,
-                      child: Icon(
-                        _isListening ? Icons.mic_none : Icons.mic,
-                        size: 28,
+            Tooltip(
+              key: _micTooltipKey,
+              message: ViewConstants.ideaEditorMicLongPressToTalk.tr(),
+              triggerMode: TooltipTriggerMode.manual,
+              showDuration: const Duration(seconds: 3),
+              child: GestureDetector(
+                key: const Key('idea-editor-mic-fab'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _handleMicSingleTap,
+                onLongPress: _handleMicLongPress,
+                onLongPressEnd: (_) => _handleMicLongPressEnd(),
+                child: ScaleTransition(
+                  scale: _micScaleAnimation,
+                  child: AnimatedBuilder(
+                    animation: _micGlowController,
+                    builder: (context, child) {
+                      final glowOpacity =
+                          0.16 + (_micGlowController.value * 0.22);
+                      final glowRadius =
+                          32.0 + (_micGlowController.value * 12.0);
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: _isListening
+                              ? [
+                                  BoxShadow(
+                                    color: primaryColor.withValues(
+                                        alpha: glowOpacity),
+                                    blurRadius: glowRadius,
+                                    spreadRadius: 3,
+                                  ),
+                                ]
+                              : const [],
+                        ),
+                        child: child,
+                      );
+                    },
+                    child: AbsorbPointer(
+                      child: FloatingActionButton(
+                        heroTag: 'idea-editor-mic-fab',
+                        onPressed: () {},
+                        elevation: _isListening ? 8 : 6,
+                        backgroundColor: primaryColor,
+                        foregroundColor: theme.onPrimary,
+                        child: Icon(
+                          _isListening ? Icons.mic_none : Icons.mic,
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
@@ -621,6 +630,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         selection: TextSelection.collapsed(offset: cursorOffset),
       )
       ..addListener(_handleEditorContentChanged);
+  }
+
+  Future<void> _handleMicSingleTap() async {
+    if (_isListening) {
+      return;
+    }
+
+    final paywall = context.read<PaywallViewModel>();
+    if (!paywall.isPro) {
+      await AppRouter.showPaywall(context);
+      return;
+    }
+
+    _micTooltipKey.currentState?.ensureTooltipVisible();
   }
 
   Future<void> _handleMicLongPress() async {

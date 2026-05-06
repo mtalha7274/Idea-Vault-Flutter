@@ -77,6 +77,8 @@ class ViewConstants {
   static const String paywallFooterMonthly = 'paywallFooterMonthly';
   static const String paywallCtaStartTrial = 'paywallCtaStartTrial';
   static const String paywallCtaGetMonthly = 'paywallCtaGetMonthly';
+  static const String paywallCtaSubscribeYearly = 'paywallCtaSubscribeYearly';
+  static const String paywallFooterYearlyNoTrial = 'paywallFooterYearlyNoTrial';
   static const String paywallCloseTooltip = 'paywallCloseTooltip';
   static const String paywallComingSoon = 'paywallComingSoon';
   static const String paywallRestorePurchases = 'paywallRestorePurchases';
@@ -177,6 +179,8 @@ class ViewConstants {
   static const String ideaEditorMicPermissionBody =
       'ideaEditorMicPermissionBody';
   static const String ideaEditorOpenSettings = 'ideaEditorOpenSettings';
+  static const String ideaEditorMicLongPressToTalk =
+      'ideaEditorMicLongPressToTalk';
 
   static const String paywallPurchaseUnavailable = 'paywallPurchaseUnavailable';
 

@@ -61,6 +61,8 @@ paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice} per year"
 paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice} per month
 paywallCtaStartTrial,Start Free Trial
 paywallCtaGetMonthly,Get Pro Monthly
+paywallCtaSubscribeYearly,Subscribe
+paywallFooterYearlyNoTrial,{yearlyPrice} per year
 paywallCloseTooltip,Close
 paywallComingSoon,Coming soon
 paywallRestorePurchases,Restore Purchases
@@ -126,6 +128,7 @@ ideaEditorSnackbarDuplicateSection,That section already exists.
 ideaEditorMicPermissionTitle,Microphone Access Needed
 ideaEditorMicPermissionBody,To use speech to text, please enable microphone access in your device settings.
 ideaEditorOpenSettings,Open Settings
+ideaEditorMicLongPressToTalk,Long press and hold the mic button to dictate
 paywallPurchaseUnavailable,Purchase is unavailable. Please try again.
 backupRestoreCloudUpdateFailed,Cloud backup could not be updated. Please try again.
 backupRestoreLastBackupNever,Never

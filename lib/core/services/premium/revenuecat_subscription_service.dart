@@ -93,15 +93,13 @@ class RevenueCatSubscriptionService implements SubscriptionService {
       if (offering == null) {
         return null;
       }
+      final packages = offering.availablePackages;
+      final monthlyPkg = _packageForType(packages, rc.PackageType.monthly);
+      final yearlyPkg = _packageForType(packages, rc.PackageType.annual);
       return PaywallOffering(
-        yearly: _paywallPackageForType(
-          offering.availablePackages,
-          rc.PackageType.annual,
-        ),
-        monthly: _paywallPackageForType(
-          offering.availablePackages,
-          rc.PackageType.monthly,
-        ),
+        yearly:
+            yearlyPkg == null ? null : _mapYearlyPackage(yearlyPkg, monthlyPkg),
+        monthly: monthlyPkg == null ? null : _mapMonthlyPackage(monthlyPkg),
       );
     } catch (error, stackTrace) {
       printLog('RevenueCat offerings failed: $error\n$stackTrace');
@@ -179,21 +177,107 @@ class RevenueCatSubscriptionService implements SubscriptionService {
     );
   }
 
-  PaywallPackage? _paywallPackageForType(
+  rc.Package? _packageForType(
     List<rc.Package> packages,
     rc.PackageType type,
   ) {
     for (final package in packages) {
       if (package.packageType == type) {
-        return PaywallPackage(
-          id: package.identifier,
-          productId: package.storeProduct.identifier,
-          priceLabel: package.storeProduct.priceString,
-          trialLabel: package.storeProduct.introductoryPrice?.priceString,
-        );
+        return package;
       }
     }
     return null;
+  }
+
+  PaywallPackage _mapMonthlyPackage(rc.Package package) {
+    final sp = package.storeProduct;
+    final intro = sp.introductoryPrice;
+    String? trialLabel;
+    int? freeTrialDays;
+    if (intro != null) {
+      if (intro.price <= 0.001) {
+        freeTrialDays = _freeTrialDaysFromIntro(intro);
+      } else {
+        trialLabel = intro.priceString;
+      }
+    }
+    return PaywallPackage(
+      id: package.identifier,
+      productId: sp.identifier,
+      priceLabel: sp.priceString,
+      trialLabel: trialLabel,
+      billingPeriodTotalLabel: null,
+      freeTrialDays: freeTrialDays,
+      savingsPercentVsMonthly: null,
+    );
+  }
+
+  PaywallPackage _mapYearlyPackage(
+    rc.Package package,
+    rc.Package? monthlyPackage,
+  ) {
+    final sp = package.storeProduct;
+    final intro = sp.introductoryPrice;
+    String? trialLabel;
+    int? freeTrialDays;
+    if (intro != null) {
+      if (intro.price <= 0.001) {
+        freeTrialDays = _freeTrialDaysFromIntro(intro);
+      } else {
+        trialLabel = intro.priceString;
+      }
+    }
+    int? savingsPercent;
+    if (monthlyPackage != null) {
+      savingsPercent = _savingsPercentYearlyVsMonthly(
+        sp.price,
+        monthlyPackage.storeProduct.price,
+      );
+    }
+    return PaywallPackage(
+      id: package.identifier,
+      productId: sp.identifier,
+      priceLabel: sp.pricePerMonthString ?? sp.priceString,
+      trialLabel: trialLabel,
+      billingPeriodTotalLabel: sp.priceString,
+      freeTrialDays: freeTrialDays,
+      savingsPercentVsMonthly: savingsPercent,
+    );
+  }
+
+  int? _freeTrialDaysFromIntro(rc.IntroductoryPrice intro) {
+    if (intro.price > 0.001) {
+      return null;
+    }
+    final cycleCount = intro.cycles < 1 ? 1 : intro.cycles;
+    final units = intro.periodNumberOfUnits * cycleCount;
+    switch (intro.periodUnit) {
+      case rc.PeriodUnit.day:
+        return units;
+      case rc.PeriodUnit.week:
+        return units * 7;
+      case rc.PeriodUnit.month:
+        return units * 30;
+      case rc.PeriodUnit.year:
+        return units * 365;
+      case rc.PeriodUnit.unknown:
+        return null;
+    }
+  }
+
+  int? _savingsPercentYearlyVsMonthly(
+    double yearlyPrice,
+    double monthlyPrice,
+  ) {
+    if (monthlyPrice <= 0 || yearlyPrice <= 0) {
+      return null;
+    }
+    final annualizedMonthly = monthlyPrice * 12.0;
+    if (annualizedMonthly <= yearlyPrice) {
+      return null;
+    }
+    return (((annualizedMonthly - yearlyPrice) / annualizedMonthly) * 100)
+        .round();
   }
 
   Future<rc.Package?> _findRevenueCatPackage(String packageId) async {
