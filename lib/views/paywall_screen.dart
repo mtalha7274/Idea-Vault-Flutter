@@ -117,7 +117,7 @@ class PaywallPalette {
     mostPopularShadowOpacity: 0.45,
     mostPopularStroke: Color(0x5CFFFFFF),
     mostPopularStrokeWidth: 1.5,
-    mostPopularLabel: Color(0xFFFFFFFF),
+    mostPopularLabel: Color(0xFF1A120E),
     mostPopularOuterGlow: Color(0x7AFFB74D),
     mostPopularBadgePadH: 8,
     mostPopularBadgePadV: 4,
@@ -676,10 +676,8 @@ class _PlanOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final cardColor =
-        isSelected ? palette.selectedTint : palette.surface;
-    final borderColor =
-        isSelected ? palette.accentGreen : palette.borderSubtle;
+    final cardColor = isSelected ? palette.selectedTint : palette.surface;
+    final borderColor = isSelected ? palette.accentGreen : palette.borderSubtle;
     final borderWidth = isSelected ? 1.4 : 1.0;
 
     return Stack(
