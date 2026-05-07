@@ -15,8 +15,8 @@ class Config {
   // TODO: Add your own bundle id and apple id
   // Example: bundleId = 'com.example.app';
   // Example: appleId = '1234567890';
-  static const String bundleId = '';
-  static const String appleId = '';
+  static const String bundleId = 'com.pocketmicros.ideavault';
+  static const String appleId = '6765999984';
   static const String appPlaystoreUrl =
       'https://play.google.com/store/apps/details?id=$bundleId';
   static const String appAppstoreUrl = 'https://apps.apple.com/app/id$appleId';
