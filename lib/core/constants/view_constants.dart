@@ -65,6 +65,7 @@ class ViewConstants {
   static const String paywallFeaturePrioritySupport =
       'paywallFeaturePrioritySupport';
   static const String paywallPlanYearly = 'paywallPlanYearly';
+  static const String paywallYearlyHeadlinePrice = 'paywallYearlyHeadlinePrice';
   static const String paywallYearlyPriceLine = 'paywallYearlyPriceLine';
   static const String paywallYearlySubtitle = 'paywallYearlySubtitle';
   static const String paywallTrialLabel = 'paywallTrialLabel';

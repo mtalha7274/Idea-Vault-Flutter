@@ -210,8 +210,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           _PlanOption(
                             palette: palette,
                             titleKey: ViewConstants.paywallPlanYearly,
-                            priceKey: ViewConstants.paywallYearlyPriceLine,
-                            priceText: yearlyPackage?.priceLabel,
+                            priceKey: ViewConstants.paywallYearlyHeadlinePrice,
+                            priceText: null,
                             subtitleKey: ViewConstants.paywallYearlySubtitle,
                             trialLabelKey: yearlyHasIntroTrial
                                 ? ViewConstants.paywallTrialLabel
@@ -226,10 +226,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             leadingBadgeKey:
                                 ViewConstants.paywallBadgeMostPopular,
                             priceNamedArgs: {
-                              'monthlyPrice': yearlyPackage?.priceLabel ?? '—',
-                            },
-                            subtitleNamedArgs: {
                               'yearlyPrice': yearlyTotalForCopy,
+                            },
+                            secondaryStackPriceKey:
+                                ViewConstants.paywallYearlyPriceLine,
+                            secondaryStackPriceNamedArgs: {
+                              'monthlyPrice':
+                                  yearlyPackage?.priceLabel ?? '—',
                             },
                             badgeNamedArgs: savingsPercent != null
                                 ? {'percent': '$savingsPercent'}
@@ -652,9 +655,10 @@ class _PlanOption extends StatelessWidget {
     this.badgeKey,
     this.leadingBadgeKey,
     this.priceNamedArgs,
-    this.subtitleNamedArgs,
     this.trialNamedArgs,
     this.badgeNamedArgs,
+    this.secondaryStackPriceKey,
+    this.secondaryStackPriceNamedArgs,
   });
 
   final PaywallPalette palette;
@@ -667,9 +671,10 @@ class _PlanOption extends StatelessWidget {
   final String? badgeKey;
   final String? leadingBadgeKey;
   final Map<String, String>? priceNamedArgs;
-  final Map<String, String>? subtitleNamedArgs;
   final Map<String, String>? trialNamedArgs;
   final Map<String, String>? badgeNamedArgs;
+  final String? secondaryStackPriceKey;
+  final Map<String, String>? secondaryStackPriceNamedArgs;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -783,7 +788,6 @@ class _PlanOption extends StatelessWidget {
                         Gap(6.h),
                         TranslatedText(
                           subtitleKey,
-                          namedArgs: subtitleNamedArgs,
                           style: ideaVaultLabel(
                             context,
                             size: 12.f,
@@ -796,7 +800,54 @@ class _PlanOption extends StatelessWidget {
                     ),
                   ),
                   Gap(12.w),
-                  if (priceText != null)
+                  if (secondaryStackPriceKey != null)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (priceText != null)
+                          Text(
+                            priceText!,
+                            textAlign: TextAlign.right,
+                            style: ideaVaultHeadline(
+                              context,
+                              size: 22.f,
+                              weight: FontWeight.w900,
+                              color: theme.primaryText,
+                              height: 1.08,
+                              letterSpacing: -0.35,
+                            ),
+                          )
+                        else
+                          TranslatedText(
+                            priceKey,
+                            namedArgs: priceNamedArgs,
+                            textAlign: TextAlign.right,
+                            style: ideaVaultHeadline(
+                              context,
+                              size: 22.f,
+                              weight: FontWeight.w900,
+                              color: theme.primaryText,
+                              height: 1.08,
+                              letterSpacing: -0.35,
+                            ),
+                          ),
+                        Gap(4.h),
+                        TranslatedText(
+                          secondaryStackPriceKey!,
+                          namedArgs: secondaryStackPriceNamedArgs,
+                          textAlign: TextAlign.right,
+                          style: ideaVaultLabel(
+                            context,
+                            size: 12.f,
+                            weight: FontWeight.w600,
+                            color: theme.textMuted,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (priceText != null)
                     Text(
                       priceText!,
                       textAlign: TextAlign.right,

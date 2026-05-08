@@ -49,8 +49,9 @@ paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
 paywallFeaturePrioritySupport,Priority support
 paywallPlanYearly,Yearly
+paywallYearlyHeadlinePrice,{yearlyPrice}
 paywallYearlyPriceLine,{monthlyPrice} / month
-paywallYearlySubtitle,{yearlyPrice} per year
+paywallYearlySubtitle,Billed annually
 paywallTrialLabel,{days}-day free trial
 paywallBadgeSave,Save {percent}%
 paywallBadgeMostPopular,Most popular
