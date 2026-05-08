@@ -117,7 +117,7 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
     final themeProvider = context.watch<ThemeProvider>();
     return MaterialApp(
       navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: Config.debug,
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,

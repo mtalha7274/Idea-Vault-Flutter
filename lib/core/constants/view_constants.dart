@@ -204,13 +204,10 @@ class ViewConstants {
       'backupRestoreConfirmRestoreBody';
   static const String backupRestoreConfirmRestoreButton =
       'backupRestoreConfirmRestoreButton';
-  static const String backupRestoreNoBackupFound =
-      'backupRestoreNoBackupFound';
+  static const String backupRestoreNoBackupFound = 'backupRestoreNoBackupFound';
   static const String backupRestoreRestoredMessage =
       'backupRestoreRestoredMessage';
   static const String backupRestoreFormatBytesB = 'backupRestoreFormatBytesB';
-  static const String backupRestoreFormatBytesKb =
-      'backupRestoreFormatBytesKb';
-  static const String backupRestoreFormatBytesMb =
-      'backupRestoreFormatBytesMb';
+  static const String backupRestoreFormatBytesKb = 'backupRestoreFormatBytesKb';
+  static const String backupRestoreFormatBytesMb = 'backupRestoreFormatBytesMb';
 }

@@ -231,8 +231,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             secondaryStackPriceKey:
                                 ViewConstants.paywallYearlyPriceLine,
                             secondaryStackPriceNamedArgs: {
-                              'monthlyPrice':
-                                  yearlyPackage?.priceLabel ?? '—',
+                              'monthlyPrice': yearlyPackage?.priceLabel ?? '—',
                             },
                             badgeNamedArgs: savingsPercent != null
                                 ? {'percent': '$savingsPercent'}
