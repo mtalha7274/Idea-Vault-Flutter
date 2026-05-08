@@ -49,21 +49,21 @@ paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
 paywallFeaturePrioritySupport,Priority support
 paywallPlanYearly,Yearly
-paywallYearlyHeadlinePrice,{yearlyPrice}
-paywallYearlyPriceLine,{monthlyPrice} / month
+paywallYearlyHeadlinePrice,{yearlyPrice}/yr
+paywallYearlyPriceLine,{monthlyPrice}/mo
 paywallYearlySubtitle,Billed annually
 paywallTrialLabel,{days}-day free trial
 paywallBadgeSave,Save {percent}%
 paywallBadgeMostPopular,Most popular
 paywallPlanMonthly,Monthly
-paywallMonthlyPriceLine,{monthlyPrice} / month
+paywallMonthlyPriceLine,{monthlyPrice}/mo
 paywallMonthlySubtitle,Billed monthly
-paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice} per year"
-paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice} per month
+paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice}/yr"
+paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice}/mo
 paywallCtaStartTrial,Start Free Trial
 paywallCtaGetMonthly,Get Pro Monthly
 paywallCtaSubscribeYearly,Subscribe
-paywallFooterYearlyNoTrial,{yearlyPrice} per year
+paywallFooterYearlyNoTrial,{yearlyPrice}/yr
 paywallCloseTooltip,Close
 paywallComingSoon,Coming soon
 paywallRestorePurchases,Restore Purchases

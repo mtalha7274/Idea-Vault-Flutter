@@ -8,7 +8,6 @@ import 'package:idea_vault/views/home.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'config/config.dart';
 import 'config/languages/language_config.dart';
 import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';

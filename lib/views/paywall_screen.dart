@@ -156,6 +156,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final yearlyTotalForCopy = yearlyPackage?.billingPeriodTotalLabel ??
         yearlyPackage?.priceLabel ??
         '—';
+    final yearlyMonthlyEquivalentForCopy =
+        yearlyPackage?.monthlyEquivalentPriceLabel ?? '—';
     final monthlyPriceForCopy = monthlyPackage?.priceLabel ?? '—';
     final yearlyTrialDays = yearlyPackage?.freeTrialDays;
     final yearlyHasIntroTrial = yearlyTrialDays != null && yearlyTrialDays > 0;
@@ -212,7 +214,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             titleKey: ViewConstants.paywallPlanYearly,
                             priceKey: ViewConstants.paywallYearlyHeadlinePrice,
                             priceText: null,
-                            subtitleKey: ViewConstants.paywallYearlySubtitle,
+                            subtitleKey: ViewConstants.paywallYearlyPriceLine,
                             trialLabelKey: yearlyHasIntroTrial
                                 ? ViewConstants.paywallTrialLabel
                                 : null,
@@ -220,18 +222,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             trialNamedArgs: yearlyHasIntroTrial
                                 ? {'days': '$yearlyTrialDays'}
                                 : null,
-                            badgeKey: savingsPercent != null
+                            leadingBadgeKey: savingsPercent != null
                                 ? ViewConstants.paywallBadgeSave
                                 : null,
-                            leadingBadgeKey:
-                                ViewConstants.paywallBadgeMostPopular,
                             priceNamedArgs: {
                               'yearlyPrice': yearlyTotalForCopy,
                             },
-                            secondaryStackPriceKey:
-                                ViewConstants.paywallYearlyPriceLine,
-                            secondaryStackPriceNamedArgs: {
-                              'monthlyPrice': yearlyPackage?.priceLabel ?? '—',
+                            subtitleNamedArgs: {
+                              'monthlyPrice': yearlyMonthlyEquivalentForCopy,
                             },
                             badgeNamedArgs: savingsPercent != null
                                 ? {'percent': '$savingsPercent'}
@@ -245,8 +243,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             palette: palette,
                             titleKey: ViewConstants.paywallPlanMonthly,
                             priceKey: ViewConstants.paywallMonthlyPriceLine,
-                            priceText: monthlyPackage?.priceLabel,
-                            subtitleKey: ViewConstants.paywallMonthlySubtitle,
+                            contentPadding: EdgeInsets.fromLTRB(
+                              16.d,
+                              24.d,
+                              16.d,
+                              24.d,
+                            ),
                             priceNamedArgs: {
                               'monthlyPrice': monthlyPriceForCopy,
                             },
@@ -645,35 +647,33 @@ class _PlanOption extends StatelessWidget {
     required this.palette,
     required this.titleKey,
     required this.priceKey,
-    required this.subtitleKey,
     required this.isSelected,
     required this.onTap,
+    this.subtitleKey,
     this.priceText,
     this.trialLabelText,
     this.trialLabelKey,
-    this.badgeKey,
     this.leadingBadgeKey,
     this.priceNamedArgs,
+    this.subtitleNamedArgs,
     this.trialNamedArgs,
     this.badgeNamedArgs,
-    this.secondaryStackPriceKey,
-    this.secondaryStackPriceNamedArgs,
+    this.contentPadding,
   });
 
   final PaywallPalette palette;
   final String titleKey;
   final String priceKey;
-  final String subtitleKey;
+  final String? subtitleKey;
   final String? priceText;
   final String? trialLabelText;
   final String? trialLabelKey;
-  final String? badgeKey;
   final String? leadingBadgeKey;
   final Map<String, String>? priceNamedArgs;
+  final Map<String, String>? subtitleNamedArgs;
   final Map<String, String>? trialNamedArgs;
   final Map<String, String>? badgeNamedArgs;
-  final String? secondaryStackPriceKey;
-  final Map<String, String>? secondaryStackPriceNamedArgs;
+  final EdgeInsetsGeometry? contentPadding;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -695,7 +695,7 @@ class _PlanOption extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: EdgeInsets.all(16.d),
+              padding: contentPadding ?? EdgeInsets.all(16.d),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
@@ -747,115 +747,47 @@ class _PlanOption extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (badgeKey != null) ...[
-                              Gap(8.w),
-                              _Badge(
-                                palette: palette,
-                                labelKey: badgeKey!,
-                                namedArgs: badgeNamedArgs,
-                              ),
-                            ],
                           ],
                         ),
                         if (trialLabelText != null ||
                             trialLabelKey != null) ...[
                           Gap(6.h),
-                          if (trialLabelText != null)
-                            Text(
-                              trialLabelText!,
-                              style: ideaVaultLabel(
-                                context,
-                                size: 12.f,
-                                weight: FontWeight.w800,
-                                color: palette.accentGreenDark,
-                                height: 1.2,
-                              ),
-                            )
-                          else
-                            TranslatedText(
-                              trialLabelKey!,
-                              namedArgs: trialNamedArgs,
-                              style: ideaVaultLabel(
-                                context,
-                                size: 12.f,
-                                weight: FontWeight.w800,
-                                color: palette.accentGreenDark,
-                                height: 1.2,
-                              ),
-                            ),
-                        ],
-                        Gap(6.h),
-                        TranslatedText(
-                          subtitleKey,
-                          style: ideaVaultLabel(
-                            context,
-                            size: 12.f,
-                            weight: FontWeight.w600,
-                            color: theme.textMuted,
-                            height: 1.2,
+                          _InlineTrialLabel(
+                            labelText: trialLabelText,
+                            labelKey: trialLabelKey,
+                            namedArgs: trialNamedArgs,
+                            color: palette.accentGreenDark,
                           ),
-                        ),
+                        ],
+                        if (subtitleKey != null) ...[
+                          Gap(6.h),
+                          TranslatedText(
+                            subtitleKey!,
+                            namedArgs: subtitleNamedArgs,
+                            style: ideaVaultLabel(
+                              context,
+                              size: 12.f,
+                              weight: FontWeight.w600,
+                              color: theme.textMuted,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   Gap(12.w),
-                  if (secondaryStackPriceKey != null)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (priceText != null)
-                          Text(
-                            priceText!,
-                            textAlign: TextAlign.right,
-                            style: ideaVaultHeadline(
-                              context,
-                              size: 22.f,
-                              weight: FontWeight.w900,
-                              color: theme.primaryText,
-                              height: 1.08,
-                              letterSpacing: -0.35,
-                            ),
-                          )
-                        else
-                          TranslatedText(
-                            priceKey,
-                            namedArgs: priceNamedArgs,
-                            textAlign: TextAlign.right,
-                            style: ideaVaultHeadline(
-                              context,
-                              size: 22.f,
-                              weight: FontWeight.w900,
-                              color: theme.primaryText,
-                              height: 1.08,
-                              letterSpacing: -0.35,
-                            ),
-                          ),
-                        Gap(4.h),
-                        TranslatedText(
-                          secondaryStackPriceKey!,
-                          namedArgs: secondaryStackPriceNamedArgs,
-                          textAlign: TextAlign.right,
-                          style: ideaVaultLabel(
-                            context,
-                            size: 12.f,
-                            weight: FontWeight.w600,
-                            color: theme.textMuted,
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
-                    )
-                  else if (priceText != null)
+                  if (priceText != null)
                     Text(
                       priceText!,
                       textAlign: TextAlign.right,
                       style: ideaVaultHeadline(
                         context,
-                        size: 18.f,
+                        size: 22.f,
                         weight: FontWeight.w900,
                         color: theme.primaryText,
-                        height: 1.1,
+                        height: 1.08,
+                        letterSpacing: -0.35,
                       ),
                     )
                   else
@@ -865,10 +797,11 @@ class _PlanOption extends StatelessWidget {
                       textAlign: TextAlign.right,
                       style: ideaVaultHeadline(
                         context,
-                        size: 18.f,
+                        size: 22.f,
                         weight: FontWeight.w900,
                         color: theme.primaryText,
-                        height: 1.1,
+                        height: 1.08,
+                        letterSpacing: -0.35,
                       ),
                     ),
                 ],
@@ -883,10 +816,51 @@ class _PlanOption extends StatelessWidget {
             child: _Badge(
               palette: palette,
               labelKey: leadingBadgeKey!,
+              namedArgs: badgeNamedArgs,
               isPrimary: true,
             ),
           ),
       ],
+    );
+  }
+}
+
+class _InlineTrialLabel extends StatelessWidget {
+  const _InlineTrialLabel({
+    required this.color,
+    this.labelText,
+    this.labelKey,
+    this.namedArgs,
+  });
+
+  final Color color;
+  final String? labelText;
+  final String? labelKey;
+  final Map<String, String>? namedArgs;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ideaVaultLabel(
+      context,
+      size: 12.f,
+      weight: FontWeight.w800,
+      color: color,
+      height: 1.2,
+    );
+
+    if (labelText != null) {
+      return Text(
+        labelText!,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+
+    return TranslatedText(
+      labelKey!,
+      namedArgs: namedArgs,
+      overflow: TextOverflow.ellipsis,
+      style: style,
     );
   }
 }

@@ -207,6 +207,7 @@ class RevenueCatSubscriptionService implements SubscriptionService {
       priceLabel: sp.priceString,
       trialLabel: trialLabel,
       billingPeriodTotalLabel: null,
+      monthlyEquivalentPriceLabel: null,
       freeTrialDays: freeTrialDays,
       savingsPercentVsMonthly: null,
     );
@@ -237,9 +238,10 @@ class RevenueCatSubscriptionService implements SubscriptionService {
     return PaywallPackage(
       id: package.identifier,
       productId: sp.identifier,
-      priceLabel: sp.pricePerMonthString ?? sp.priceString,
+      priceLabel: sp.priceString,
       trialLabel: trialLabel,
       billingPeriodTotalLabel: sp.priceString,
+      monthlyEquivalentPriceLabel: sp.pricePerMonthString,
       freeTrialDays: freeTrialDays,
       savingsPercentVsMonthly: savingsPercent,
     );

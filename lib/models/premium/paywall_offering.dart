@@ -10,6 +10,7 @@ class PaywallPackage {
     required this.priceLabel,
     this.trialLabel,
     this.billingPeriodTotalLabel,
+    this.monthlyEquivalentPriceLabel,
     this.freeTrialDays,
     this.savingsPercentVsMonthly,
   });
@@ -22,6 +23,8 @@ class PaywallPackage {
   final String? trialLabel;
 
   final String? billingPeriodTotalLabel;
+
+  final String? monthlyEquivalentPriceLabel;
 
   final int? freeTrialDays;
 
