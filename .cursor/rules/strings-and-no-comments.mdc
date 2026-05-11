@@ -1,0 +1,17 @@
+---
+description: User-visible strings via translations pipeline; never add source comments
+alwaysApply: false
+---
+# User-visible strings
+
+When introducing or changing copy shown in the UI:
+
+1. Add a row to `assets/translations/translations.csv` using the `key,en_US` header. The key must be stable and descriptive (e.g. camelCase matching existing keys).
+2. Add a matching entry on `ViewConstants` in `lib/core/constants/view_constants.dart` — a `static const String` whose value equals that CSV key string literal.
+3. Render the text with `TranslatedText` from `lib/widgets/translated_text.dart`, passing `ViewConstants.<name>` as the first argument (plus `namedArgs` when the CSV uses placeholders).
+
+Avoid hardcoding user-visible English in Dart except where localization does not apply.
+
+# Comments
+
+Do not add new comments to source code (`//`, `///`, or block comments). Do not add explanatory comment blocks when making changes.

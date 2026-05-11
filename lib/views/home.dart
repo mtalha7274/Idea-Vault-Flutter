@@ -1,13 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../config/config.dart';
-import '../core/services/force_update.dart';
-import '../viewmodels/providers/info_provider.dart';
-import '../viewmodels/providers/theme_provider.dart';
-import '../widgets/custom_bottom_navigation_bar.dart';
+
+import '../config/router/app_router.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import 'homepage.dart';
-import 'search.dart';
-import 'settings.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -17,53 +15,37 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  int _currentIndex = 0;
-
-  final List<Widget> _pages = const [
-    Homepage(),
-    Search(),
-    Settings(),
-  ];
+  bool _startupPaywallHandled = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((timestamp) {
-      if (Config.firebaseEnabled) {
-        checkForcedUpdates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
       }
+      final paywallVm = context.read<PaywallViewModel>();
+      void tryShowStartupPaywall() {
+        if (!mounted || _startupPaywallHandled) {
+          return;
+        }
+        if (paywallVm.isLoading) {
+          return;
+        }
+        _startupPaywallHandled = true;
+        paywallVm.removeListener(tryShowStartupPaywall);
+        if (!paywallVm.isPro) {
+          unawaited(AppRouter.showPaywall(context));
+        }
+      }
+
+      paywallVm.addListener(tryShowStartupPaywall);
+      tryShowStartupPaywall();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = context.watch<ThemeProvider>();
-    final infoProvider = context.watch<InfoProvider>();
-    return Scaffold(
-      appBar: appBar(themeProvider, infoProvider),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages.map((widget) => widget).toList(),
-      ),
-      bottomNavigationBar: CustomBottomNavigationBar(
-        onChanged: (index) {
-          if (_currentIndex == index) return;
-          _currentIndex = index;
-          setState(() {});
-        },
-      ),
-    );
-  }
-
-  AppBar appBar(ThemeProvider themeProvider, InfoProvider infoProvider) {
-    return AppBar(
-      backgroundColor: themeProvider.baseTheme.surface,
-      title: Consumer<InfoProvider>(
-        builder: (context, infoProvider, child) {
-          return Text(infoProvider.deviceInfo?.country ?? 'No Data',
-              style: TextStyle(color: themeProvider.baseTheme.primaryText));
-        },
-      ),
-    );
+    return const Homepage();
   }
 }

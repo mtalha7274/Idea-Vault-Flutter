@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_base_project_mvvm/core/resources/data_state.dart';
+import 'package:idea_vault/core/resources/data_state.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/constants/app_constants.dart';
-import '../../core/services/firebase_remote_config.dart';
 import '../../data/managers/local/local_storage.dart';
 import '../../data/repositories/remote/settings/country.dart';
 import '../../injection_container.dart';
@@ -39,10 +38,5 @@ class InfoProvider with ChangeNotifier {
       _localStorageManager.getString(key: AppConstants.skippedVersion) ??
       sl<PackageInfo>().version;
 
-  Future<void> setSkippedVersion() async {
-    final firebaseRemoteConfigService = sl<FirebaseRemoteConfigService>();
-    await _localStorageManager.setString(
-        key: AppConstants.skippedVersion,
-        value: firebaseRemoteConfigService.getRecommendedMinimumVersion());
-  }
+  Future<void> setSkippedVersion() async {}
 }

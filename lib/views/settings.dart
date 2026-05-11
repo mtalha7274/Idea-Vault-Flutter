@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/double.dart';
-import 'package:flutter_base_project_mvvm/core/extensions/int.dart';
+import 'package:idea_vault/core/extensions/double.dart';
+import 'package:idea_vault/core/extensions/int.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:in_app_review/in_app_review.dart';
@@ -12,13 +11,14 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/config.dart';
+import '../config/theme/base.dart';
 import '../core/constants/app_assets.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/view_constants.dart';
 import '../core/utils/helpers.dart';
 import '../main.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import '../widgets/custom_modal_progress_hud.dart';
+import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
 
 class Settings extends StatefulWidget {
@@ -36,50 +36,186 @@ class _SettingsState extends State<Settings> {
     final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
+      backgroundColor: themeProvider.baseTheme.background,
+      appBar: IdeaVaultSubpageAppBar(
+        titleKey: ViewConstants.settings,
+      ),
       body: SafeArea(
-          child: CustomModalProgressHUD(
-        inAsyncCall: inAsyncCall,
-        child: Padding(
-          padding: EdgeInsets.only(
-              left: AppConstants.gap20Px.w,
-              right: (AppConstants.gap18Px + 1).w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Gap(AppConstants.gap18Px + 1),
-              title(themeProvider),
-              const Gap(AppConstants.gap18Px + 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Wrap(
-                    runSpacing: AppConstants.gap10Px,
-                    children: [
-                      actionTile(themeProvider, ViewConstants.privacyPolicy,
-                          AppAssets.privacyPolicy,
-                          size: 18.0, onTap: privacyPolicy),
-                      actionTile(
-                          themeProvider,
-                          ViewConstants.termsAndConditions,
-                          AppAssets.termsAndConditions,
-                          size: 16.0,
-                          onTap: termsAndConditions),
-                      actionTile(themeProvider, ViewConstants.rateApp,
-                          AppAssets.rateApp,
-                          onTap: rateApp),
-                      actionTile(themeProvider, ViewConstants.shareApp,
-                          AppAssets.shareApp,
-                          onTap: shareApp),
-                      actionTile(themeProvider, ViewConstants.contactUs,
-                          AppAssets.contactUs,
-                          onTap: contactUs),
-                    ],
-                  ),
+          child: Padding(
+        padding: EdgeInsets.only(
+            left: AppConstants.gap20Px.w, right: (AppConstants.gap18Px + 1).w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Gap(AppConstants.gap18Px + 1),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Wrap(
+                  runSpacing: AppConstants.gap10Px,
+                  children: [
+                    appearanceTile(themeProvider),
+                    actionTile(themeProvider, ViewConstants.privacyPolicy,
+                        AppAssets.privacyPolicy,
+                        size: 18.0, onTap: privacyPolicy),
+                    actionTile(themeProvider, ViewConstants.termsAndConditions,
+                        AppAssets.termsAndConditions,
+                        size: 16.0, onTap: termsAndConditions),
+                    actionTile(
+                        themeProvider, ViewConstants.rateApp, AppAssets.rateApp,
+                        onTap: rateApp),
+                    actionTile(themeProvider, ViewConstants.shareApp,
+                        AppAssets.shareApp,
+                        onTap: shareApp),
+                    actionTile(themeProvider, ViewConstants.contactUs,
+                        AppAssets.contactUs,
+                        onTap: contactUs),
+                  ],
                 ),
-              )
-            ],
-          ),
+              ),
+            )
+          ],
         ),
       )),
+    );
+  }
+
+  Widget appearanceTile(ThemeProvider themeProvider) {
+    final base = themeProvider.baseTheme;
+    final isDark = themeProvider.themeType == Config.dark;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: (AppConstants.gap14Px).w,
+        vertical: (AppConstants.gap12Px).h,
+      ),
+      decoration: BoxDecoration(
+        color: base.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 31.h,
+            width: 31.4.w,
+            decoration: BoxDecoration(
+              color: base.settings.iconBackground,
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
+            ),
+            alignment: Alignment.center,
+            child: SvgPicture.asset(
+              isDark ? AppAssets.moon : AppAssets.sun,
+              height: 17.h,
+              width: 17.w,
+              colorFilter: ColorFilter.mode(
+                base.settings.icon,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+          Gap((AppConstants.gap10Px + 1.6).w),
+          Expanded(
+            child: TranslatedText(
+              ViewConstants.settingsAppearance,
+              style: TextStyle(
+                color: base.settings.tileTitle,
+                fontSize: AppConstants.font14Px,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          _appearanceThemeToggle(themeProvider, base, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _appearanceThemeToggle(
+    ThemeProvider themeProvider,
+    BaseTheme base,
+    bool isDark,
+  ) {
+    final hintColor = base.textMuted.withValues(alpha: 0.75);
+    return GestureDetector(
+      onTap: () {
+        themeProvider.setTheme(
+          theme: isDark ? Config.light : Config.dark,
+        );
+      },
+      child: SizedBox(
+        width: 58.w,
+        height: 38.h,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: base.surfaceLow,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: base.outlineSoft, width: 1),
+              ),
+              child: SizedBox(width: 58.w, height: 38.h),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SvgPicture.asset(
+                    AppAssets.sun,
+                    width: 15,
+                    height: 15,
+                    colorFilter: ColorFilter.mode(
+                      hintColor,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  SvgPicture.asset(
+                    AppAssets.moon,
+                    width: 14,
+                    height: 14,
+                    colorFilter: ColorFilter.mode(
+                      hintColor,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              alignment: isDark ? Alignment.centerRight : Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 2.5.w),
+                child: Container(
+                  width: 30.d,
+                  height: 30.d,
+                  decoration: BoxDecoration(
+                    color: isDark ? base.primary : base.settings.switchThumb,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: base.overlay.withValues(alpha: 0.35),
+                        blurRadius: 5,
+                        offset: Offset(0, 2.h),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: SvgPicture.asset(
+                    isDark ? AppAssets.moon : AppAssets.sun,
+                    width: 15,
+                    height: 15,
+                    colorFilter: ColorFilter.mode(
+                      isDark ? base.onPrimary : base.primary,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -109,7 +245,10 @@ class _SettingsState extends State<Settings> {
                 icon,
                 height: size.h,
                 width: size.w,
-                color: themeProvider.baseTheme.settings.icon,
+                colorFilter: ColorFilter.mode(
+                  themeProvider.baseTheme.settings.icon,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
             Gap((AppConstants.gap10Px + 1.6).w),
@@ -123,25 +262,6 @@ class _SettingsState extends State<Settings> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget title(ThemeProvider themeProvider) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        TranslatedText(
-          ViewConstants.settings,
-          style: TextStyle(
-              color: themeProvider.baseTheme.primaryText,
-              fontSize: AppConstants.font20Px,
-              fontWeight: FontWeight.w600),
-        ),
-        CupertinoSwitch(
-          value: themeProvider.themeType == Config.dark,
-          onChanged: (val) => onThemeChange(val, themeProvider),
-        ),
-      ],
     );
   }
 
@@ -184,9 +304,5 @@ class _SettingsState extends State<Settings> {
     } catch (e) {
       printLog(e.toString());
     }
-  }
-
-  void onThemeChange(bool val, ThemeProvider themeProvider) {
-    themeProvider.setTheme(theme: val ? Config.dark : Config.light);
   }
 }

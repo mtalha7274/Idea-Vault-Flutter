@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../config/config.dart';
@@ -12,9 +14,18 @@ class ThemeProvider with ChangeNotifier {
   final ThemeRepo _themeRepo;
 
   ThemeProvider(this._themeRepo) {
-    final String type = _themeRepo.getTheme();
-    baseTheme = type == Config.dark ? DarkTheme() : LightTheme();
-    themeType = type;
+    final String? type = _themeRepo.getTheme();
+    final String resolved;
+    if (type == null) {
+      resolved = ui.PlatformDispatcher.instance.platformBrightness ==
+              ui.Brightness.dark
+          ? Config.dark
+          : Config.light;
+    } else {
+      resolved = type == Config.dark ? Config.dark : Config.light;
+    }
+    themeType = resolved;
+    baseTheme = resolved == Config.dark ? DarkTheme() : LightTheme();
   }
 
   void setTheme({required String theme}) async {
