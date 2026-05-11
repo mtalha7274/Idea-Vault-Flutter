@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_action_button.dart';
+import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -63,33 +64,7 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
     };
     return Scaffold(
       backgroundColor: theme.background,
-      appBar: AppBar(
-        backgroundColor: theme.background,
-        foregroundColor: theme.primaryText,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        leadingWidth: 52.w,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18.d,
-          ),
-          padding: EdgeInsets.all(10.d),
-          splashRadius: 20.d,
-          visualDensity: VisualDensity.compact,
-        ),
-        title: TranslatedText(
-          titleKey,
-          style: ideaVaultHeadline(
-            context,
-            size: 20,
-            weight: FontWeight.w800,
-          ),
-        ),
-      ),
+      appBar: IdeaVaultSubpageAppBar(titleKey: titleKey),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

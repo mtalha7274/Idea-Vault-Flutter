@@ -355,12 +355,19 @@ void main() {
 
       await tester.longPress(find.byKey(Key('idea-card-$firstIdeaId')));
       await settleUi(tester);
-      expect(find.text('1 selected'), findsOneWidget);
-      expect(find.byKey(const Key('ideas-delete-button')), findsOneWidget);
+      final deleteButton = find.byKey(const Key('ideas-delete-button'));
+      expect(deleteButton, findsOneWidget);
+      expect(
+        find.descendant(of: deleteButton, matching: find.text('1')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Second delete target'));
       await settleUi(tester);
-      expect(find.text('2 selected'), findsOneWidget);
+      expect(
+        find.descendant(of: deleteButton, matching: find.text('2')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('ideas-delete-button')));
       await settleUi(tester);

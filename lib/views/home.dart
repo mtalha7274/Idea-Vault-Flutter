@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../config/router/app_router.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import 'homepage.dart';
-import 'paywall_screen.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -10,28 +15,33 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  static const _paywallDelay = Duration(milliseconds: 1500);
+  bool _startupPaywallHandled = false;
 
   @override
   void initState() {
     super.initState();
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   _showStartupPaywall();
-    // });
-  }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final paywallVm = context.read<PaywallViewModel>();
+      void tryShowStartupPaywall() {
+        if (!mounted || _startupPaywallHandled) {
+          return;
+        }
+        if (paywallVm.isLoading) {
+          return;
+        }
+        _startupPaywallHandled = true;
+        paywallVm.removeListener(tryShowStartupPaywall);
+        if (!paywallVm.isPro) {
+          unawaited(AppRouter.showPaywall(context));
+        }
+      }
 
-  Future<void> _showStartupPaywall() async {
-    await Future.delayed(_paywallDelay);
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => const PaywallScreen(),
-      ),
-    );
+      paywallVm.addListener(tryShowStartupPaywall);
+      tryShowStartupPaywall();
+    });
   }
 
   @override

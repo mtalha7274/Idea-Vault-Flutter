@@ -17,7 +17,6 @@ abstract class BaseTheme {
   Color get outlineSoft;
   Color get warning;
   SettingsColors get settings;
-  BottomNavBarColors get bottomNavBar;
 
   ThemeData get themeData;
 }
@@ -27,10 +26,4 @@ abstract class SettingsColors {
   Color get icon;
   Color get tileTitle;
   Color get switchThumb;
-}
-
-abstract class BottomNavBarColors {
-  Color get foreground;
-  Color get background;
-  Color get indicator;
 }

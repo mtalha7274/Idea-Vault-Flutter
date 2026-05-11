@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
@@ -18,7 +19,9 @@ import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
+import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
@@ -49,8 +52,6 @@ class IdeaEditorScreen extends StatefulWidget {
 class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _autosaveDelay = Duration(milliseconds: 700);
-  static const _untitledIdeaTitle = 'Untitled Idea';
-
   final SpeechToText _speechToText = SpeechToText();
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
@@ -75,6 +76,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _hasSaveFailed = false;
   bool _isListening = false;
   bool _isMicPressHeld = false;
+  final GlobalKey<TooltipState> _micTooltipKey = GlobalKey<TooltipState>();
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
   bool _isOrganizing = false;
@@ -303,7 +305,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           minLines: 1,
           maxLines: 3,
           decoration: InputDecoration(
-            hintText: 'Enter idea title...',
+            hintText: ViewConstants.ideaEditorTitleHint.tr(),
             hintStyle: ideaVaultHeadline(
               context,
               size: 38,
@@ -369,7 +371,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                       ],
                     ),
                     child: Text(
-                      'Listening...',
+                      ViewConstants.ideaEditorListening.tr(),
                       style: ideaVaultLabel(
                         context,
                         size: 13,
@@ -383,49 +385,57 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               ),
             ),
             const SizedBox(height: 18),
-            GestureDetector(
-              key: const Key('idea-editor-mic-fab'),
-              behavior: HitTestBehavior.opaque,
-              onLongPress: _handleMicLongPress,
-              onLongPressEnd: (_) => _handleMicLongPressEnd(),
-              child: ScaleTransition(
-                scale: _micScaleAnimation,
-                child: AnimatedBuilder(
-                  animation: _micGlowController,
-                  builder: (context, child) {
-                    final glowOpacity =
-                        0.16 + (_micGlowController.value * 0.22);
-                    final glowRadius = 32.0 + (_micGlowController.value * 12.0);
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: _isListening
-                            ? [
-                                BoxShadow(
-                                  color: primaryColor.withValues(
-                                      alpha: glowOpacity),
-                                  blurRadius: glowRadius,
-                                  spreadRadius: 3,
-                                ),
-                              ]
-                            : const [],
-                      ),
-                      child: child,
-                    );
-                  },
-                  child: AbsorbPointer(
-                    child: FloatingActionButton(
-                      heroTag: 'idea-editor-mic-fab',
-                      onPressed: () {},
-                      elevation: _isListening ? 8 : 6,
-                      backgroundColor: primaryColor,
-                      foregroundColor: theme.onPrimary,
-                      child: Icon(
-                        _isListening ? Icons.mic_none : Icons.mic,
-                        size: 28,
+            Tooltip(
+              key: _micTooltipKey,
+              message: ViewConstants.ideaEditorMicLongPressToTalk.tr(),
+              triggerMode: TooltipTriggerMode.manual,
+              showDuration: const Duration(seconds: 3),
+              child: GestureDetector(
+                key: const Key('idea-editor-mic-fab'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _handleMicSingleTap,
+                onLongPress: _handleMicLongPress,
+                onLongPressEnd: (_) => _handleMicLongPressEnd(),
+                child: ScaleTransition(
+                  scale: _micScaleAnimation,
+                  child: AnimatedBuilder(
+                    animation: _micGlowController,
+                    builder: (context, child) {
+                      final glowOpacity =
+                          0.16 + (_micGlowController.value * 0.22);
+                      final glowRadius =
+                          32.0 + (_micGlowController.value * 12.0);
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: _isListening
+                              ? [
+                                  BoxShadow(
+                                    color: primaryColor.withValues(
+                                        alpha: glowOpacity),
+                                    blurRadius: glowRadius,
+                                    spreadRadius: 3,
+                                  ),
+                                ]
+                              : const [],
+                        ),
+                        child: child,
+                      );
+                    },
+                    child: AbsorbPointer(
+                      child: FloatingActionButton(
+                        heroTag: 'idea-editor-mic-fab',
+                        onPressed: () {},
+                        elevation: _isListening ? 8 : 6,
+                        backgroundColor: primaryColor,
+                        foregroundColor: theme.onPrimary,
+                        child: Icon(
+                          _isListening ? Icons.mic_none : Icons.mic,
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
@@ -447,7 +457,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Widget _buildAddSectionTab() {
     return Tooltip(
-      message: 'Add section',
+      message: ViewConstants.ideaEditorAddSectionTooltip.tr(),
       child: _SectionTabButton(
         key: const Key('idea-editor-add-section'),
         icon: Icons.add_rounded,
@@ -519,9 +529,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
 
     if (activeSection.name == 'Idea') {
-      return 'Start articulating your vision here.';
+      return ViewConstants.ideaEditorPlaceholderDefaultSection.tr();
     }
-    return 'Capture ${activeSection.name.toLowerCase()} here.';
+    return ViewConstants.ideaEditorPlaceholderNamedSection.tr(
+      namedArgs: {'section': activeSection.name.toLowerCase()},
+    );
   }
 
   void _switchSection(String sectionId) {
@@ -580,9 +592,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _onOrganizeToolbarPressed() async {
+    final hasAccess = await _ensurePremiumAccess(PremiumFeature.aiOrganize);
+    if (!hasAccess || !mounted) {
+      return;
+    }
+
     if (_contentPlainTextForEditing().trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nothing to organize')),
+        SnackBar(
+          content: TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
+        ),
       );
       return;
     }
@@ -613,8 +632,27 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       ..addListener(_handleEditorContentChanged);
   }
 
+  Future<void> _handleMicSingleTap() async {
+    if (_isListening) {
+      return;
+    }
+
+    final paywall = context.read<PaywallViewModel>();
+    if (!paywall.isPro) {
+      await AppRouter.showPaywall(context);
+      return;
+    }
+
+    _micTooltipKey.currentState?.ensureTooltipVisible();
+  }
+
   Future<void> _handleMicLongPress() async {
     if (_isListening) {
+      return;
+    }
+
+    final hasAccess = await _ensurePremiumAccess(PremiumFeature.speechToText);
+    if (!hasAccess || !mounted) {
       return;
     }
 
@@ -761,8 +799,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Speech recognition stopped. Please try again.'),
+      SnackBar(
+        content: TranslatedText(ViewConstants.ideaEditorSnackbarSpeechStopped),
       ),
     );
   }
@@ -837,8 +875,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   void _showSpeechUnavailableMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Speech recognition is unavailable on this device.'),
+      SnackBar(
+        content: TranslatedText(
+          ViewConstants.ideaEditorSnackbarSpeechUnavailable,
+        ),
       ),
     );
   }
@@ -853,21 +893,19 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Microphone Access Needed'),
-          content: const Text(
-            'To use speech to text, please enable microphone access in your device settings.',
-          ),
+          title: TranslatedText(ViewConstants.ideaEditorMicPermissionTitle),
+          content: TranslatedText(ViewConstants.ideaEditorMicPermissionBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+              child: TranslatedText(ViewConstants.cancel),
             ),
             FilledButton(
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
                 await openAppSettings();
               },
-              child: const Text('Open Settings'),
+              child: TranslatedText(ViewConstants.ideaEditorOpenSettings),
             ),
           ],
         );
@@ -1024,7 +1062,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   void _showDuplicateSectionMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('That section already exists.')),
+      SnackBar(
+        content: TranslatedText(ViewConstants.ideaEditorSnackbarDuplicateSection),
+      ),
     );
   }
 
@@ -1049,10 +1089,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     switch (action) {
       case IdeaEditorOptionsSheetAction.exportForAI:
-        await _openExportScreen(ExportMode.aiExport);
+        if (await _ensurePremiumAccess(PremiumFeature.exportForAi)) {
+          await _openExportScreen(ExportMode.aiExport);
+        }
         break;
       case IdeaEditorOptionsSheetAction.exportToPDF:
-        await _openExportScreen(ExportMode.pdfExport);
+        if (await _ensurePremiumAccess(PremiumFeature.exportPdf)) {
+          await _openExportScreen(ExportMode.pdfExport);
+        }
         break;
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
@@ -1074,6 +1118,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         mode: mode,
       ),
     );
+  }
+
+  Future<bool> _ensurePremiumAccess(PremiumFeature feature) async {
+    try {
+      return context.read<PaywallViewModel>().ensureAccess(context, feature);
+    } on ProviderNotFoundException {
+      return true;
+    }
   }
 
   Future<void> _confirmDeleteIdea() async {
@@ -1199,7 +1251,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   String get _autosaveTitle {
     final title = _titleController.text.trim();
-    return title.isEmpty ? _untitledIdeaTitle : title;
+    return title.isEmpty ? ViewConstants.ideaEditorUntitledIdea.tr() : title;
   }
 
   List<IdeaSection> _sectionsToSave() {
@@ -1237,7 +1289,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     if (currentText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nothing to organize')),
+        SnackBar(
+          content: TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
+        ),
       );
       return;
     }
@@ -1264,8 +1318,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           _isOrganizing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to organize. Please try again.')),
+          SnackBar(
+            content: TranslatedText(ViewConstants.ideaEditorSnackbarOrganizeFailed),
+          ),
         );
       }
     }

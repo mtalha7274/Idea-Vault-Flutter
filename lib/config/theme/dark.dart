@@ -5,29 +5,29 @@ import 'base.dart';
 
 class DarkTheme implements BaseTheme {
   @override
-  final Color primary = const Color(0xFF446556);
+  final Color primary = const Color(0xFF81B39C);
   @override
-  final Color secondary = const Color(0xFFd7ccfe);
+  final Color secondary = const Color(0xFFC5BAFF);
   @override
-  final Color onPrimary = const Color(0xFFE0FFEE);
+  final Color onPrimary = const Color(0xFF1A2421);
   @override
-  final Color background = const Color(0xFFF9F9F9);
+  final Color background = const Color(0xFF121416);
   @override
-  final Color primaryText = const Color(0xFF2D3435);
+  final Color primaryText = const Color(0xFFE3E5E5);
   @override
-  final Color surface = const Color(0xFFFFFFFF);
+  final Color surface = const Color(0xFF1C1F22);
   @override
-  final Color onSurface = const Color(0xFF5A6061);
+  final Color onSurface = const Color(0xFFAFB3B7);
   @override
-  final Color overlay = const Color(0xFF000000).withOpacity(0.1);
+  final Color overlay = const Color(0xFFFFFFFF).withOpacity(0.08);
   @override
-  final Color surfaceLow = const Color(0xFFF2F4F4);
+  final Color surfaceLow = const Color(0xFF23272A);
   @override
-  final Color surfaceHigh = const Color(0xFFDDE4E5);
+  final Color surfaceHigh = const Color(0xFF2D3236);
   @override
-  final Color outline = const Color(0xFFADB3B4);
+  final Color outline = const Color(0xFF3D444A);
   @override
-  final Color textMuted = const Color(0xFF5A6061);
+  final Color textMuted = const Color(0xFF8E9499);
 
   @override
   Color get accentTint => primary.withValues(alpha: 0.12);
@@ -36,38 +36,36 @@ class DarkTheme implements BaseTheme {
   Color get outlineSoft => outline.withValues(alpha: 0.16);
 
   @override
-  final Color warning = Color(0xFFF4BD2B);
+  final Color warning = const Color(0xFFFFD966);
   @override
   final SettingsColors settings = SettingsColorsImpl();
-  @override
-  final BottomNavBarColors bottomNavBar = BottomNavBarColorsImpl();
 
   @override
   late final ThemeData themeData = ThemeData(
+    brightness: Brightness.dark,
     fontFamily: Config.fontFamily,
     scaffoldBackgroundColor: background,
-    colorScheme: ColorScheme.fromSeed(seedColor: primary),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+      primary: primary,
+      secondary: secondary,
+      surface: surface,
+      onSurface: primaryText,
+      onPrimary: onPrimary,
+    ),
   );
 }
 
 class SettingsColorsImpl implements SettingsColors {
   @override
-  final iconBackground = const Color(0xFF485166).withOpacity(0.32);
+  final iconBackground = const Color(0xFF2D3236);
   @override
-  final icon = const Color(0xFF98A6A0);
+  final icon = const Color(0xFF81B39C);
 
   @override
-  Color get tileTitle => const Color(0xFFEEEEEF);
+  Color get tileTitle => const Color(0xFFE3E5E5);
 
   @override
-  Color get switchThumb => const Color(0xFF333836);
-}
-
-class BottomNavBarColorsImpl implements BottomNavBarColors {
-  @override
-  Color get background => const Color(0xFF343946).withOpacity(0.32);
-  @override
-  Color get foreground => const Color(0xFFFFFFFF);
-  @override
-  Color get indicator => const Color(0xFFC981C8);
+  Color get switchThumb => const Color(0xFFFFFFFF);
 }

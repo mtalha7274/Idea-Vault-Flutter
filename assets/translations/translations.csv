@@ -18,6 +18,10 @@ rateApp,Rate App
 shareApp,Share App
 contactUs,Contact Us
 settings,Settings
+settingsAppearance,Appearance
+settingsThemeLight,Light
+settingsThemeDark,Dark
+settingsThemeDescription,Choose light or dark colors across the app.
 home,Home
 search,Search
 more,More
@@ -45,18 +49,21 @@ paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
 paywallFeaturePrioritySupport,Priority support
 paywallPlanYearly,Yearly
-paywallYearlyPriceLine,$1.67 / month
-paywallYearlySubtitle,$19.99 per year
-paywallTrialLabel,3-day free trial
-paywallBadgeSave,Save 44%
+paywallYearlyHeadlinePrice,{yearlyPrice}/yr
+paywallYearlyPriceLine,{monthlyPrice}/mo
+paywallYearlySubtitle,Billed annually
+paywallTrialLabel,{days}-day free trial
+paywallBadgeSave,Save {percent}%
 paywallBadgeMostPopular,Most popular
 paywallPlanMonthly,Monthly
-paywallMonthlyPriceLine,$2.99 / month
+paywallMonthlyPriceLine,{monthlyPrice}/mo
 paywallMonthlySubtitle,Billed monthly
-paywallFooterYearly,"Try free for 3 days, then $19.99 per year"
-paywallFooterMonthly,Get Idea Vault Pro for $2.99 per month
+paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice}/yr"
+paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice}/mo
 paywallCtaStartTrial,Start Free Trial
 paywallCtaGetMonthly,Get Pro Monthly
+paywallCtaSubscribeYearly,Subscribe
+paywallFooterYearlyNoTrial,{yearlyPrice}/yr
 paywallCloseTooltip,Close
 paywallComingSoon,Coming soon
 paywallRestorePurchases,Restore Purchases
@@ -76,3 +83,67 @@ exportForAiClipboardIdeaLine,Idea: {title}
 exportForAiSectionNoContentYet,No content yet
 ideaEditorOptionsSheetTitle,Idea options
 ideaEditorOptionsDeleteIdea,Delete Idea
+homepageSavedIdeasTooltipOne,1 saved idea
+homepageSavedIdeasTooltipMany,{count} saved ideas
+homepageTitle,Idea Vault
+backupRestoreScreenTitle,Backup and Restore
+backupRestoreCloudBackup,Cloud Backup
+backupRestoreGoogleAccount,Google Account
+backupRestoreChangeAccount,Change
+backupRestoreAutoBackup,Auto Backup
+backupRestoreAutoBackupDescription,We back up your ideas every 24 hours.
+backupRestoreLastBackup,Last Backup
+backupRestoreBackupSize,Backup Size
+backupRestoreBackUpNow,Back Up Now
+backupRestoreSectionRestore,RESTORE
+backupRestoreRestoreFromBackup,Restore from Backup
+backupRestoreRestoreWarning,This will replace all current data.
+homepageFabNewIdea,New Idea
+homepageSortSheetTitle,Sort ideas
+homepageSortSheetSubtitle,Choose how your vault is arranged.
+homepageSortNewestFirst,Newest First
+homepageSortOldestFirst,Oldest First
+homepageSortMostSections,Most Sections
+homepageGetIdeaVaultPro,Get Idea Vault Pro
+homepageEmptyTitle,Nothing saved yet
+homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
+homepageIdeaCardOneSection,1 section
+homepageIdeaCardSectionsMany,{count} sections
+homepageIdeaCardUpdatedToday,Updated today • {time}
+homepageIdeaCardUpdatedYesterday,Updated yesterday
+homepageIdeaCardUpdatedOnDate,Updated {date}
+homepageSearchHint,Search ideas
+homepageNoSearchResults,No ideas match your search
+homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
+ideaEditorUntitledIdea,Untitled Idea
+ideaEditorTitleHint,Enter idea title...
+ideaEditorListening,Listening...
+ideaEditorAddSectionTooltip,Add section
+ideaEditorPlaceholderDefaultSection,Start articulating your vision here.
+ideaEditorPlaceholderNamedSection,Capture {section} here.
+ideaEditorSnackbarNothingToOrganize,Nothing to organize
+ideaEditorSnackbarOrganizeFailed,Failed to organize. Please try again.
+ideaEditorSnackbarSpeechStopped,Speech recognition stopped. Please try again.
+ideaEditorSnackbarSpeechUnavailable,Speech recognition is unavailable on this device.
+ideaEditorSnackbarDuplicateSection,That section already exists.
+ideaEditorMicPermissionTitle,Microphone Access Needed
+ideaEditorMicPermissionBody,To use speech to text, please enable microphone access in your device settings.
+ideaEditorOpenSettings,Open Settings
+ideaEditorMicLongPressToTalk,Long press and hold the mic button to dictate
+paywallPurchaseUnavailable,Purchase is unavailable. Please try again.
+backupRestoreCloudUpdateFailed,Cloud backup could not be updated. Please try again.
+backupRestoreLastBackupNever,Never
+backupRestoreNoBackupYet,No backup yet
+backupRestoreAccountPlaceholderIcloud,iCloud
+backupRestoreBackingUp,Backing up...
+backupRestoreRestoring,Restoring...
+backupRestoreAutoBackupUpdateFailed,Auto Backup could not be updated.
+backupRestoreBackupComplete,Backup complete.
+backupRestoreConfirmRestoreTitle,Restore from Backup?
+backupRestoreConfirmRestoreBody,All current data will be replaced with the ideas in your cloud backup.
+backupRestoreConfirmRestoreButton,Restore
+backupRestoreNoBackupFound,No cloud backup was found.
+backupRestoreRestoredMessage,Backup restored.
+backupRestoreFormatBytesB,{bytes} B
+backupRestoreFormatBytesKb,{kb} KB
+backupRestoreFormatBytesMb,{mb} MB

@@ -12,7 +12,24 @@
           "package_name": "com.pocketmicros.ideavault"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "911513267572-2r9mbb5mif1j624c3ft8f5pkcq2vtvcc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pocketmicros.ideavault",
+            "certificate_hash": "b424eee4b10ea4e316260034b6997086f667e67f"
+          }
+        },
+        {
+          "client_id": "911513267572-qvct5g41slutcq0gjvsj82e6aco8gkof.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pocketmicros.ideavault",
+            "certificate_hash": "3aa8349cf65c100b1730196b6c0e009bca1b1d35"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyALAnEoOYiOVH1ukrAW_FZBBt4ksRf7Jug"
