@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
+import 'package:idea_vault/data/repositories/remote/idea_organization_repository.dart';
+import 'package:idea_vault/injection_container.dart';
+import 'package:idea_vault/main.dart' show navigatorKey;
 import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
@@ -27,6 +30,11 @@ void main() {
 
     setUpAll(() {
       VisibilityDetectorController.instance.updateInterval = Duration.zero;
+      if (!sl.isRegistered<IdeaOrganizationRepository>()) {
+        sl.registerSingleton<IdeaOrganizationRepository>(
+          _FakeIdeaOrganizationRepository(),
+        );
+      }
     });
 
     setUp(() async {
@@ -65,6 +73,7 @@ void main() {
             ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
           ],
           child: MaterialApp(
+            navigatorKey: navigatorKey,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
@@ -475,6 +484,92 @@ void main() {
       );
     });
 
+    testWidgets('toggles idea cards between list and remembered grid layout',
+        (tester) async {
+      late String firstIdeaId;
+      late String secondIdeaId;
+      await tester.runAsync(() async {
+        final firstIdea = await provider.saveIdea(
+          title: 'First layout card',
+          sections: [
+            const IdeaSection(
+              id: 'first-layout-section',
+              name: 'Idea',
+              content: 'A compact card should still reveal useful context.',
+            ),
+          ],
+        );
+        firstIdeaId = firstIdea!.id;
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+        final secondIdea = await provider.saveIdea(
+          title: 'Second layout card',
+          sections: [
+            const IdeaSection(
+              id: 'second-layout-section',
+              name: 'Idea',
+              content: 'The grid keeps this preview visible too.',
+            ),
+          ],
+        );
+        secondIdeaId = secondIdea!.id;
+      });
+
+      await pumpIdeasApp(tester);
+
+      final firstCard = find.byKey(Key('idea-card-$firstIdeaId'));
+      final secondCard = find.byKey(Key('idea-card-$secondIdeaId'));
+
+      expect(
+        (tester.getTopLeft(firstCard).dx - tester.getTopLeft(secondCard).dx)
+            .abs(),
+        lessThan(1),
+      );
+      expect(
+        tester.getTopLeft(firstCard).dy,
+        greaterThan(tester.getTopLeft(secondCard).dy),
+      );
+
+      await tester.tap(find.byKey(const Key('ideas-layout-toggle')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 320));
+
+      expect(
+        tester.getTopLeft(firstCard).dx,
+        greaterThan(tester.getTopLeft(secondCard).dx),
+      );
+      expect(
+        (tester.getTopLeft(firstCard).dy - tester.getTopLeft(secondCard).dy)
+            .abs(),
+        lessThan(1),
+      );
+
+      await pumpIdeasApp(tester);
+
+      expect(
+        tester.getTopLeft(firstCard).dx,
+        greaterThan(tester.getTopLeft(secondCard).dx),
+      );
+      expect(
+        (tester.getTopLeft(firstCard).dy - tester.getTopLeft(secondCard).dy)
+            .abs(),
+        lessThan(1),
+      );
+
+      await tester.tap(find.byKey(const Key('ideas-layout-toggle')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 320));
+
+      expect(
+        (tester.getTopLeft(firstCard).dx - tester.getTopLeft(secondCard).dx)
+            .abs(),
+        lessThan(1),
+      );
+      expect(
+        tester.getTopLeft(firstCard).dy,
+        greaterThan(tester.getTopLeft(secondCard).dy),
+      );
+    });
+
     testWidgets('renames and deletes sections from the edit sheet',
         (tester) async {
       await pumpIdeasApp(tester);
@@ -601,5 +696,12 @@ class _FailingIdeasRepo extends InMemoryIdeasRepo {
       throw StateError('sqlite write failed');
     }
     await super.upsertIdea(idea);
+  }
+}
+
+class _FakeIdeaOrganizationRepository implements IdeaOrganizationRepository {
+  @override
+  Future<String> organizeIdea(String sectionContent) async {
+    return sectionContent;
   }
 }

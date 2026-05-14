@@ -139,6 +139,10 @@ class ViewConstants {
   static const String homepageSortNewestFirst = 'homepageSortNewestFirst';
   static const String homepageSortOldestFirst = 'homepageSortOldestFirst';
   static const String homepageSortMostSections = 'homepageSortMostSections';
+  static const String homepageSwitchToGridTooltip =
+      'homepageSwitchToGridTooltip';
+  static const String homepageSwitchToListTooltip =
+      'homepageSwitchToListTooltip';
   static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
   static const String homepageEmptyTitle = 'homepageEmptyTitle';
   static const String homepageEmptySubtitle = 'homepageEmptySubtitle';

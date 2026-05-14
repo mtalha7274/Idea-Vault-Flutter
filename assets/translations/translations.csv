@@ -104,6 +104,8 @@ homepageSortSheetSubtitle,Choose how your vault is arranged.
 homepageSortNewestFirst,Newest First
 homepageSortOldestFirst,Oldest First
 homepageSortMostSections,Most Sections
+homepageSwitchToGridTooltip,Switch to grid view
+homepageSwitchToListTooltip,Switch to list view
 homepageGetIdeaVaultPro,Get Idea Vault Pro
 homepageEmptyTitle,Nothing saved yet
 homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
