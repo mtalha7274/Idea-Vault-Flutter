@@ -181,14 +181,12 @@ class ViewConstants {
       'ideaEditorImageTextTakePhoto';
   static const String ideaEditorImageTextChoosePhoto =
       'ideaEditorImageTextChoosePhoto';
-  static const String ideaEditorImageTextReading =
-      'ideaEditorImageTextReading';
-  static const String ideaEditorImageTextTooltip =
-      'ideaEditorImageTextTooltip';
-  static const String ideaEditorImageTextNoText =
-      'ideaEditorImageTextNoText';
-  static const String ideaEditorImageTextFailed =
-      'ideaEditorImageTextFailed';
+  static const String ideaEditorImageTextReading = 'ideaEditorImageTextReading';
+  static const String ideaEditorImageTextPreparing =
+      'ideaEditorImageTextPreparing';
+  static const String ideaEditorImageTextTooltip = 'ideaEditorImageTextTooltip';
+  static const String ideaEditorImageTextNoText = 'ideaEditorImageTextNoText';
+  static const String ideaEditorImageTextFailed = 'ideaEditorImageTextFailed';
   static const String ideaEditorImagePermissionTitle =
       'ideaEditorImagePermissionTitle';
   static const String ideaEditorImagePermissionBody =

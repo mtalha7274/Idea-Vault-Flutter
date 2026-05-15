@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -85,6 +86,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
   bool _isOrganizing = false;
+  bool _isPreparingImageText = false;
   bool _isExtractingImageText = false;
   bool _didShowImagePermissionDialog = false;
   String _partialSpeechText = '';
@@ -232,7 +234,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         onImageText: () =>
                             unawaited(_onImageTextToolbarPressed()),
                         organizeEnabled: !_isOrganizing,
-                        imageTextEnabled: !_isExtractingImageText,
+                        imageTextEnabled:
+                            !_isPreparingImageText && !_isExtractingImageText,
                         exceedsAiCharacterLimit:
                             _sectionExceedsAiSoftCharacterLimit,
                       ),
@@ -252,6 +255,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             ),
           ),
           if (_isOrganizing) _buildOrganizingOverlay(context),
+          if (_isPreparingImageText) _buildPreparingImageOverlay(context),
           if (_isExtractingImageText) _buildImageTextOverlay(context),
         ],
       ),
@@ -480,6 +484,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
+  Widget _buildPreparingImageOverlay(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: AiLoadingOverlay(
+        icon: Icons.crop_rounded,
+        statusMessages: [ViewConstants.ideaEditorImageTextPreparing.tr()],
+      ),
+    );
+  }
+
   Widget _buildAddSectionTab() {
     return Tooltip(
       message: ViewConstants.ideaEditorAddSectionTooltip.tr(),
@@ -644,7 +658,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _onImageTextToolbarPressed() async {
-    if (_isPreviewMode || _isExtractingImageText) {
+    if (_isPreviewMode || _isPreparingImageText || _isExtractingImageText) {
       return;
     }
 
@@ -721,8 +735,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     XFile? image;
     try {
+      _setPreparingImageText(true);
       image = await _imagePicker.pickImage(source: source);
     } on PlatformException catch (error) {
+      _setPreparingImageText(false);
       if (_isImagePermissionError(error)) {
         await _showImagePermissionDialog();
         return;
@@ -730,11 +746,19 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       _showImageTextFailedMessage();
       return;
     } catch (_) {
+      _setPreparingImageText(false);
       _showImageTextFailedMessage();
       return;
     }
 
     if (!mounted || image == null) {
+      _setPreparingImageText(false);
+      return;
+    }
+
+    final croppedImage = await _cropImageForText(image);
+    _setPreparingImageText(false);
+    if (!mounted || croppedImage == null) {
       return;
     }
 
@@ -744,7 +768,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     try {
       final extractedText =
-          await _imageTextRecognitionService.recognizeText(image.path);
+          await _imageTextRecognitionService.recognizeText(croppedImage.path);
       if (!mounted) {
         return;
       }
@@ -768,6 +792,55 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       });
       _showImageTextFailedMessage();
     }
+  }
+
+  Future<CroppedFile?> _cropImageForText(XFile image) async {
+    final theme = context.read<ThemeProvider>().baseTheme;
+    try {
+      return await ImageCropper().cropImage(
+        sourcePath: image.path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: ViewConstants.cropImage.tr(),
+            toolbarColor: theme.primary,
+            toolbarWidgetColor: theme.onPrimary,
+            activeControlsWidgetColor: theme.primary,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            cropStyle: CropStyle.rectangle,
+          ),
+          IOSUiSettings(
+            title: ViewConstants.cropImage.tr(),
+            aspectRatioLockEnabled: false,
+            cropStyle: CropStyle.rectangle,
+            resetButtonHidden: true,
+          ),
+        ],
+      );
+    } on PlatformException catch (error) {
+      if (_isImagePermissionError(error)) {
+        await _showImagePermissionDialog();
+        return null;
+      }
+      _showImageTextFailedMessage();
+      return null;
+    } catch (_) {
+      _showImageTextFailedMessage();
+      return null;
+    }
+  }
+
+  void _setPreparingImageText(bool isPreparing) {
+    if (_isPreparingImageText == isPreparing) {
+      return;
+    }
+    if (!mounted) {
+      _isPreparingImageText = isPreparing;
+      return;
+    }
+    setState(() {
+      _isPreparingImageText = isPreparing;
+    });
   }
 
   Future<bool> _ensureImagePermission(ImageSource source) async {

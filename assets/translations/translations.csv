@@ -130,6 +130,7 @@ ideaEditorSnackbarSpeechUnavailable,Speech recognition is unavailable on this de
 ideaEditorImageTextTakePhoto,Take photo
 ideaEditorImageTextChoosePhoto,Choose from gallery
 ideaEditorImageTextReading,Reading text...
+ideaEditorImageTextPreparing,Preparing image...
 ideaEditorImageTextTooltip,Extract text from image
 ideaEditorImageTextNoText,No readable text found in that image.
 ideaEditorImageTextFailed,Could not read text from that image. Please try again.
