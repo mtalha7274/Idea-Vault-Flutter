@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -96,7 +97,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
+    required this.onImageText,
     this.organizeEnabled = true,
+    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
   });
 
@@ -105,7 +108,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
+  final VoidCallback onImageText;
   final bool organizeEnabled;
+  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
 
   @override
@@ -123,7 +128,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
           isPreviewMode: isPreviewMode,
           onPreviewToggle: onPreviewToggle,
           onOrganize: onOrganize,
+          onImageText: onImageText,
           organizeEnabled: organizeEnabled,
+          imageTextEnabled: imageTextEnabled,
           exceedsAiCharacterLimit: exceedsAiCharacterLimit,
         ),
       ),
@@ -139,7 +146,9 @@ class IdeaEditorToolbar extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
+    required this.onImageText,
     this.organizeEnabled = true,
+    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
   });
 
@@ -148,7 +157,9 @@ class IdeaEditorToolbar extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
+  final VoidCallback onImageText;
   final bool organizeEnabled;
+  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
 
   @override
@@ -193,6 +204,14 @@ class IdeaEditorToolbar extends StatelessWidget {
                               _wrapSelection(controller, '_', '_', false),
                         ),
                         _ToolbarIconButton(
+                          key: const Key('idea-editor-image-text'),
+                          icon: Icons.camera_alt_rounded,
+                          tooltip:
+                              ViewConstants.ideaEditorImageTextTooltip.tr(),
+                          enabled: imageTextEnabled && !isPreviewMode,
+                          onPressed: onImageText,
+                        ),
+                        _ToolbarIconButton(
                           icon: Icons.format_list_bulleted,
                           tooltip: 'Bullet List',
                           enabled: !isPreviewMode,
@@ -206,6 +225,7 @@ class IdeaEditorToolbar extends StatelessWidget {
                           onPressed: () => _wrapSelection(
                               controller, '```\n', '\n```', false),
                         ),
+                        const SizedBox(width: 18),
                       ],
                     ),
                   ),
@@ -247,6 +267,7 @@ class IdeaEditorToolbar extends StatelessWidget {
           icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
           tooltip: isPreviewMode ? 'Edit' : 'Preview',
           onPressed: onPreviewToggle,
+          rightPadding: 2,
         ),
       ],
     );
@@ -431,6 +452,7 @@ class _ToolbarIconButton extends StatelessWidget {
     required this.onPressed,
     this.iconSize,
     this.enabled = true,
+    this.rightPadding = 8,
   });
 
   final IconData icon;
@@ -438,6 +460,7 @@ class _ToolbarIconButton extends StatelessWidget {
   final String tooltip;
   final double? iconSize;
   final bool enabled;
+  final double rightPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -446,7 +469,7 @@ class _ToolbarIconButton extends StatelessWidget {
         enabled ? theme.primary : theme.textMuted.withValues(alpha: 0.55);
 
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: EdgeInsets.only(right: rightPadding),
       child: Tooltip(
         message: tooltip,
         child: IgnorePointer(

@@ -177,6 +177,22 @@ class ViewConstants {
       'ideaEditorSnackbarSpeechStopped';
   static const String ideaEditorSnackbarSpeechUnavailable =
       'ideaEditorSnackbarSpeechUnavailable';
+  static const String ideaEditorImageTextTakePhoto =
+      'ideaEditorImageTextTakePhoto';
+  static const String ideaEditorImageTextChoosePhoto =
+      'ideaEditorImageTextChoosePhoto';
+  static const String ideaEditorImageTextReading =
+      'ideaEditorImageTextReading';
+  static const String ideaEditorImageTextTooltip =
+      'ideaEditorImageTextTooltip';
+  static const String ideaEditorImageTextNoText =
+      'ideaEditorImageTextNoText';
+  static const String ideaEditorImageTextFailed =
+      'ideaEditorImageTextFailed';
+  static const String ideaEditorImagePermissionTitle =
+      'ideaEditorImagePermissionTitle';
+  static const String ideaEditorImagePermissionBody =
+      'ideaEditorImagePermissionBody';
   static const String ideaEditorSnackbarDuplicateSection =
       'ideaEditorSnackbarDuplicateSection';
   static const String ideaEditorMicPermissionTitle =

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -15,6 +16,8 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config/router/app_router.dart';
+import '../core/services/image_text_recognition_service.dart';
+import '../core/utils/editor_text_insertion.dart';
 import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
@@ -53,6 +56,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _autosaveDelay = Duration(milliseconds: 700);
   final SpeechToText _speechToText = SpeechToText();
+  final ImagePicker _imagePicker = ImagePicker();
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
   late final FocusNode _titleFocusNode;
@@ -66,6 +70,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late String _lastSavedSnapshot;
   late IdeasProvider _ideasProvider;
   late IdeaOrganizationRepository _organizationRepo;
+  late ImageTextRecognitionService _imageTextRecognitionService;
 
   Timer? _autosaveTimer;
   Future<void>? _saveInFlight;
@@ -80,6 +85,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isSpeechInitialized = false;
   bool _didShowPermissionDialog = false;
   bool _isOrganizing = false;
+  bool _isExtractingImageText = false;
+  bool _didShowImagePermissionDialog = false;
   String _partialSpeechText = '';
   int _lastInsertedSpeechOffset = 0;
 
@@ -91,6 +98,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final ideasProvider = context.read<IdeasProvider>();
     _ideasProvider = ideasProvider;
     _organizationRepo = sl<IdeaOrganizationRepository>();
+    _imageTextRecognitionService =
+        sl.isRegistered<ImageTextRecognitionService>()
+            ? sl<ImageTextRecognitionService>()
+            : GoogleMlKitImageTextRecognitionService();
     final existingIdea =
         widget.ideaId == null ? null : ideasProvider.findById(widget.ideaId!);
     final resumeState =
@@ -218,7 +229,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         onPreviewToggle: _togglePreviewMode,
                         onOrganize: () =>
                             unawaited(_onOrganizeToolbarPressed()),
+                        onImageText: () =>
+                            unawaited(_onImageTextToolbarPressed()),
                         organizeEnabled: !_isOrganizing,
+                        imageTextEnabled: !_isExtractingImageText,
                         exceedsAiCharacterLimit:
                             _sectionExceedsAiSoftCharacterLimit,
                       ),
@@ -238,6 +252,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             ),
           ),
           if (_isOrganizing) _buildOrganizingOverlay(context),
+          if (_isExtractingImageText) _buildImageTextOverlay(context),
         ],
       ),
     );
@@ -455,6 +470,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
+  Widget _buildImageTextOverlay(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: AiLoadingOverlay(
+        icon: Icons.document_scanner_rounded,
+        statusMessages: [ViewConstants.ideaEditorImageTextReading.tr()],
+      ),
+    );
+  }
+
   Widget _buildAddSectionTab() {
     return Tooltip(
       message: ViewConstants.ideaEditorAddSectionTooltip.tr(),
@@ -600,7 +625,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     if (_contentPlainTextForEditing().trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
+          content:
+              TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
         ),
       );
       return;
@@ -617,6 +643,157 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
   }
 
+  Future<void> _onImageTextToolbarPressed() async {
+    if (_isPreviewMode || _isExtractingImageText) {
+      return;
+    }
+
+    final hasAccess =
+        await _ensurePremiumAccess(PremiumFeature.imageTextExtraction);
+    if (!hasAccess || !mounted) {
+      return;
+    }
+
+    final source = await _showImageTextSourceSheet();
+    if (!mounted || source == null) {
+      return;
+    }
+
+    await _pickAndReadImageText(source);
+  }
+
+  Future<ImageSource?> _showImageTextSourceSheet() {
+    final theme = context.read<ThemeProvider>().baseTheme;
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: theme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading:
+                      Icon(Icons.photo_camera_rounded, color: theme.primary),
+                  title: TranslatedText(
+                    ViewConstants.ideaEditorImageTextTakePhoto,
+                    style: ideaVaultBody(
+                      context,
+                      weight: FontWeight.w700,
+                      color: theme.primaryText,
+                    ),
+                  ),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(ImageSource.camera),
+                ),
+                ListTile(
+                  leading:
+                      Icon(Icons.photo_library_rounded, color: theme.primary),
+                  title: TranslatedText(
+                    ViewConstants.ideaEditorImageTextChoosePhoto,
+                    style: ideaVaultBody(
+                      context,
+                      weight: FontWeight.w700,
+                      color: theme.primaryText,
+                    ),
+                  ),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndReadImageText(ImageSource source) async {
+    final hasPermission = await _ensureImagePermission(source);
+    if (!hasPermission || !mounted) {
+      return;
+    }
+
+    XFile? image;
+    try {
+      image = await _imagePicker.pickImage(source: source);
+    } on PlatformException catch (error) {
+      if (_isImagePermissionError(error)) {
+        await _showImagePermissionDialog();
+        return;
+      }
+      _showImageTextFailedMessage();
+      return;
+    } catch (_) {
+      _showImageTextFailedMessage();
+      return;
+    }
+
+    if (!mounted || image == null) {
+      return;
+    }
+
+    setState(() {
+      _isExtractingImageText = true;
+    });
+
+    try {
+      final extractedText =
+          await _imageTextRecognitionService.recognizeText(image.path);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isExtractingImageText = false;
+      });
+
+      if (extractedText.trim().isEmpty) {
+        _showNoImageTextMessage();
+        return;
+      }
+
+      _insertTextOnOwnLine(extractedText);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isExtractingImageText = false;
+      });
+      _showImageTextFailedMessage();
+    }
+  }
+
+  Future<bool> _ensureImagePermission(ImageSource source) async {
+    PermissionStatus status = PermissionStatus.granted;
+    if (source == ImageSource.camera) {
+      status = await Permission.camera.request();
+    } else if (Platform.isIOS) {
+      status = await Permission.photos.request();
+    }
+
+    final hasPermission = status.isGranted || status.isLimited;
+    if (!hasPermission && mounted) {
+      await _showImagePermissionDialog();
+    }
+    return hasPermission;
+  }
+
+  bool _isImagePermissionError(PlatformException error) {
+    final code = error.code.toLowerCase();
+    final message = error.message?.toLowerCase() ?? '';
+    return code.contains('denied') ||
+        code.contains('permission') ||
+        message.contains('denied') ||
+        message.contains('permission');
+  }
+
   void _replaceEditorContent(String content) {
     final selection = _contentController.selection;
     final cursorOffset = math.min(
@@ -630,6 +807,39 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         selection: TextSelection.collapsed(offset: cursorOffset),
       )
       ..addListener(_handleEditorContentChanged);
+  }
+
+  void _insertTextOnOwnLine(String insertedText) {
+    final normalizedText = insertedText.trim();
+    if (normalizedText.isEmpty || _isPreviewMode) {
+      return;
+    }
+
+    final value = _contentController.value;
+    final currentText = value.text;
+    final selection = value.selection;
+    final canInsertAtCursor = _contentFocusNode.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end >= 0;
+
+    final start = canInsertAtCursor
+        ? math.min(selection.start, selection.end)
+        : currentText.length;
+    final end = canInsertAtCursor
+        ? math.max(selection.start, selection.end)
+        : currentText.length;
+    final before = currentText.substring(0, start);
+    final after = currentText.substring(end);
+    final middle = textOnOwnLine(before, after, normalizedText);
+    final updatedText = before + middle + after;
+    final nextOffset = before.length + middle.length;
+
+    _contentController.value = TextEditingValue(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: nextOffset),
+    );
+    _contentFocusNode.requestFocus();
   }
 
   Future<void> _handleMicSingleTap() async {
@@ -835,7 +1045,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     if (!canInsertAtCursor) {
       if (isFinal) {
-        final middle = _dictatedTextOnOwnLine(currentText, '', normalizedText);
+        final middle = textOnOwnLine(currentText, '', normalizedText);
         final updatedText = currentText + middle;
         _contentController.value = TextEditingValue(
           text: updatedText,
@@ -851,7 +1061,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       _lastInsertedSpeechOffset + _partialSpeechText.length,
     );
 
-    final middle = _dictatedTextOnOwnLine(
+    final middle = textOnOwnLine(
       before,
       after,
       normalizedText,
@@ -881,6 +1091,56 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         ),
       ),
     );
+  }
+
+  void _showNoImageTextMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText(ViewConstants.ideaEditorImageTextNoText),
+      ),
+    );
+  }
+
+  void _showImageTextFailedMessage() {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText(ViewConstants.ideaEditorImageTextFailed),
+      ),
+    );
+  }
+
+  Future<void> _showImagePermissionDialog() async {
+    if (_didShowImagePermissionDialog || !mounted) {
+      return;
+    }
+
+    _didShowImagePermissionDialog = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: TranslatedText(ViewConstants.ideaEditorImagePermissionTitle),
+          content: TranslatedText(ViewConstants.ideaEditorImagePermissionBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: TranslatedText(ViewConstants.cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await openAppSettings();
+              },
+              child: TranslatedText(ViewConstants.ideaEditorOpenSettings),
+            ),
+          ],
+        );
+      },
+    );
+    _didShowImagePermissionDialog = false;
   }
 
   Future<void> _showMicrophonePermissionDialog() async {
@@ -1063,7 +1323,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   void _showDuplicateSectionMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: TranslatedText(ViewConstants.ideaEditorSnackbarDuplicateSection),
+        content:
+            TranslatedText(ViewConstants.ideaEditorSnackbarDuplicateSection),
       ),
     );
   }
@@ -1290,7 +1551,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     if (currentText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
+          content:
+              TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
         ),
       );
       return;
@@ -1319,7 +1581,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: TranslatedText(ViewConstants.ideaEditorSnackbarOrganizeFailed),
+            content:
+                TranslatedText(ViewConstants.ideaEditorSnackbarOrganizeFailed),
           ),
         );
       }
@@ -1342,20 +1605,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       'sections': sectionsSnapshot,
     });
   }
-}
-
-/// Builds the dictated chunk so it always starts on its own line.
-String _dictatedTextOnOwnLine(String before, String after, String dictated) {
-  if (before.isEmpty && after.isEmpty) {
-    return dictated;
-  }
-  if (before.isEmpty && after.isNotEmpty) {
-    return '$dictated\n';
-  }
-  if (before.isNotEmpty && !before.endsWith('\n')) {
-    return '\n$dictated';
-  }
-  return dictated;
 }
 
 class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {

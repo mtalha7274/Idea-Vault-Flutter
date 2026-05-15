@@ -446,6 +446,9 @@ class _HomepageFab extends StatelessWidget {
   static const double _height = 56;
   static const double _collapsedWidth = 56;
   static const double _extendedWidth = 144;
+  static const BorderRadius _borderRadius = BorderRadius.all(
+    Radius.circular(16),
+  );
   static const Duration _duration = Duration(milliseconds: 240);
 
   final bool isExtended;
@@ -476,9 +479,14 @@ class _HomepageFab extends StatelessWidget {
             color: theme.primary,
             elevation: 6,
             shadowColor: Colors.black.withValues(alpha: 0.24),
-            shape: const StadiumBorder(),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _borderRadius,
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
+              customBorder: const RoundedRectangleBorder(
+                borderRadius: _borderRadius,
+              ),
               onTap: onPressed,
               child: SizedBox(
                 width: width,

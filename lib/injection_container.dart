@@ -21,6 +21,7 @@ import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
+import 'core/services/image_text_recognition_service.dart';
 import 'core/services/premium/bypass_paywall_subscription_service.dart';
 import 'core/services/premium/paywall_provider.dart';
 import 'core/services/premium/revenuecat_subscription_service.dart';
@@ -61,6 +62,8 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<IdeasDatabaseManager>(IdeasDatabaseManager());
   sl.registerSingleton<CloudBackupService>(CloudBackupService());
   sl.registerSingleton<CloudBackupScheduler>(const CloudBackupScheduler());
+  sl.registerSingleton<ImageTextRecognitionService>(
+      GoogleMlKitImageTextRecognitionService());
   sl.registerSingleton<SubscriptionService>(_buildSubscriptionService());
   sl.registerSingleton<PaywallProvider>(_buildPaywallProvider());
 
