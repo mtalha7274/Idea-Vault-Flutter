@@ -88,7 +88,10 @@ class _HomepageState extends State<Homepage> {
       key: _scaffoldKey,
       backgroundColor: theme.background,
       drawer: _HomeDrawer(hostContext: context),
-      body: Stack(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Stack(
         children: [
           SafeArea(
             bottom: false,
@@ -198,6 +201,7 @@ class _HomepageState extends State<Homepage> {
           ),
           if (!_isSelectionMode) _buildQuickAdditionDock(context),
         ],
+        ),
       ),
       floatingActionButton: _isSelectionMode
           ? null
