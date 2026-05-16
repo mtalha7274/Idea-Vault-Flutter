@@ -215,22 +215,46 @@ class _HomepageState extends State<Homepage> {
   }
 
   Widget _buildQuickAdditionDock(BuildContext context) {
+    final theme = context.read<ThemeProvider>().baseTheme;
     return Align(
       alignment: Alignment.bottomCenter,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: RandomAdditionComposer(
-              controller: _quickAdditionController,
-              fieldKey: const Key('homepage-random-addition-field'),
-              sendButtonKey: const Key('homepage-random-addition-send'),
-              onSubmit: _submitQuickAddition,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IgnorePointer(
+            child: Container(
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.background.withValues(alpha: 0),
+                    theme.background,
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+          ColoredBox(
+            color: theme.background,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: RandomAdditionComposer(
+                    controller: _quickAdditionController,
+                    fieldKey: const Key('homepage-random-addition-field'),
+                    sendButtonKey: const Key('homepage-random-addition-send'),
+                    onSubmit: _submitQuickAddition,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

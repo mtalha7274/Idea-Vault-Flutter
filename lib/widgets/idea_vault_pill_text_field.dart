@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
-class IdeaVaultPillTextField extends StatelessWidget {
+class IdeaVaultPillTextField extends StatefulWidget {
   const IdeaVaultPillTextField({
     super.key,
     required this.controller,
@@ -31,14 +31,43 @@ class IdeaVaultPillTextField extends StatelessWidget {
   final bool useShadow;
 
   @override
+  State<IdeaVaultPillTextField> createState() => _IdeaVaultPillTextFieldState();
+}
+
+class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_onFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final borderColor = _focusNode.hasFocus
+        ? theme.primary.withValues(alpha: 0.6)
+        : theme.primary.withValues(alpha: 0.12);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.surface,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: theme.primary.withValues(alpha: 0.6)),
-        boxShadow: useShadow
+        border: Border.all(color: borderColor),
+        boxShadow: widget.useShadow
             ? [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),
@@ -50,28 +79,29 @@ class IdeaVaultPillTextField extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          leading != null ? 12 : 14,
+          widget.leading != null ? 12 : 14,
           8,
-          trailing != null ? 8 : 12,
+          widget.trailing != null ? 8 : 12,
           8,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (leading != null) ...[
-              leading!,
+            if (widget.leading != null) ...[
+              widget.leading!,
               const SizedBox(width: 8),
             ],
             Expanded(
               child: TextField(
-                key: fieldKey,
-                controller: controller,
-                minLines: minLines,
-                maxLines: maxLines,
-                textCapitalization: textCapitalization,
-                textInputAction: textInputAction,
+                key: widget.fieldKey,
+                controller: widget.controller,
+                focusNode: _focusNode,
+                minLines: widget.minLines,
+                maxLines: widget.maxLines,
+                textCapitalization: widget.textCapitalization,
+                textInputAction: widget.textInputAction,
                 decoration: InputDecoration(
-                  hintText: hintText,
+                  hintText: widget.hintText,
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.all(8),
@@ -90,9 +120,9 @@ class IdeaVaultPillTextField extends StatelessWidget {
                 ),
               ),
             ),
-            if (trailing != null) ...[
+            if (widget.trailing != null) ...[
               const SizedBox(width: 8),
-              trailing!,
+              widget.trailing!,
             ],
           ],
         ),

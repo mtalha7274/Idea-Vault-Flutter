@@ -28,7 +28,7 @@ class RandomAdditionComposer extends StatelessWidget {
       controller: controller,
       hintText: ViewConstants.randomAdditionsComposerHint.tr(),
       minLines: 1,
-      maxLines: 5,
+      maxLines: 2,
       textCapitalization: TextCapitalization.sentences,
       textInputAction: TextInputAction.newline,
       useShadow: true,

@@ -48,51 +48,60 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
     final additionsProvider = context.watch<RandomAdditionsProvider>();
     final additions = additionsProvider.additions;
 
-    return Scaffold(
-      key: const Key('random-additions-screen'),
-      backgroundColor: theme.background,
-      appBar: const IdeaVaultSubpageAppBar(
-        titleKey: ViewConstants.randomAdditionsTitle,
-      ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: additions.isEmpty
-                  ? const _RandomAdditionsEmptyState()
-                  : ListView.builder(
-                      key: const Key('random-additions-list'),
-                      reverse: true,
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                      itemCount: additions.length,
-                      itemBuilder: (context, index) {
-                        final addition =
-                            additions[additions.length - 1 - index];
-                        return _RandomAdditionBubble(
-                          addition: addition,
-                          onFile: () => _showFilingSheet(addition),
-                        );
-                      },
+    return PopScope(
+      onPopInvokedWithResult: (_, __) =>
+          FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        key: const Key('random-additions-screen'),
+        backgroundColor: theme.background,
+        appBar: const IdeaVaultSubpageAppBar(
+          titleKey: ViewConstants.randomAdditionsTitle,
+        ),
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: additions.isEmpty
+                      ? const _RandomAdditionsEmptyState()
+                      : ListView.builder(
+                          key: const Key('random-additions-list'),
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                          itemCount: additions.length,
+                          itemBuilder: (context, index) {
+                            final addition =
+                                additions[additions.length - 1 - index];
+                            return _RandomAdditionBubble(
+                              addition: addition,
+                              onFile: () => _showFilingSheet(addition),
+                              isLast: index == 0,
+                            );
+                          },
+                        ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 860),
+                      child: RandomAdditionComposer(
+                        controller: _composerController,
+                        fieldKey: const Key('random-additions-composer'),
+                        sendButtonKey: const Key('random-additions-send'),
+                        onSubmit: _submitAddition,
+                      ),
                     ),
-            ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 860),
-                  child: RandomAdditionComposer(
-                    controller: _composerController,
-                    fieldKey: const Key('random-additions-composer'),
-                    sendButtonKey: const Key('random-additions-send'),
-                    onSubmit: _submitAddition,
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -220,20 +229,22 @@ class _RandomAdditionBubble extends StatelessWidget {
   const _RandomAdditionBubble({
     required this.addition,
     required this.onFile,
+    this.isLast = false,
   });
 
   final RandomAddition addition;
   final VoidCallback onFile;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
           child: Material(
             color: theme.primary,
             borderRadius: const BorderRadius.only(
