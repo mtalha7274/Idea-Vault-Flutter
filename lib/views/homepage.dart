@@ -338,6 +338,7 @@ class _HomepageState extends State<Homepage> {
   }
 
   Future<void> _submitQuickAddition() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final addition = await context
         .read<RandomAdditionsProvider>()
         .addAddition(_quickAdditionController.text);
