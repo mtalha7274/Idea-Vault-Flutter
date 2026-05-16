@@ -84,18 +84,20 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
                           },
                         ),
                 ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 860),
-                      child: RandomAdditionComposer(
-                        controller: _composerController,
-                        fieldKey: const Key('random-additions-composer'),
-                        sendButtonKey: const Key('random-additions-send'),
-                        onSubmit: _submitAddition,
-                      ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    4,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 4,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 860),
+                    child: RandomAdditionComposer(
+                      controller: _composerController,
+                      fieldKey: const Key('random-additions-composer'),
+                      sendButtonKey: const Key('random-additions-send'),
+                      onSubmit: _submitAddition,
                     ),
                   ),
                 ),
@@ -126,37 +128,49 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
       return;
     }
 
+    final selectedIdea = await showModalBottomSheet<Idea>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.surface,
+      builder: (ideaSheetContext) {
+        return _IdeaPickerSheet(
+          ideas: ideasProvider.ideas,
+          onIdeaSelected: (idea) => Navigator.of(ideaSheetContext).pop(idea),
+        );
+      },
+    );
+
+    if (selectedIdea == null || !mounted) {
+      return;
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: theme.surface,
-      builder: (sheetContext) {
-        return _RandomAdditionFilingSheet(
-          addition: addition,
-          ideas: ideasProvider.ideas,
-          onSectionSelected: (idea, section) async {
-            final sheetNavigator = Navigator.of(sheetContext);
+      builder: (sectionSheetContext) {
+        return _SectionPickerSheet(
+          idea: selectedIdea,
+          onSectionSelected: (section) async {
             final savedIdea = await ideasProvider.appendContentToSection(
-              ideaId: idea.id,
+              ideaId: selectedIdea.id,
               sectionId: section.id,
               content: addition.content,
             );
-            if (savedIdea == null || !mounted) {
+            if (savedIdea == null) {
               return;
             }
-
             await additionsProvider.deleteAddition(addition.id);
-            if (!mounted || !sheetContext.mounted) {
+            if (!sectionSheetContext.mounted) {
               return;
             }
-
-            sheetNavigator.pop();
+            Navigator.of(sectionSheetContext).pop();
             messenger.showSnackBar(
               SnackBar(
                 content: Text(
                   ViewConstants.randomAdditionsFiledSnackbar.tr(
                     namedArgs: {
-                      'idea': idea.title,
+                      'idea': selectedIdea.title,
                       'section': section.name,
                     },
                   ),
@@ -280,20 +294,15 @@ class _RandomAdditionBubble extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
+                    Container(
                       key: Key('random-addition-file-${addition.id}'),
-                      onPressed: onFile,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 24,
-                        height: 24,
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: theme.onPrimary.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
                       ),
-                      style: IconButton.styleFrom(
-                        backgroundColor:
-                            theme.onPrimary.withValues(alpha: 0.16),
-                        foregroundColor: theme.onPrimary,
-                      ),
-                      icon: Icon(
+                      child: Icon(
                         Icons.add_rounded,
                         size: 16,
                         color: theme.onPrimary,
@@ -310,59 +319,141 @@ class _RandomAdditionBubble extends StatelessWidget {
   }
 }
 
-class _RandomAdditionFilingSheet extends StatefulWidget {
-  const _RandomAdditionFilingSheet({
-    required this.addition,
+class _IdeaPickerSheet extends StatelessWidget {
+  const _IdeaPickerSheet({
     required this.ideas,
+    required this.onIdeaSelected,
+  });
+
+  final List<Idea> ideas;
+  final ValueChanged<Idea> onIdeaSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.5,
+      minChildSize: 0.25,
+      maxChildSize: 0.9,
+      snap: true,
+      snapSizes: const [0.5, 0.9],
+      builder: (context, scrollController) {
+        return CustomScrollView(
+          controller: scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: theme.outline.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: TranslatedText(
+                      ViewConstants.randomAdditionsChooseIdeaTitle,
+                      style: ideaVaultHeadline(
+                        context,
+                        size: 23,
+                        weight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (ideas.isEmpty) _NoIdeasForFiling(theme: theme),
+                ],
+              ),
+            ),
+            if (ideas.isNotEmpty)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottomInset),
+                sliver: SliverList.separated(
+                  itemCount: ideas.length,
+                  separatorBuilder: (_, __) => const SizedBox.shrink(),
+                  itemBuilder: (context, index) {
+                    final idea = ideas[index];
+                    return _FilingTile(
+                      key: Key('random-addition-idea-${idea.id}'),
+                      title: idea.title,
+                      subtitle: idea.sections.length == 1
+                          ? ViewConstants.homepageIdeaCardOneSection.tr()
+                          : ViewConstants.homepageIdeaCardSectionsMany.tr(
+                              namedArgs: {
+                                'count': '${idea.sections.length}',
+                              },
+                            ),
+                      icon: Icons.lightbulb_outline_rounded,
+                      onTap: () => onIdeaSelected(idea),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SectionPickerSheet extends StatefulWidget {
+  const _SectionPickerSheet({
+    required this.idea,
     required this.onSectionSelected,
   });
 
-  final RandomAddition addition;
-  final List<Idea> ideas;
-  final Future<void> Function(Idea idea, IdeaSection section) onSectionSelected;
+  final Idea idea;
+  final Future<void> Function(IdeaSection section) onSectionSelected;
 
   @override
-  State<_RandomAdditionFilingSheet> createState() =>
-      _RandomAdditionFilingSheetState();
+  State<_SectionPickerSheet> createState() => _SectionPickerSheetState();
 }
 
-class _RandomAdditionFilingSheetState
-    extends State<_RandomAdditionFilingSheet> {
-  Idea? _selectedIdea;
+class _SectionPickerSheetState extends State<_SectionPickerSheet> {
   bool _isFiling = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final selectedIdea = _selectedIdea;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + bottomPadding),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.72,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.5,
+      minChildSize: 0.25,
+      maxChildSize: 0.9,
+      snap: true,
+      snapSizes: const [0.5, 0.9],
+      builder: (context, scrollController) {
+        return CustomScrollView(
+          controller: scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (selectedIdea != null)
-                    IconButton(
-                      key: const Key('random-addition-file-back-to-ideas'),
-                      onPressed: _isFiling
-                          ? null
-                          : () => setState(() => _selectedIdea = null),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: theme.outline.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  Expanded(
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                     child: TranslatedText(
-                      selectedIdea == null
-                          ? ViewConstants.randomAdditionsChooseIdeaTitle
-                          : ViewConstants.randomAdditionsChooseSectionTitle,
+                      ViewConstants.randomAdditionsChooseSectionTitle,
                       style: ideaVaultHeadline(
                         context,
                         size: 23,
@@ -372,67 +463,34 @@ class _RandomAdditionFilingSheetState
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              if (widget.ideas.isEmpty)
-                _NoIdeasForFiling(theme: theme)
-              else
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: selectedIdea == null
-                        ? [
-                            for (final idea in widget.ideas)
-                              _FilingTile(
-                                key: Key('random-addition-idea-${idea.id}'),
-                                title: idea.title,
-                                subtitle: idea.sections.length == 1
-                                    ? ViewConstants.homepageIdeaCardOneSection
-                                        .tr()
-                                    : ViewConstants.homepageIdeaCardSectionsMany
-                                        .tr(
-                                        namedArgs: {
-                                          'count': '${idea.sections.length}',
-                                        },
-                                      ),
-                                icon: Icons.lightbulb_outline_rounded,
-                                onTap: _isFiling
-                                    ? null
-                                    : () =>
-                                        setState(() => _selectedIdea = idea),
-                              ),
-                          ]
-                        : [
-                            for (final section in selectedIdea.sections)
-                              _FilingTile(
-                                key: Key(
-                                  'random-addition-section-${section.id}',
-                                ),
-                                title: section.name,
-                                subtitle: ViewConstants
-                                    .randomAdditionsAppendToSection
-                                    .tr(),
-                                icon: Icons.notes_rounded,
-                                onTap: _isFiling
-                                    ? null
-                                    : () => _fileToSection(
-                                          selectedIdea,
-                                          section,
-                                        ),
-                              ),
-                          ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottomInset),
+              sliver: SliverList.separated(
+                itemCount: widget.idea.sections.length,
+                separatorBuilder: (_, __) => const SizedBox.shrink(),
+                itemBuilder: (context, index) {
+                  final section = widget.idea.sections[index];
+                  return _FilingTile(
+                    key: Key('random-addition-section-${section.id}'),
+                    title: section.name,
+                    subtitle: ViewConstants.randomAdditionsAppendToSection.tr(),
+                    icon: Icons.notes_rounded,
+                    onTap: _isFiling ? null : () => _file(section),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Future<void> _fileToSection(Idea idea, IdeaSection section) async {
+  Future<void> _file(IdeaSection section) async {
     setState(() => _isFiling = true);
     try {
-      await widget.onSectionSelected(idea, section);
+      await widget.onSectionSelected(section);
     } finally {
       if (mounted) {
         setState(() => _isFiling = false);

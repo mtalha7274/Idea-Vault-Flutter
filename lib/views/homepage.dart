@@ -202,7 +202,7 @@ class _HomepageState extends State<Homepage> {
       floatingActionButton: _isSelectionMode
           ? null
           : Padding(
-              padding: const EdgeInsets.only(bottom: 82),
+              padding: const EdgeInsets.only(bottom: 60),
               child: _HomepageFab(
                 isExtended: _layoutOption == IdeaLayoutOption.list,
                 onPressed: () => AppRouter.push(
@@ -238,18 +238,20 @@ class _HomepageState extends State<Homepage> {
           ),
           ColoredBox(
             color: theme.background,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 860),
-                  child: RandomAdditionComposer(
-                    controller: _quickAdditionController,
-                    fieldKey: const Key('homepage-random-addition-field'),
-                    sendButtonKey: const Key('homepage-random-addition-send'),
-                    onSubmit: _submitQuickAddition,
-                  ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                MediaQuery.of(context).padding.bottom + 4,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: RandomAdditionComposer(
+                  controller: _quickAdditionController,
+                  fieldKey: const Key('homepage-random-addition-field'),
+                  sendButtonKey: const Key('homepage-random-addition-send'),
+                  onSubmit: _submitQuickAddition,
                 ),
               ),
             ),
