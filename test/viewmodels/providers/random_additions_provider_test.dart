@@ -44,6 +44,16 @@ void main() {
       expect(provider.additions, isEmpty);
     });
 
+    test('deletes multiple random additions', () async {
+      final first = await provider.addAddition('Remove first');
+      final second = await provider.addAddition('Keep second');
+      final third = await provider.addAddition('Remove third');
+
+      await provider.deleteAdditions([first!.id, third!.id]);
+
+      expect(provider.additions, [second]);
+    });
+
     test('replaces random additions on restore', () async {
       await provider.addAddition('Local draft');
       final restoredAddition = RandomAddition(

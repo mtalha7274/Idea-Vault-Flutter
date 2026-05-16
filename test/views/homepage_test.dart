@@ -851,6 +851,90 @@ void main() {
       expect(find.text('First line\nSecond line'), findsOneWidget);
     });
 
+    testWidgets('supports selecting and deleting random additions',
+        (tester) async {
+      late String firstAdditionId;
+      late String secondAdditionId;
+      await tester.runAsync(() async {
+        final firstAddition = await randomAdditionsProvider.addAddition(
+          'First loose note',
+        );
+        final secondAddition = await randomAdditionsProvider.addAddition(
+          'Second loose note',
+        );
+        firstAdditionId = firstAddition!.id;
+        secondAdditionId = secondAddition!.id;
+      });
+
+      await pumpIdeasApp(tester);
+      await openRandomAdditionsFromDrawer(tester);
+
+      await tester.longPress(
+        find.byKey(Key('random-addition-bubble-$firstAdditionId')),
+      );
+      await settleUi(tester);
+      final deleteButton =
+          find.byKey(const Key('random-additions-delete-button'));
+      expect(deleteButton, findsOneWidget);
+      expect(
+        find.descendant(of: deleteButton, matching: find.text('1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(Key('random-addition-bubble-$secondAdditionId')),
+      );
+      await settleUi(tester);
+      expect(
+        find.descendant(of: deleteButton, matching: find.text('2')),
+        findsOneWidget,
+      );
+
+      await tester.tap(deleteButton);
+      await settleUi(tester);
+      expect(find.text('Delete additions?'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('random-additions-delete-confirm')),
+      );
+      await settlePersistenceAction(tester);
+
+      expect(randomAdditionsProvider.additions, isEmpty);
+      expect(find.byKey(const Key('random-additions-empty')), findsOneWidget);
+    });
+
+    testWidgets('canceling random additions deletion keeps additions',
+        (tester) async {
+      late String additionId;
+      await tester.runAsync(() async {
+        final addition = await randomAdditionsProvider.addAddition(
+          'Keep this loose note',
+        );
+        additionId = addition!.id;
+      });
+
+      await pumpIdeasApp(tester);
+      await openRandomAdditionsFromDrawer(tester);
+
+      await tester.longPress(
+        find.byKey(Key('random-addition-bubble-$additionId')),
+      );
+      await settleUi(tester);
+      await tester.tap(
+        find.byKey(const Key('random-additions-delete-button')),
+      );
+      await settleUi(tester);
+      await tester.tap(find.text('Cancel'));
+      await settleUi(tester);
+
+      expect(randomAdditionsProvider.additions, hasLength(1));
+      expect(find.text('Keep this loose note'), findsOneWidget);
+      expect(
+        find.byKey(const Key('random-additions-delete-button')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('files a random addition into an idea section', (tester) async {
       late String ideaId;
       late String sectionId;
@@ -876,12 +960,7 @@ void main() {
 
       final additionId = randomAdditionsProvider.additions.single.id;
       await openRandomAdditionsFromDrawer(tester);
-      tester
-          .widget<IconButton>(
-            find.byKey(Key('random-addition-file-$additionId')),
-          )
-          .onPressed!
-          .call();
+      await tester.tap(find.byKey(Key('random-addition-bubble-$additionId')));
       await tester.runAsync(() async {
         await Future<void>.delayed(Duration.zero);
       });
@@ -908,12 +987,7 @@ void main() {
 
       final additionId = randomAdditionsProvider.additions.single.id;
       await openRandomAdditionsFromDrawer(tester);
-      tester
-          .widget<IconButton>(
-            find.byKey(Key('random-addition-file-$additionId')),
-          )
-          .onPressed!
-          .call();
+      await tester.tap(find.byKey(Key('random-addition-bubble-$additionId')));
       await tester.runAsync(() async {
         await Future<void>.delayed(Duration.zero);
       });

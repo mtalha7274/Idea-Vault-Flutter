@@ -92,115 +92,115 @@ class _HomepageState extends State<Homepage> {
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         child: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: NestedScrollView(
-                  floatHeaderSlivers: true,
-                  headerSliverBuilder: (context, innerBoxIsScrolled) {
-                    final handle =
-                        NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    );
-                    return [
-                      SliverOverlapAbsorber(
-                        handle: handle,
-                        sliver: SliverToBoxAdapter(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Gap(8.h),
-                              _Header(
-                                ideaCount: ideas.length,
-                                selectedCount: _selectedIdeaIds.length,
-                                onMenuPressed: () =>
-                                    _scaffoldKey.currentState?.openDrawer(),
-                                onDeletePressed: _isSelectionMode
-                                    ? _confirmDeleteSelection
-                                    : null,
-                                onSortPressed:
-                                    _isSelectionMode ? null : _showSortSheet,
-                                layoutOption: _layoutOption,
-                                onLayoutPressed: _isSelectionMode
-                                    ? null
-                                    : _toggleLayoutOption,
-                              ),
-                              SizedBox(height: 18.h),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 24.w),
-                                child: _SearchField(
-                                  controller: _searchController,
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: NestedScrollView(
+                    floatHeaderSlivers: true,
+                    headerSliverBuilder: (context, innerBoxIsScrolled) {
+                      final handle =
+                          NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      );
+                      return [
+                        SliverOverlapAbsorber(
+                          handle: handle,
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Gap(8.h),
+                                _Header(
+                                  ideaCount: ideas.length,
+                                  selectedCount: _selectedIdeaIds.length,
+                                  onMenuPressed: () =>
+                                      _scaffoldKey.currentState?.openDrawer(),
+                                  onDeletePressed: _isSelectionMode
+                                      ? _confirmDeleteSelection
+                                      : null,
+                                  onSortPressed:
+                                      _isSelectionMode ? null : _showSortSheet,
+                                  layoutOption: _layoutOption,
+                                  onLayoutPressed: _isSelectionMode
+                                      ? null
+                                      : _toggleLayoutOption,
                                 ),
-                              ),
-                              SizedBox(height: 22.h),
-                              if (_hasCloudBackupProvider(context))
-                                const BackupRestorePromptBanner(),
-                            ],
+                                SizedBox(height: 18.h),
+                                Padding(
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: 24.w),
+                                  child: _SearchField(
+                                    controller: _searchController,
+                                  ),
+                                ),
+                                SizedBox(height: 22.h),
+                                if (_hasCloudBackupProvider(context))
+                                  const BackupRestorePromptBanner(),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ];
-                  },
-                  body: Builder(
-                    builder: (context) {
-                      return CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverOverlapInjector(
-                            handle:
-                                NestedScrollView.sliverOverlapAbsorberHandleFor(
-                                    context),
-                          ),
-                          if (ideas.isEmpty)
-                            SliverPadding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              sliver: SliverFillRemaining(
-                                hasScrollBody: false,
-                                child: const _EmptyIdeasState(),
-                              ),
-                            )
-                          else if (visibleIdeas.isEmpty)
-                            SliverPadding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              sliver: SliverFillRemaining(
-                                hasScrollBody: false,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 180),
-                                  child: const _NoSearchResultsState(),
-                                ),
-                              ),
-                            )
-                          else
-                            SliverPadding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 0, 16, 200),
-                              sliver: SliverToBoxAdapter(
-                                child: _IdeasLayout(
-                                  ideas: visibleIdeas,
-                                  layoutOption: _layoutOption,
-                                  selectedIdeaIds: _selectedIdeaIds,
-                                  onTap: _handleIdeaTap,
-                                  onLongPress: _handleIdeaLongPress,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
+                      ];
                     },
+                    body: Builder(
+                      builder: (context) {
+                        return CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverOverlapInjector(
+                              handle: NestedScrollView
+                                  .sliverOverlapAbsorberHandleFor(context),
+                            ),
+                            if (ideas.isEmpty)
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                sliver: SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: const _EmptyIdeasState(),
+                                ),
+                              )
+                            else if (visibleIdeas.isEmpty)
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                sliver: SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 180),
+                                    child: const _NoSearchResultsState(),
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 200),
+                                sliver: SliverToBoxAdapter(
+                                  child: _IdeasLayout(
+                                    ideas: visibleIdeas,
+                                    layoutOption: _layoutOption,
+                                    selectedIdeaIds: _selectedIdeaIds,
+                                    onTap: _handleIdeaTap,
+                                    onLongPress: _handleIdeaLongPress,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          if (!_isSelectionMode) _buildQuickAdditionDock(context),
-        ],
+            if (!_isSelectionMode) _buildQuickAdditionDock(context),
+          ],
         ),
       ),
       floatingActionButton: _isSelectionMode

@@ -44,6 +44,22 @@ class RandomAdditionsProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAdditions(Iterable<String> additionIds) async {
+    await ensureLoaded();
+    final ids = additionIds.toSet();
+    if (ids.isEmpty) {
+      return;
+    }
+
+    for (final id in ids) {
+      await _repo.deleteAddition(id);
+    }
+    _additions = _additions
+        .where((addition) => !ids.contains(addition.id))
+        .toList(growable: false);
+    notifyListeners();
+  }
+
   Future<void> replaceAdditions(List<RandomAddition> additions) async {
     await ensureLoaded();
     final nextAdditions =

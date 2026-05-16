@@ -24,7 +24,10 @@ class RandomAdditionsScreen extends StatefulWidget {
 }
 
 class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
+  final Set<String> _selectedAdditionIds = <String>{};
   late final TextEditingController _composerController;
+
+  bool get _isSelectionMode => _selectedAdditionIds.isNotEmpty;
 
   @override
   void initState() {
@@ -54,8 +57,43 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
       child: Scaffold(
         key: const Key('random-additions-screen'),
         backgroundColor: theme.background,
-        appBar: const IdeaVaultSubpageAppBar(
+        appBar: IdeaVaultSubpageAppBar(
           titleKey: ViewConstants.randomAdditionsTitle,
+          actions: [
+            if (_isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: IconButton(
+                  key: const Key('random-additions-delete-button'),
+                  onPressed: _confirmDeleteSelection,
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.surfaceLow,
+                    foregroundColor: theme.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  icon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_selectedAdditionIds.length}',
+                        style: ideaVaultLabel(
+                          context,
+                          size: 14,
+                          weight: FontWeight.w800,
+                          color: theme.primary,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.delete_outline_rounded, size: 22),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -78,7 +116,11 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
                                 additions[additions.length - 1 - index];
                             return _RandomAdditionBubble(
                               addition: addition,
-                              onFile: () => _showFilingSheet(addition),
+                              isSelected:
+                                  _selectedAdditionIds.contains(addition.id),
+                              onTap: () => _handleAdditionTap(addition),
+                              onLongPress: () =>
+                                  _handleAdditionLongPress(addition),
                               isLast: index == 0,
                             );
                           },
@@ -116,6 +158,80 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
       return;
     }
     _composerController.clear();
+  }
+
+  void _handleAdditionTap(RandomAddition addition) {
+    if (_isSelectionMode) {
+      _toggleAdditionSelection(addition.id);
+      return;
+    }
+
+    unawaited(_showFilingSheet(addition));
+  }
+
+  void _handleAdditionLongPress(RandomAddition addition) {
+    setState(() {
+      _selectedAdditionIds.add(addition.id);
+    });
+  }
+
+  void _toggleAdditionSelection(String additionId) {
+    setState(() {
+      if (_selectedAdditionIds.contains(additionId)) {
+        _selectedAdditionIds.remove(additionId);
+      } else {
+        _selectedAdditionIds.add(additionId);
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteSelection() async {
+    final selectedCount = _selectedAdditionIds.length;
+    if (selectedCount == 0) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final title = selectedCount == 1
+            ? 'Delete selected addition?'
+            : 'Delete additions?';
+        final body = selectedCount == 1
+            ? 'This addition will be removed from random additions.'
+            : '$selectedCount additions will be removed from random additions.';
+
+        return AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('random-additions-delete-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    final selectedIds = _selectedAdditionIds.toList(growable: false);
+    await context.read<RandomAdditionsProvider>().deleteAdditions(selectedIds);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedAdditionIds.clear();
+    });
   }
 
   Future<void> _showFilingSheet(RandomAddition addition) async {
@@ -242,17 +358,28 @@ class _RandomAdditionsEmptyState extends StatelessWidget {
 class _RandomAdditionBubble extends StatelessWidget {
   const _RandomAdditionBubble({
     required this.addition,
-    required this.onFile,
+    required this.isSelected,
+    required this.onTap,
+    required this.onLongPress,
     this.isLast = false,
   });
 
   final RandomAddition addition;
-  final VoidCallback onFile;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    const radius = BorderRadius.only(
+      topLeft: Radius.circular(18),
+      topRight: Radius.circular(18),
+      bottomLeft: Radius.circular(18),
+      bottomRight: Radius.circular(6),
+    );
+    final foregroundColor = isSelected ? theme.primary : theme.onPrimary;
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
       child: Align(
@@ -260,21 +387,21 @@ class _RandomAdditionBubble extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 320),
           child: Material(
-            color: theme.primary,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
-              bottomLeft: Radius.circular(18),
-              bottomRight: Radius.circular(6),
-            ),
-            child: InkWell(
-              onTap: onFile,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(18),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(6),
+            color: isSelected ? theme.accentTint : theme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: radius,
+              side: BorderSide(
+                color: isSelected
+                    ? theme.primary.withValues(alpha: 0.32)
+                    : Colors.transparent,
               ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: Key('random-addition-bubble-${addition.id}'),
+              onTap: onTap,
+              onLongPress: onLongPress,
+              borderRadius: radius,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                 child: Row(
@@ -288,7 +415,7 @@ class _RandomAdditionBubble extends StatelessWidget {
                           context,
                           size: 15,
                           weight: FontWeight.w600,
-                          color: theme.onPrimary,
+                          color: foregroundColor,
                           height: 1.38,
                         ),
                       ),
@@ -299,13 +426,13 @@ class _RandomAdditionBubble extends StatelessWidget {
                       width: 24,
                       height: 24,
                       decoration: BoxDecoration(
-                        color: theme.onPrimary.withValues(alpha: 0.16),
+                        color: foregroundColor.withValues(alpha: 0.16),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.add_rounded,
                         size: 16,
-                        color: theme.onPrimary,
+                        color: foregroundColor,
                       ),
                     ),
                   ],
