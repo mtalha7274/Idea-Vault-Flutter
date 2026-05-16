@@ -117,6 +117,20 @@ homepageIdeaCardUpdatedOnDate,Updated {date}
 homepageSearchHint,Search ideas
 homepageNoSearchResults,No ideas match your search
 homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
+randomAdditionsTitle,Random Additions
+randomAdditionsCountOne,1 unfiled addition
+randomAdditionsCountMany,{count} unfiled additions
+randomAdditionsComposerHint,Add a random note...
+randomAdditionsSendTooltip,Add random note
+randomAdditionsFileTooltip,File into an idea
+randomAdditionsEmptyTitle,No random additions yet
+randomAdditionsEmptySubtitle,Drop quick thoughts here and file them into ideas later.
+randomAdditionsChooseIdeaTitle,Choose idea
+randomAdditionsChooseSectionTitle,Choose section
+randomAdditionsAppendToSection,Append to this section
+randomAdditionsNoIdeasTitle,No ideas yet
+randomAdditionsNoIdeasSubtitle,"Create an idea first, then you can file this addition into a section."
+randomAdditionsFiledSnackbar,Added to {idea} / {section}
 ideaEditorUntitledIdea,Untitled Idea
 ideaEditorTitleHint,Enter idea title...
 ideaEditorListening,Listening...

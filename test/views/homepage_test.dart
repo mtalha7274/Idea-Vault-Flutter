@@ -10,6 +10,7 @@ import 'package:idea_vault/injection_container.dart';
 import 'package:idea_vault/main.dart' show navigatorKey;
 import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
+import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -17,6 +18,7 @@ import 'package:provider/provider.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../helpers/in_memory_ideas_repo.dart';
+import '../helpers/in_memory_random_additions_repo.dart';
 import '../helpers/memory_local_storage.dart';
 
 void main() {
@@ -25,6 +27,7 @@ void main() {
   group('Homepage ideas flow', () {
     late MemoryLocalStorageManager storage;
     late IdeasProvider provider;
+    late RandomAdditionsProvider randomAdditionsProvider;
     late ThemeProvider themeProvider;
     late IdeaListPreferencesRepo sortPreferencesRepo;
 
@@ -45,7 +48,11 @@ void main() {
         InMemoryIdeasRepo(),
         IdeaEditorStateRepo(storage),
       );
+      randomAdditionsProvider = RandomAdditionsProvider(
+        InMemoryRandomAdditionsRepo(),
+      );
       await provider.ensureLoaded();
+      await randomAdditionsProvider.ensureLoaded();
     });
 
     Future<void> settleUi(WidgetTester tester) async {
@@ -70,6 +77,9 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<IdeasProvider>.value(value: provider),
+            ChangeNotifierProvider<RandomAdditionsProvider>.value(
+              value: randomAdditionsProvider,
+            ),
             ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
           ],
           child: MaterialApp(
@@ -116,7 +126,7 @@ void main() {
       expect(titleField.autofocus, isTrue);
       expect(titleField.controller?.text, isEmpty);
       expect(provider.ideas, hasLength(1));
-      expect(provider.ideas.single.title, 'Untitled Idea');
+      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
@@ -148,7 +158,7 @@ void main() {
       await settlePersistenceAction(tester);
 
       expect(find.text('Solar Rooftop Co-op'), findsOneWidget);
-      expect(find.text('1 section'), findsOneWidget);
+      expect(find.text('homepageIdeaCardOneSection'), findsOneWidget);
       expect(provider.ideas, hasLength(1));
     });
 
@@ -169,7 +179,7 @@ void main() {
       await settlePersistenceAction(tester);
 
       expect(provider.ideas, hasLength(1));
-      expect(provider.ideas.single.title, 'Untitled Idea');
+      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
     });
 
     testWidgets('opens an existing idea with populated data', (tester) async {
@@ -304,7 +314,7 @@ void main() {
         await settleUi(tester);
       }
 
-      await expectTooltip(Icons.title, 'Text');
+      await expectTooltip(Icons.title, 'Heading');
       await expectTooltip(Icons.format_bold, 'Bold');
       await expectTooltip(Icons.format_italic, 'Italic');
       await expectTooltip(Icons.format_list_bulleted, 'Bullet List');
@@ -336,7 +346,7 @@ void main() {
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
       expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsNothing);
-      expect(find.text('Edit Idea'), findsOneWidget);
+      expect(find.text('ideaEditorTitleEdit'), findsOneWidget);
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
@@ -432,7 +442,7 @@ void main() {
       );
       await settleUi(tester);
 
-      expect(find.text('No ideas match your search'), findsOneWidget);
+      expect(find.text('homepageNoSearchResults'), findsOneWidget);
     });
 
     testWidgets('sorts ideas and remembers the selected preference',
@@ -570,6 +580,124 @@ void main() {
       );
     });
 
+    testWidgets('homepage composer saves a note and opens random additions',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('homepage-random-addition-field')),
+        'Loose capture\nwith two lines',
+      );
+      await tester.tap(find.byKey(const Key('homepage-random-addition-send')));
+      await settlePersistenceAction(tester);
+
+      expect(find.byKey(const Key('random-additions-screen')), findsOneWidget);
+      expect(randomAdditionsProvider.additions, hasLength(1));
+      expect(
+        randomAdditionsProvider.additions.single.content,
+        'Loose capture\nwith two lines',
+      );
+      expect(find.text('Loose capture\nwith two lines'), findsOneWidget);
+    });
+
+    testWidgets('random additions screen sends multiline notes',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('random-additions-nav')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('random-additions-composer')),
+        'First line\nSecond line',
+      );
+      await tester.tap(find.byKey(const Key('random-additions-send')));
+      await settlePersistenceAction(tester);
+
+      expect(randomAdditionsProvider.additions, hasLength(1));
+      expect(
+        randomAdditionsProvider.additions.single.content,
+        'First line\nSecond line',
+      );
+      expect(find.text('First line\nSecond line'), findsOneWidget);
+    });
+
+    testWidgets('files a random addition into an idea section', (tester) async {
+      late String ideaId;
+      late String sectionId;
+      await tester.runAsync(() async {
+        final savedIdea = await provider.saveIdea(
+          title: 'Filed idea',
+          sections: [
+            const IdeaSection(
+              id: 'filing-section',
+              name: 'Notes',
+              content: 'Existing note',
+            ),
+          ],
+        );
+        ideaId = savedIdea!.id;
+        sectionId = savedIdea.sections.single.id;
+        await randomAdditionsProvider.addAddition(
+          'New dictated line\nSecond line',
+        );
+      });
+
+      await pumpIdeasApp(tester);
+
+      final additionId = randomAdditionsProvider.additions.single.id;
+      await tester.tap(find.byKey(const Key('random-additions-nav')));
+      await settleUi(tester);
+      tester
+          .widget<IconButton>(
+            find.byKey(Key('random-addition-file-$additionId')),
+          )
+          .onPressed!
+          .call();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('random-addition-idea-$ideaId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('random-addition-section-$sectionId')));
+      await settlePersistenceAction(tester);
+
+      expect(randomAdditionsProvider.additions, isEmpty);
+      expect(
+        provider.ideas.single.sections.single.content,
+        'Existing note\n\nNew dictated line\nSecond line',
+      );
+    });
+
+    testWidgets('filing without ideas keeps the random addition in the inbox',
+        (tester) async {
+      await tester.runAsync(() async {
+        await randomAdditionsProvider.addAddition('Keep me unfiled');
+      });
+
+      await pumpIdeasApp(tester);
+
+      final additionId = randomAdditionsProvider.additions.single.id;
+      await tester.tap(find.byKey(const Key('random-additions-nav')));
+      await settleUi(tester);
+      tester
+          .widget<IconButton>(
+            find.byKey(Key('random-addition-file-$additionId')),
+          )
+          .onPressed!
+          .call();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('random-additions-no-ideas')),
+        findsOneWidget,
+      );
+      expect(randomAdditionsProvider.additions, hasLength(1));
+    });
+
     testWidgets('renames and deletes sections from the edit sheet',
         (tester) async {
       await pumpIdeasApp(tester);
@@ -659,7 +787,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('ideas-fab')));
       await settlePersistenceAction(tester);
-      expect(provider.ideas.single.title, 'Untitled Idea');
+      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
 
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -671,7 +799,7 @@ void main() {
       await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('idea-editor-save-failed')), findsOneWidget);
-      expect(provider.ideas.single.title, 'Untitled Idea');
+      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
 
       failingRepo.failWrites = false;
       await tester.enterText(

@@ -16,6 +16,7 @@ import 'data/managers/remote/dio_api_manager.dart';
 import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/ideas.dart';
+import 'data/repositories/local/random_additions.dart';
 import 'data/repositories/local/cloud_backup_settings.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
@@ -31,6 +32,7 @@ import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
+import 'viewmodels/providers/random_additions_provider.dart';
 import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/premium/paywall_view_model.dart';
@@ -81,6 +83,8 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
+  sl.registerSingleton<RandomAdditionsRepo>(
+      RandomAdditionsRepo(sl<IdeasDatabaseManager>()));
   sl.registerSingleton<ThemeRepo>(ThemeRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
@@ -91,6 +95,8 @@ Future<void> initializeDependencies() async {
   // Providers
   sl.registerFactory<IdeasProvider>(
       () => IdeasProvider(sl<IdeasRepo>(), sl<IdeaEditorStateRepo>()));
+  sl.registerFactory<RandomAdditionsProvider>(
+      () => RandomAdditionsProvider(sl<RandomAdditionsRepo>()));
   sl.registerFactory<CloudBackupProvider>(() => CloudBackupProvider(
         sl<CloudBackupSettingsRepo>(),
         sl<CloudBackupService>(),

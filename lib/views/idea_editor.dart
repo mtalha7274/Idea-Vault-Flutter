@@ -1753,6 +1753,14 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
+        if (hasSaveFailed) ...[
+          const Icon(
+            Icons.cloud_off_rounded,
+            key: Key('idea-editor-save-failed'),
+            size: 20,
+          ),
+          Gap(8.w),
+        ],
         IconButton(
           key: const Key('idea-editor-menu'),
           onPressed: onMenuPressed,

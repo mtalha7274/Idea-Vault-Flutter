@@ -160,6 +160,29 @@ class ViewConstants {
   static const String homepageIdeaCardPreviewPlaceholder =
       'homepageIdeaCardPreviewPlaceholder';
 
+  static const String randomAdditionsTitle = 'randomAdditionsTitle';
+  static const String randomAdditionsCountOne = 'randomAdditionsCountOne';
+  static const String randomAdditionsCountMany = 'randomAdditionsCountMany';
+  static const String randomAdditionsComposerHint =
+      'randomAdditionsComposerHint';
+  static const String randomAdditionsSendTooltip = 'randomAdditionsSendTooltip';
+  static const String randomAdditionsFileTooltip = 'randomAdditionsFileTooltip';
+  static const String randomAdditionsEmptyTitle = 'randomAdditionsEmptyTitle';
+  static const String randomAdditionsEmptySubtitle =
+      'randomAdditionsEmptySubtitle';
+  static const String randomAdditionsChooseIdeaTitle =
+      'randomAdditionsChooseIdeaTitle';
+  static const String randomAdditionsChooseSectionTitle =
+      'randomAdditionsChooseSectionTitle';
+  static const String randomAdditionsAppendToSection =
+      'randomAdditionsAppendToSection';
+  static const String randomAdditionsNoIdeasTitle =
+      'randomAdditionsNoIdeasTitle';
+  static const String randomAdditionsNoIdeasSubtitle =
+      'randomAdditionsNoIdeasSubtitle';
+  static const String randomAdditionsFiledSnackbar =
+      'randomAdditionsFiledSnackbar';
+
   static const String ideaEditorUntitledIdea = 'ideaEditorUntitledIdea';
   static const String ideaEditorTitleHint = 'ideaEditorTitleHint';
   static const String ideaEditorListening = 'ideaEditorListening';

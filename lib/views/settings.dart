@@ -289,11 +289,17 @@ class _SettingsState extends State<Settings> {
 
     final context = navigatorKey.currentContext;
     if (context == null) return;
-    Share.shareUri(
-      Uri.parse(url),
-      // sharePositionOrigin is required for iOS tablets otherwise an error is thrown
-      sharePositionOrigin: Rect.fromLTWH(0, 0, MediaQuery.sizeOf(context).width,
-          MediaQuery.sizeOf(context).height / 2),
+    await SharePlus.instance.share(
+      ShareParams(
+        uri: Uri.parse(url),
+        // Required for iOS tablets otherwise an error is thrown.
+        sharePositionOrigin: Rect.fromLTWH(
+          0,
+          0,
+          MediaQuery.sizeOf(context).width,
+          MediaQuery.sizeOf(context).height / 2,
+        ),
+      ),
     );
   }
 

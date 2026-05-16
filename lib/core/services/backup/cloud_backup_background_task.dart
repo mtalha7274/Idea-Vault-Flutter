@@ -4,6 +4,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../data/repositories/local/ideas.dart';
+import '../../../data/repositories/local/random_additions.dart';
 import '../../../data/managers/local/ideas_database.dart';
 import '../../../data/managers/local/shared_preference.dart';
 import 'cloud_backup_scheduler.dart';
@@ -36,9 +37,15 @@ void cloudBackupCallbackDispatcher() {
       return true;
     }
 
-    final ideasRepo = IdeasRepo(IdeasDatabaseManager());
+    final databaseManager = IdeasDatabaseManager();
+    final ideasRepo = IdeasRepo(databaseManager);
+    final randomAdditionsRepo = RandomAdditionsRepo(databaseManager);
     final ideas = await ideasRepo.getIdeas();
-    final sizeBytes = await CloudBackupService().backUpIdeas(ideas);
+    final randomAdditions = await randomAdditionsRepo.getAdditions();
+    final sizeBytes = await CloudBackupService().backUpIdeas(
+      ideas,
+      randomAdditions: randomAdditions,
+    );
     await settingsRepo.saveState(
       state.copyWith(
         lastBackupAt: DateTime.now(),

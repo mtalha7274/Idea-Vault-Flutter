@@ -13,13 +13,16 @@ import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/premium/paywall_view_model.dart';
+import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
+import 'random_additions_screen.dart';
 import 'settings.dart';
 
 class Homepage extends StatefulWidget {
@@ -38,6 +41,7 @@ class _HomepageState extends State<Homepage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _searchController;
+  late final TextEditingController _quickAdditionController;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
 
   bool _didHandleResume = false;
@@ -56,6 +60,7 @@ class _HomepageState extends State<Homepage> {
     _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _searchController = TextEditingController()
       ..addListener(_handleSearchChanged);
+    _quickAdditionController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resumeEditorIfNeeded();
       _checkFreshInstallBackup();
@@ -67,6 +72,7 @@ class _HomepageState extends State<Homepage> {
     _searchController
       ..removeListener(_handleSearchChanged)
       ..dispose();
+    _quickAdditionController.dispose();
     super.dispose();
   }
 
@@ -76,119 +82,161 @@ class _HomepageState extends State<Homepage> {
     final ideasProvider = context.watch<IdeasProvider>();
     final ideas = ideasProvider.ideas;
     final visibleIdeas = _visibleIdeas(ideas);
+    final randomAdditionCount =
+        context.watch<RandomAdditionsProvider>().additions.length;
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: theme.background,
       drawer: _HomeDrawer(hostContext: context),
-      body: SafeArea(
-        bottom: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: NestedScrollView(
-              floatHeaderSlivers: true,
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
-                final handle =
-                    NestedScrollView.sliverOverlapAbsorberHandleFor(context);
-                return [
-                  SliverOverlapAbsorber(
-                    handle: handle,
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Gap(8.h),
-                          _Header(
-                            ideaCount: ideas.length,
-                            selectedCount: _selectedIdeaIds.length,
-                            onMenuPressed: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                            onDeletePressed: _isSelectionMode
-                                ? _confirmDeleteSelection
-                                : null,
-                            onSortPressed:
-                                _isSelectionMode ? null : _showSortSheet,
-                            layoutOption: _layoutOption,
-                            onLayoutPressed:
-                                _isSelectionMode ? null : _toggleLayoutOption,
-                          ),
-                          SizedBox(height: 18.h),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 24.w),
-                            child: _SearchField(
-                              controller: _searchController,
-                            ),
-                          ),
-                          SizedBox(height: 22.h),
-                          if (_hasCloudBackupProvider(context))
-                            const BackupRestorePromptBanner(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ];
-              },
-              body: Builder(
-                builder: (context) {
-                  return CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverOverlapInjector(
-                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                            context),
-                      ),
-                      if (ideas.isEmpty)
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          sliver: SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: const _EmptyIdeasState(),
-                          ),
-                        )
-                      else if (visibleIdeas.isEmpty)
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          sliver: SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 120),
-                              child: const _NoSearchResultsState(),
-                            ),
-                          ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                          sliver: SliverToBoxAdapter(
-                            child: _IdeasLayout(
-                              ideas: visibleIdeas,
-                              layoutOption: _layoutOption,
-                              selectedIdeaIds: _selectedIdeaIds,
-                              onTap: _handleIdeaTap,
-                              onLongPress: _handleIdeaLongPress,
-                            ),
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: NestedScrollView(
+                  floatHeaderSlivers: true,
+                  headerSliverBuilder: (context, innerBoxIsScrolled) {
+                    final handle =
+                        NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      context,
+                    );
+                    return [
+                      SliverOverlapAbsorber(
+                        handle: handle,
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Gap(8.h),
+                              _Header(
+                                ideaCount: ideas.length,
+                                selectedCount: _selectedIdeaIds.length,
+                                randomAdditionCount: randomAdditionCount,
+                                onMenuPressed: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
+                                onDeletePressed: _isSelectionMode
+                                    ? _confirmDeleteSelection
+                                    : null,
+                                onSortPressed:
+                                    _isSelectionMode ? null : _showSortSheet,
+                                layoutOption: _layoutOption,
+                                onLayoutPressed: _isSelectionMode
+                                    ? null
+                                    : _toggleLayoutOption,
+                                onRandomAdditionsPressed: _isSelectionMode
+                                    ? null
+                                    : _openRandomAdditions,
+                              ),
+                              SizedBox(height: 18.h),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                                child: _SearchField(
+                                  controller: _searchController,
+                                ),
+                              ),
+                              SizedBox(height: 22.h),
+                              if (_hasCloudBackupProvider(context))
+                                const BackupRestorePromptBanner(),
+                            ],
                           ),
                         ),
-                    ],
-                  );
-                },
+                      ),
+                    ];
+                  },
+                  body: Builder(
+                    builder: (context) {
+                      return CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverOverlapInjector(
+                            handle:
+                                NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                    context),
+                          ),
+                          if (ideas.isEmpty)
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              sliver: SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: const _EmptyIdeasState(),
+                              ),
+                            )
+                          else if (visibleIdeas.isEmpty)
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              sliver: SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 180),
+                                  child: const _NoSearchResultsState(),
+                                ),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 0, 16, 180),
+                              sliver: SliverToBoxAdapter(
+                                child: _IdeasLayout(
+                                  ideas: visibleIdeas,
+                                  layoutOption: _layoutOption,
+                                  selectedIdeaIds: _selectedIdeaIds,
+                                  onTap: _handleIdeaTap,
+                                  onLongPress: _handleIdeaLongPress,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
+            ),
+          ),
+          if (!_isSelectionMode) _buildQuickAdditionDock(context),
+        ],
+      ),
+      floatingActionButton: _isSelectionMode
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 82),
+              child: _HomepageFab(
+                isExtended: _layoutOption == IdeaLayoutOption.list,
+                onPressed: () => AppRouter.push(
+                  context,
+                  const IdeaEditorScreen(),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildQuickAdditionDock(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: RandomAdditionComposer(
+              controller: _quickAdditionController,
+              fieldKey: const Key('homepage-random-addition-field'),
+              sendButtonKey: const Key('homepage-random-addition-send'),
+              onSubmit: _submitQuickAddition,
             ),
           ),
         ),
       ),
-      floatingActionButton: _isSelectionMode
-          ? null
-          : _HomepageFab(
-              isExtended: _layoutOption == IdeaLayoutOption.list,
-              onPressed: () => AppRouter.push(
-                context,
-                const IdeaEditorScreen(),
-              ),
-            ),
     );
   }
 
@@ -261,6 +309,25 @@ class _HomepageState extends State<Homepage> {
     AppRouter.push(
       context,
       IdeaEditorScreen(ideaId: idea.id),
+    );
+  }
+
+  Future<void> _submitQuickAddition() async {
+    final addition = await context
+        .read<RandomAdditionsProvider>()
+        .addAddition(_quickAdditionController.text);
+    if (addition == null || !mounted) {
+      return;
+    }
+
+    _quickAdditionController.clear();
+    await _openRandomAdditions();
+  }
+
+  Future<void> _openRandomAdditions() async {
+    await AppRouter.push(
+      context,
+      const RandomAdditionsScreen(),
     );
   }
 
@@ -507,15 +574,17 @@ class _HomepageFab extends StatelessWidget {
                             color: theme.onPrimary,
                           ),
                           const SizedBox(width: 12),
-                          AnimatedOpacity(
-                            opacity: isExtended ? 1 : 0,
-                            duration: const Duration(milliseconds: 120),
-                            curve: Curves.easeOut,
-                            child: Text(
-                              ViewConstants.homepageFabNewIdea.tr(),
-                              maxLines: 1,
-                              overflow: TextOverflow.clip,
-                              style: labelStyle,
+                          Expanded(
+                            child: AnimatedOpacity(
+                              opacity: isExtended ? 1 : 0,
+                              duration: const Duration(milliseconds: 120),
+                              curve: Curves.easeOut,
+                              child: Text(
+                                ViewConstants.homepageFabNewIdea.tr(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: labelStyle,
+                              ),
                             ),
                           ),
                         ],
@@ -640,20 +709,24 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.ideaCount,
     required this.selectedCount,
+    required this.randomAdditionCount,
     required this.onMenuPressed,
     required this.onDeletePressed,
     required this.onSortPressed,
     required this.layoutOption,
     required this.onLayoutPressed,
+    required this.onRandomAdditionsPressed,
   });
 
   final int ideaCount;
   final int selectedCount;
+  final int randomAdditionCount;
   final VoidCallback onMenuPressed;
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSortPressed;
   final IdeaLayoutOption layoutOption;
   final VoidCallback? onLayoutPressed;
+  final VoidCallback? onRandomAdditionsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -720,6 +793,11 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ] else ...[
+              _InboxButton(
+                count: randomAdditionCount,
+                onPressed: onRandomAdditionsPressed,
+              ),
+              const SizedBox(width: 10),
               IconButton(
                 key: const Key('ideas-layout-toggle'),
                 tooltip: layoutOption == IdeaLayoutOption.list
@@ -752,6 +830,61 @@ class _Header extends StatelessWidget {
             Gap(16.w),
           ],
         ),
+      ],
+    );
+  }
+}
+
+class _InboxButton extends StatelessWidget {
+  const _InboxButton({
+    required this.count,
+    required this.onPressed,
+  });
+
+  final int count;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          key: const Key('random-additions-nav'),
+          tooltip: ViewConstants.randomAdditionsTitle.tr(),
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: theme.surfaceLow,
+            foregroundColor: theme.primary,
+            padding: const EdgeInsets.all(12),
+          ),
+          icon: const Icon(Icons.chat_bubble_outline_rounded),
+        ),
+        if (count > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.primary,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: theme.background, width: 2),
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: ideaVaultLabel(
+                  context,
+                  size: 10,
+                  weight: FontWeight.w800,
+                  color: theme.onPrimary,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
