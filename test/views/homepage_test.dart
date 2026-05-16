@@ -101,6 +101,13 @@ void main() {
       await settleUi(tester);
     }
 
+    Future<void> openRandomAdditionsFromDrawer(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('ideas-menu-button')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('random-additions-drawer')));
+      await settleUi(tester);
+    }
+
     testWidgets('shows the empty state and fab', (tester) async {
       await pumpIdeasApp(tester);
 
@@ -600,12 +607,30 @@ void main() {
       expect(find.text('Loose capture\nwith two lines'), findsOneWidget);
     });
 
+    testWidgets('drawer random additions entry shows unfiled count badge',
+        (tester) async {
+      await tester.runAsync(() async {
+        await randomAdditionsProvider.addAddition('First loose note');
+        await randomAdditionsProvider.addAddition('Second loose note');
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.tap(find.byKey(const Key('ideas-menu-button')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('random-additions-drawer')), findsOneWidget);
+      expect(
+        find.byKey(const Key('random-additions-drawer-count')),
+        findsOneWidget,
+      );
+      expect(find.text('2'), findsOneWidget);
+    });
+
     testWidgets('random additions screen sends multiline notes',
         (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('random-additions-nav')));
-      await settleUi(tester);
+      await openRandomAdditionsFromDrawer(tester);
       await tester.enterText(
         find.byKey(const Key('random-additions-composer')),
         'First line\nSecond line',
@@ -645,8 +670,7 @@ void main() {
       await pumpIdeasApp(tester);
 
       final additionId = randomAdditionsProvider.additions.single.id;
-      await tester.tap(find.byKey(const Key('random-additions-nav')));
-      await settleUi(tester);
+      await openRandomAdditionsFromDrawer(tester);
       tester
           .widget<IconButton>(
             find.byKey(Key('random-addition-file-$additionId')),
@@ -678,8 +702,7 @@ void main() {
       await pumpIdeasApp(tester);
 
       final additionId = randomAdditionsProvider.additions.single.id;
-      await tester.tap(find.byKey(const Key('random-additions-nav')));
-      await settleUi(tester);
+      await openRandomAdditionsFromDrawer(tester);
       tester
           .widget<IconButton>(
             find.byKey(Key('random-addition-file-$additionId')),

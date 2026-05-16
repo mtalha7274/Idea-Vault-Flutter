@@ -4,7 +4,6 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../config/router/app_router.dart';
 import '../config/theme/base.dart';
 import '../core/constants/view_constants.dart';
 import '../models/idea.dart';
@@ -12,6 +11,7 @@ import '../models/random_addition.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
@@ -51,11 +51,14 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
     return Scaffold(
       key: const Key('random-additions-screen'),
       backgroundColor: theme.background,
+      appBar: const IdeaVaultSubpageAppBar(
+        titleKey: ViewConstants.randomAdditionsTitle,
+      ),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
-            _RandomAdditionsHeader(count: additions.length),
             Expanded(
               child: additions.isEmpty
                   ? const _RandomAdditionsEmptyState()
@@ -158,62 +161,6 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
   }
 }
 
-class _RandomAdditionsHeader extends StatelessWidget {
-  const _RandomAdditionsHeader({
-    required this.count,
-  });
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 16, 10),
-      child: Row(
-        children: [
-          IconButton(
-            key: const Key('random-additions-back'),
-            onPressed: () => AppRouter.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TranslatedText(
-                  ViewConstants.randomAdditionsTitle,
-                  style: ideaVaultHeadline(
-                    context,
-                    size: 28,
-                    weight: FontWeight.w800,
-                    height: 1.08,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  count == 1
-                      ? ViewConstants.randomAdditionsCountOne.tr()
-                      : ViewConstants.randomAdditionsCountMany.tr(
-                          namedArgs: {'count': '$count'},
-                        ),
-                  style: ideaVaultLabel(
-                    context,
-                    size: 13,
-                    weight: FontWeight.w700,
-                    color: theme.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RandomAdditionsEmptyState extends StatelessWidget {
   const _RandomAdditionsEmptyState();
 
@@ -298,7 +245,7 @@ class _RandomAdditionBubble extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+              padding: const EdgeInsets.fromLTRB(12, 8, 6, 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -322,10 +269,10 @@ class _RandomAdditionBubble extends StatelessWidget {
                     style: IconButton.styleFrom(
                       backgroundColor: theme.onPrimary.withValues(alpha: 0.16),
                       foregroundColor: theme.onPrimary,
-                      fixedSize: const Size(36, 36),
+                      fixedSize: const Size(30, 30),
                       padding: EdgeInsets.zero,
                     ),
-                    icon: const Icon(Icons.add_rounded, size: 22),
+                    icon: const Icon(Icons.add_rounded, size: 18),
                     tooltip: ViewConstants.randomAdditionsFileTooltip.tr(),
                   ),
                 ],

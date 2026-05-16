@@ -17,6 +17,7 @@ import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/idea_vault_pill_text_field.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
@@ -82,8 +83,6 @@ class _HomepageState extends State<Homepage> {
     final ideasProvider = context.watch<IdeasProvider>();
     final ideas = ideasProvider.ideas;
     final visibleIdeas = _visibleIdeas(ideas);
-    final randomAdditionCount =
-        context.watch<RandomAdditionsProvider>().additions.length;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -116,7 +115,6 @@ class _HomepageState extends State<Homepage> {
                               _Header(
                                 ideaCount: ideas.length,
                                 selectedCount: _selectedIdeaIds.length,
-                                randomAdditionCount: randomAdditionCount,
                                 onMenuPressed: () =>
                                     _scaffoldKey.currentState?.openDrawer(),
                                 onDeletePressed: _isSelectionMode
@@ -128,9 +126,6 @@ class _HomepageState extends State<Homepage> {
                                 onLayoutPressed: _isSelectionMode
                                     ? null
                                     : _toggleLayoutOption,
-                                onRandomAdditionsPressed: _isSelectionMode
-                                    ? null
-                                    : _openRandomAdditions,
                               ),
                               SizedBox(height: 18.h),
                               Padding(
@@ -182,7 +177,7 @@ class _HomepageState extends State<Homepage> {
                           else
                             SliverPadding(
                               padding:
-                                  const EdgeInsets.fromLTRB(16, 0, 16, 180),
+                                  const EdgeInsets.fromLTRB(16, 0, 16, 200),
                               sliver: SliverToBoxAdapter(
                                 child: _IdeasLayout(
                                   ideas: visibleIdeas,
@@ -620,6 +615,10 @@ class _HomeDrawer extends StatelessWidget {
           children: [
             if (paywall != null && !paywall.isPro)
               ListTile(
+                leading: Icon(
+                  Icons.workspace_premium_rounded,
+                  color: theme.primary,
+                ),
                 title: TranslatedText(
                   ViewConstants.homepageGetIdeaVaultPro,
                   style: ideaVaultBody(
@@ -667,6 +666,31 @@ class _HomeDrawer extends StatelessWidget {
               },
             ),
             ListTile(
+              key: const Key('random-additions-drawer'),
+              leading: Icon(
+                Icons.chat_bubble_outline_rounded,
+                color: theme.primary,
+              ),
+              title: TranslatedText(
+                ViewConstants.randomAdditionsTitle,
+                style: ideaVaultBody(
+                  context,
+                  size: 16,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                if (!hostContext.mounted) {
+                  return;
+                }
+                AppRouter.push(
+                  hostContext,
+                  const RandomAdditionsScreen(),
+                );
+              },
+            ),
+            ListTile(
               leading: Icon(
                 Icons.settings_rounded,
                 color: theme.primary,
@@ -709,24 +733,20 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.ideaCount,
     required this.selectedCount,
-    required this.randomAdditionCount,
     required this.onMenuPressed,
     required this.onDeletePressed,
     required this.onSortPressed,
     required this.layoutOption,
     required this.onLayoutPressed,
-    required this.onRandomAdditionsPressed,
   });
 
   final int ideaCount;
   final int selectedCount;
-  final int randomAdditionCount;
   final VoidCallback onMenuPressed;
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSortPressed;
   final IdeaLayoutOption layoutOption;
   final VoidCallback? onLayoutPressed;
-  final VoidCallback? onRandomAdditionsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -793,11 +813,6 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ] else ...[
-              _InboxButton(
-                count: randomAdditionCount,
-                onPressed: onRandomAdditionsPressed,
-              ),
-              const SizedBox(width: 10),
               IconButton(
                 key: const Key('ideas-layout-toggle'),
                 tooltip: layoutOption == IdeaLayoutOption.list
@@ -830,61 +845,6 @@ class _Header extends StatelessWidget {
             Gap(16.w),
           ],
         ),
-      ],
-    );
-  }
-}
-
-class _InboxButton extends StatelessWidget {
-  const _InboxButton({
-    required this.count,
-    required this.onPressed,
-  });
-
-  final int count;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          key: const Key('random-additions-nav'),
-          tooltip: ViewConstants.randomAdditionsTitle.tr(),
-          onPressed: onPressed,
-          style: IconButton.styleFrom(
-            backgroundColor: theme.surfaceLow,
-            foregroundColor: theme.primary,
-            padding: const EdgeInsets.all(12),
-          ),
-          icon: const Icon(Icons.chat_bubble_outline_rounded),
-        ),
-        if (count > 0)
-          Positioned(
-            right: -2,
-            top: -2,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.primary,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: theme.background, width: 2),
-              ),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                style: ideaVaultLabel(
-                  context,
-                  size: 10,
-                  weight: FontWeight.w800,
-                  color: theme.onPrimary,
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1353,34 +1313,17 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return TextField(
-      key: const Key('ideas-search-field'),
+    return IdeaVaultPillTextField(
+      fieldKey: const Key('ideas-search-field'),
       controller: controller,
-      textCapitalization: TextCapitalization.sentences,
-      decoration: InputDecoration(
-        hintText: ViewConstants.homepageSearchHint.tr(),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          color: theme.textMuted,
-        ),
-        filled: true,
-        fillColor: theme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        hintStyle: ideaVaultBody(
-          context,
-          size: 15,
-          weight: FontWeight.w500,
-          color: theme.outline,
-        ),
+      hintText: ViewConstants.homepageSearchHint.tr(),
+      leading: Icon(
+        Icons.search_rounded,
+        color: theme.textMuted,
+        size: 22,
       ),
-      style: ideaVaultBody(
-        context,
-        size: 15,
-        weight: FontWeight.w600,
-      ),
+      textInputAction: TextInputAction.search,
+      useShadow: false,
     );
   }
 }

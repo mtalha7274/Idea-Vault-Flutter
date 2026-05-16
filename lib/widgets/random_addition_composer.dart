@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../core/constants/view_constants.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import '../views/ideas/idea_vault_theme.dart';
+import 'idea_vault_pill_text_field.dart';
 
 class RandomAdditionComposer extends StatelessWidget {
   const RandomAdditionComposer({
@@ -23,65 +23,28 @@ class RandomAdditionComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: theme.outlineSoft),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                key: fieldKey,
-                controller: controller,
-                minLines: 1,
-                maxLines: 5,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: ViewConstants.randomAdditionsComposerHint.tr(),
-                  border: InputBorder.none,
-                  isDense: true,
-                  hintStyle: ideaVaultBody(
-                    context,
-                    size: 15,
-                    weight: FontWeight.w500,
-                    color: theme.outline,
-                  ),
-                ),
-                style: ideaVaultBody(
-                  context,
-                  size: 15,
-                  weight: FontWeight.w600,
-                  height: 1.35,
-                ),
-                textInputAction: TextInputAction.newline,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              key: sendButtonKey,
-              onPressed: onSubmit,
-              style: IconButton.styleFrom(
-                backgroundColor: theme.primary,
-                foregroundColor: theme.onPrimary,
-                fixedSize: const Size(44, 44),
-              ),
-              icon: const Icon(Icons.arrow_upward_rounded),
-              tooltip: ViewConstants.randomAdditionsSendTooltip.tr(),
-            ),
-          ],
+    return IdeaVaultPillTextField(
+      fieldKey: fieldKey,
+      controller: controller,
+      hintText: ViewConstants.randomAdditionsComposerHint.tr(),
+      minLines: 1,
+      maxLines: 5,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: TextInputAction.newline,
+      useShadow: true,
+      trailing: IconButton.filled(
+        key: sendButtonKey,
+        onPressed: onSubmit,
+        style: IconButton.styleFrom(
+          backgroundColor: theme.primary,
+          foregroundColor: theme.onPrimary,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(38, 38),
+          fixedSize: const Size(38, 38),
+          padding: EdgeInsets.zero,
         ),
+        icon: const Icon(Icons.arrow_upward_rounded, size: 20),
+        tooltip: ViewConstants.randomAdditionsSendTooltip.tr(),
       ),
     );
   }
