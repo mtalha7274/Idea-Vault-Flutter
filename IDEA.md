@@ -14,6 +14,8 @@ AI Feature — Organize Section: Firebase onCall function in functions/src/organ
 
 Editor: Plain markdown editor with preview mode. Toolbar has Title, Bold, Italic, Bullet List, Code Block buttons. Auto-save implemented with 800ms debounce timer. Saves on dispose and app lifecycle pause. Save button replaced with subtle "Saved" checkmark indicator. OCR from camera or gallery inserts recognized text into the section at the cursor.
 
+Random additions: Quick-capture flow for stray thoughts before filing into an idea. Homepage shows a bottom pill composer (same widget as the dedicated screen) anchored with a solid background and fade so list content does not show through. Drawer entry below Backup & Restore opens lib/views/random_additions_screen.dart, which shows a reverse-ordered list of chat-style bubbles; tapping a bubble opens a bottom sheet to choose an idea and section, appends the text to that section, and deletes the addition.
+
 Bottom Sheet (more_vert icon in editor): Three options — Export for AI, Export to PDF, Delete Idea.
 
 Export for AI: Opens ExportForAIScreen with ExportMode.aiExport. Reorderable list of sections with checkboxes, all checked by default. Fixed Copy to Clipboard button at bottom. Copies formatted text in this format:
