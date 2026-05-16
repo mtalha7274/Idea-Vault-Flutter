@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.1
+
+- **Grid view** for ideas
+- **AI** function updates
+- **OCR** for **image to text** using **camera** and **gallery**
+
 ## v1.0.0
 
 - **Markdown editor** with **AI organise** for structuring notes
