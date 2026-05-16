@@ -39,7 +39,9 @@ import 'export_for_ai_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
 /// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
-const int ideaSectionAiSoftCharacterLimit = 2000;
+const int ideaSectionAiMaxCharacterLimit = 4200;
+const int ideaSectionAiWarningCharacterLimit = 4000;
+const String _untitledSectionName = 'Untitled';
 
 class IdeaEditorScreen extends StatefulWidget {
   const IdeaEditorScreen({
@@ -115,7 +117,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _sectionContentById = {
       for (final section in _sections) section.id: section.content,
     };
-    _activeSectionId = _resolveInitialSectionId(resumeState);
+    _activeSectionId = _resolveInitialSectionId(resumeState, existingIdea);
     _isPreviewMode = resumeState?.isPreviewMode ?? false;
     _savedIdeaId = existingIdea?.id;
 
@@ -237,7 +239,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         imageTextEnabled:
                             !_isPreparingImageText && !_isExtractingImageText,
                         exceedsAiCharacterLimit:
-                            _sectionExceedsAiSoftCharacterLimit,
+                            _sectionExceedsAiWarningCharacterLimit,
                       ),
                     ),
                   ),
@@ -451,6 +453,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                         elevation: _isListening ? 8 : 6,
                         backgroundColor: primaryColor,
                         foregroundColor: theme.onPrimary,
+                        shape: const CircleBorder(),
                         child: Icon(
                           _isListening ? Icons.mic_none : Icons.mic,
                           size: 28,
@@ -525,8 +528,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                   for (var i = 0; i < _sections.length; i++) ...[
                     if (i > 0) const SizedBox(width: 10),
                     _SectionTabButton(
-                      key: Key(
-                          'idea-editor-section-tab-${_sections[i].name.toLowerCase()}'),
+                      key: Key('idea-editor-section-tab-${_sections[i].id}'),
                       title: _sections[i].name,
                       isActive: _sections[i].id == _activeSectionId,
                       onTap: () => _handleSectionTap(_sections[i]),
@@ -552,11 +554,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     return state;
   }
 
-  String _resolveInitialSectionId(IdeaEditorState? resumeState) {
+  String _resolveInitialSectionId(
+    IdeaEditorState? resumeState,
+    Idea? existingIdea,
+  ) {
     final restoredSectionId = resumeState?.activeSectionId;
     if (restoredSectionId != null &&
         _sections.any((section) => section.id == restoredSectionId)) {
       return restoredSectionId;
+    }
+
+    final lastOpenedSectionId = existingIdea?.lastOpenedSectionId;
+    if (lastOpenedSectionId != null &&
+        _sections.any((section) => section.id == lastOpenedSectionId)) {
+      return lastOpenedSectionId;
     }
 
     return _sections.first.id;
@@ -586,6 +597,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
     _replaceEditorContent(nextContent);
     _persistEditorState();
+    unawaited(_persistLastOpenedSectionId());
   }
 
   Future<void> _handleSectionTap(IdeaSection section) async {
@@ -619,8 +631,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _updateActiveSectionContent(_contentController.text);
   }
 
-  bool get _sectionExceedsAiSoftCharacterLimit =>
-      _contentPlainTextForEditing().length > ideaSectionAiSoftCharacterLimit;
+  bool get _sectionExceedsAiWarningCharacterLimit =>
+      _contentPlainTextForEditing().length > ideaSectionAiWarningCharacterLimit;
+
+  bool get _sectionExceedsAiMaxCharacterLimit =>
+      _contentPlainTextForEditing().length > ideaSectionAiMaxCharacterLimit;
 
   String _contentPlainTextForEditing() {
     var plain = _contentController.text;
@@ -648,8 +663,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     final proceed = await showOrganizeSectionSheet(
       context,
-      characterLimit: ideaSectionAiSoftCharacterLimit,
-      exceedsCharacterLimit: _sectionExceedsAiSoftCharacterLimit,
+      warningCharacterLimit: ideaSectionAiWarningCharacterLimit,
+      maxCharacterLimit: ideaSectionAiMaxCharacterLimit,
+      exceedsWarningLimit: _sectionExceedsAiWarningCharacterLimit,
+      exceedsMaxLimit: _sectionExceedsAiMaxCharacterLimit,
     );
 
     if (proceed && mounted) {
@@ -1278,29 +1295,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
+  Future<void> _persistLastOpenedSectionId() async {
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+
+    await _ideasProvider.saveLastOpenedSectionId(
+      ideaId: ideaId,
+      sectionId: _activeSectionId,
+    );
+  }
+
   Future<void> _showAddSectionSheet() async {
-    final result = await showIdeaEditorSectionSheet(
-      context,
-      sectionCount: _sections.length,
-    );
-    if (!mounted || result == null || result.name == null) {
-      return;
-    }
-
-    final normalizedName = result.name!.trim();
-    if (normalizedName.isEmpty) {
-      return;
-    }
-
-    final hasDuplicate = _sections.any(
-      (section) => section.name.toLowerCase() == normalizedName.toLowerCase(),
-    );
-    if (hasDuplicate) {
-      _showDuplicateSectionMessage();
-      return;
-    }
-
-    final newSection = IdeaSection.empty(name: normalizedName);
+    final newSection = IdeaSection.empty(name: _untitledSectionName);
     setState(() {
       _sections = [..._sections, newSection];
       _sectionContentById = {
@@ -1312,6 +1320,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _replaceEditorContent(newSection.content);
     _scheduleAutosave();
     _persistEditorState();
+    unawaited(_persistLastOpenedSectionId());
   }
 
   Future<void> _showEditSectionSheet(IdeaSection section) async {
@@ -1334,6 +1343,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
+    if (nextName == section.name) {
+      return;
+    }
+
     final hasDuplicate = _sections.any(
       (candidate) =>
           candidate.id != section.id &&
@@ -1341,10 +1354,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
     if (hasDuplicate) {
       _showDuplicateSectionMessage();
-      return;
-    }
-
-    if (nextName == section.name) {
       return;
     }
 
@@ -1359,6 +1368,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
     _scheduleAutosave();
     _persistEditorState();
+    unawaited(_persistLastOpenedSectionId());
   }
 
   void _deleteSection(String sectionId) {
@@ -1391,6 +1401,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _replaceEditorContent(nextContent);
     _scheduleAutosave();
     _persistEditorState();
+    unawaited(_persistLastOpenedSectionId());
   }
 
   void _showDuplicateSectionMessage() {
@@ -1545,6 +1556,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         ideaId: _savedIdeaId,
         title: _autosaveTitle,
         sections: _sectionsToSave(),
+        lastOpenedSectionId: _activeSectionId,
       );
 
       if (savedIdea == null) {

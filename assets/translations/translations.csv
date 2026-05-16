@@ -30,7 +30,8 @@ cropImage,Crop Image
 errorOpeningCamera,Error opening camera
 cameraAccessDenied,Camera access denied
 requestTimeout,Request timeout
-organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose the extra information.
+organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose extra information.
+organizeMaxLimitDialogBody,AI Organize works with up to {limit} characters. Shorten this section and try again.
 organizeSectionSheetTitle,Organise section
 organizeSectionSheetDescription,The text in this section will be restructured and clarified with AI. Other sections stay as they are.
 organizeSectionSheetConfirmButton,Organise
@@ -43,7 +44,8 @@ paywallSubtitle,Unlock the full power of Idea Vault.
 paywallProUnlocks,Pro unlocks
 paywallFeatureAiOrganize,Extended AI Organize
 paywallFeatureAiBrainstorm,Idea Export for any AI
-paywallFeatureSpeechToText,Speech and image text capture
+paywallFeatureSpeechToText,Speech to text dictation
+paywallFeatureImageToText,Image to text
 paywallFeatureCloudBackup,Cloud backup
 paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features

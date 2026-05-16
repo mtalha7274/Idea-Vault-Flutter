@@ -8,6 +8,9 @@ const RETRY_BACKOFF_MS = [1000, 2000, 4000];
 /** Per-attempt timeout for the chat completion HTTP request. */
 const COMPLETION_TIMEOUT_MS = 30_000;
 
+/** Maximum section content accepted by the app and backend. */
+const SECTION_CONTENT_MAX_CHARS = 4200;
+
 /** Lazily-built singleton so the same client is reused across warm
  *  invocations. */
 let openaiClient: OpenAI | undefined;
@@ -86,11 +89,11 @@ export const organizeSection = onCall(
         "Section content cannot be empty.",
       );
     }
-    if (sectionContent.length > 2000) {
+    if (sectionContent.length > SECTION_CONTENT_MAX_CHARS) {
       throw new HttpsError(
         "invalid-argument",
         "Section content exceeds the maximum allowed length of " +
-          "2000 characters.",
+          `${SECTION_CONTENT_MAX_CHARS} characters.`,
       );
     }
 

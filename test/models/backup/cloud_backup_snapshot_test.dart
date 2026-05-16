@@ -11,7 +11,14 @@ void main() {
         title: 'Backup idea',
         createdAt: DateTime.utc(2026, 5, 16),
         updatedAt: DateTime.utc(2026, 5, 16),
-        sections: buildDefaultIdeaSections(),
+        lastOpenedSectionId: 'section-1',
+        sections: const [
+          IdeaSection(
+            id: 'section-1',
+            name: 'Idea',
+            content: '',
+          ),
+        ],
       );
       final addition = RandomAddition(
         id: 'random-1',
@@ -27,6 +34,7 @@ void main() {
 
       expect(restored.version, CloudBackupSnapshot.currentVersion);
       expect(restored.ideas.single.title, 'Backup idea');
+      expect(restored.ideas.single.lastOpenedSectionId, 'section-1');
       expect(restored.randomAdditions.single, addition);
     });
 

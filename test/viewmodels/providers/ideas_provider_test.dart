@@ -167,5 +167,39 @@ void main() {
       );
       expect(restoredProvider.resumeEditorState!.isPreviewMode, isTrue);
     });
+
+    test('persists last opened section for an idea', () async {
+      final provider = IdeasProvider(repo, editorStateRepo);
+      await provider.ensureLoaded();
+
+      final savedIdea = await provider.saveIdea(
+        title: 'Resume section',
+        sections: const [
+          IdeaSection(
+            id: 'section-1',
+            name: 'Idea',
+            content: '',
+          ),
+          IdeaSection(
+            id: 'section-2',
+            name: 'Notes',
+            content: '',
+          ),
+        ],
+      );
+
+      await provider.saveLastOpenedSectionId(
+        ideaId: savedIdea!.id,
+        sectionId: 'section-2',
+      );
+
+      final restoredProvider = IdeasProvider(repo, editorStateRepo);
+      await restoredProvider.ensureLoaded();
+
+      expect(
+        restoredProvider.ideas.single.lastOpenedSectionId,
+        'section-2',
+      );
+    });
   });
 }

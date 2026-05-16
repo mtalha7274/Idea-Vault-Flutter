@@ -10,8 +10,10 @@ import '../translated_text.dart';
 
 Future<bool> showOrganizeSectionSheet(
   BuildContext context, {
-  required int characterLimit,
-  required bool exceedsCharacterLimit,
+  required int warningCharacterLimit,
+  required int maxCharacterLimit,
+  required bool exceedsWarningLimit,
+  required bool exceedsMaxLimit,
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
@@ -20,8 +22,10 @@ Future<bool> showOrganizeSectionSheet(
     barrierColor: Colors.black.withValues(alpha: 0.32),
     builder: (sheetContext) {
       return _OrganizeSectionSheet(
-        characterLimit: characterLimit,
-        exceedsCharacterLimit: exceedsCharacterLimit,
+        warningCharacterLimit: warningCharacterLimit,
+        maxCharacterLimit: maxCharacterLimit,
+        exceedsWarningLimit: exceedsWarningLimit,
+        exceedsMaxLimit: exceedsMaxLimit,
       );
     },
   );
@@ -31,12 +35,16 @@ Future<bool> showOrganizeSectionSheet(
 
 class _OrganizeSectionSheet extends StatelessWidget {
   const _OrganizeSectionSheet({
-    required this.characterLimit,
-    required this.exceedsCharacterLimit,
+    required this.warningCharacterLimit,
+    required this.maxCharacterLimit,
+    required this.exceedsWarningLimit,
+    required this.exceedsMaxLimit,
   });
 
-  final int characterLimit;
-  final bool exceedsCharacterLimit;
+  final int warningCharacterLimit;
+  final int maxCharacterLimit;
+  final bool exceedsWarningLimit;
+  final bool exceedsMaxLimit;
 
   @override
   Widget build(BuildContext context) {
@@ -106,15 +114,25 @@ class _OrganizeSectionSheet extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
-                if (exceedsCharacterLimit) ...[
+                if (exceedsWarningLimit || exceedsMaxLimit) ...[
                   const SizedBox(height: 16),
                   TranslatedText(
-                    ViewConstants.organizeOverLimitDialogBody,
-                    key: const Key('idea-editor-soft-limit-warning'),
+                    exceedsMaxLimit
+                        ? ViewConstants.organizeMaxLimitDialogBody
+                        : ViewConstants.organizeOverLimitDialogBody,
+                    key: Key(
+                      exceedsMaxLimit
+                          ? 'idea-editor-max-limit-warning'
+                          : 'idea-editor-soft-limit-warning',
+                    ),
                     namedArgs: {
                       'limit': NumberFormat.decimalPattern(
                         Localizations.localeOf(context).toString(),
-                      ).format(characterLimit),
+                      ).format(
+                        exceedsMaxLimit
+                            ? maxCharacterLimit
+                            : warningCharacterLimit,
+                      ),
                     },
                     style: ideaVaultBody(
                       context,
@@ -151,7 +169,9 @@ class _OrganizeSectionSheet extends StatelessWidget {
                     Expanded(
                       child: FilledButton.tonal(
                         key: const Key('organize-over-limit-confirm'),
-                        onPressed: () => Navigator.of(context).pop(true),
+                        onPressed: exceedsMaxLimit
+                            ? null
+                            : () => Navigator.of(context).pop(true),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,

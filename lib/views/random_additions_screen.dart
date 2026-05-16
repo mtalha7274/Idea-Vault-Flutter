@@ -280,15 +280,20 @@ class _RandomAdditionBubble extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
+                    IconButton(
                       key: Key('random-addition-file-${addition.id}'),
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: theme.onPrimary.withValues(alpha: 0.16),
-                        shape: BoxShape.circle,
+                      onPressed: onFile,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 24,
+                        height: 24,
                       ),
-                      child: Icon(
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            theme.onPrimary.withValues(alpha: 0.16),
+                        foregroundColor: theme.onPrimary,
+                      ),
+                      icon: Icon(
                         Icons.add_rounded,
                         size: 16,
                         color: theme.onPrimary,

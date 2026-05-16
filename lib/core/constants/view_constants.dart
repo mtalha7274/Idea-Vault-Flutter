@@ -36,9 +36,12 @@ class ViewConstants {
   static const String cropImage = "cropImage";
   static const String requestTimeout = "requestTimeout";
 
-  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiSoftCharacterLimit]).
+  /// `{limit}` = formatted warning character count (keep in sync with [ideaSectionAiWarningCharacterLimit]).
   static const String organizeOverLimitDialogBody =
       'organizeOverLimitDialogBody';
+
+  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiMaxCharacterLimit]).
+  static const String organizeMaxLimitDialogBody = 'organizeMaxLimitDialogBody';
 
   static const String organizeSectionSheetTitle = 'organizeSectionSheetTitle';
   static const String organizeSectionSheetDescription =
@@ -59,6 +62,7 @@ class ViewConstants {
   static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
   static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
   static const String paywallFeatureSpeechToText = 'paywallFeatureSpeechToText';
+  static const String paywallFeatureImageToText = 'paywallFeatureImageToText';
   static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
   static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
   static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';

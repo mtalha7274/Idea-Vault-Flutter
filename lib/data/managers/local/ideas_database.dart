@@ -7,7 +7,7 @@ class IdeasDatabaseManager {
   });
 
   static const String databaseName = 'idea_vault.db';
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 
   static const String ideasTable = 'ideas';
   static const String sectionsTable = 'idea_sections';
@@ -39,7 +39,8 @@ class IdeasDatabaseManager {
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            last_opened_section_id TEXT
           )
         ''');
 
@@ -69,6 +70,11 @@ class IdeasDatabaseManager {
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
           await _createRandomAdditionsTable(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            'ALTER TABLE $ideasTable ADD COLUMN last_opened_section_id TEXT',
+          );
         }
       },
     );

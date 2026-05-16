@@ -101,6 +101,10 @@ void main() {
       await settleUi(tester);
     }
 
+    Finder sectionTab(IdeaSection section) {
+      return find.byKey(Key('idea-editor-section-tab-${section.id}'));
+    }
+
     Future<void> openRandomAdditionsFromDrawer(WidgetTester tester) async {
       await tester.tap(find.byKey(const Key('ideas-menu-button')));
       await settleUi(tester);
@@ -229,12 +233,14 @@ void main() {
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
       await settleUi(tester);
+      await tester.tap(find.text('Untitled').last);
+      await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-section-name')),
         'Notes',
       );
       await tester.tap(find.byKey(const Key('idea-editor-create-section')));
-      await settleUi(tester);
+      await settlePersistenceAction(tester);
 
       expect(find.text('Notes'), findsOneWidget);
 
@@ -259,6 +265,108 @@ void main() {
       await settleUi(tester);
     });
 
+    testWidgets('creates duplicate untitled sections quickly', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settlePersistenceAction(tester);
+
+      expect(find.text('Untitled'), findsNWidgets(2));
+      expect(
+        provider.ideas.single.sections
+            .where((section) => section.name == 'Untitled'),
+        hasLength(2),
+      );
+
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+    });
+
+    testWidgets('keeps manual section renames duplicate-protected',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settleUi(tester);
+      await tester.tap(find.text('Untitled').last);
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-editor-section-name')),
+        'Idea',
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-create-section')));
+      await settleUi(tester);
+
+      expect(find.text('ideaEditorSnackbarDuplicateSection'), findsOneWidget);
+      expect(find.text('Idea'), findsOneWidget);
+      expect(find.text('Untitled'), findsOneWidget);
+
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+    });
+
+    testWidgets('reopens an idea on its last active section', (tester) async {
+      late final Idea savedIdea;
+      await tester.runAsync(() async {
+        savedIdea = (await provider.saveIdea(
+          title: 'Remember sections',
+          sections: [
+            const IdeaSection(
+              id: 'section-first',
+              name: 'Idea',
+              content: 'First content',
+            ),
+            const IdeaSection(
+              id: 'section-second',
+              name: 'Notes',
+              content: 'Second content',
+            ),
+          ],
+        ))!;
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.tap(find.text('Remember sections'));
+      await settleUi(tester);
+
+      await tester.tap(sectionTab(savedIdea.sections.last));
+      await settlePersistenceAction(tester);
+
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+
+      await tester.tap(find.text('Remember sections'));
+      await settleUi(tester);
+
+      final editor = tester.widget<TextField>(
+        find.byKey(const Key('idea-markdown-text-field')),
+      );
+      expect(editor.controller?.text, 'Second content');
+
+      final reopenedCloseButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      reopenedCloseButton.onPressed!.call();
+      await settleUi(tester);
+    });
+
     testWidgets('preserves tab edits while switching sections', (tester) async {
       await pumpIdeasApp(tester);
 
@@ -266,6 +374,8 @@ void main() {
       await settleUi(tester);
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
+      await settleUi(tester);
+      await tester.tap(find.text('Untitled').last);
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-section-name')),
@@ -278,15 +388,20 @@ void main() {
         find.byKey(const Key('idea-markdown-text-field')),
         'Vision',
       );
-      await tester.pump();
+      await settlePersistenceAction(tester);
 
+      final ideaSection = provider.ideas.single.sections.firstWhere(
+        (section) => section.name == 'Idea',
+      );
+      final requirementsSection = provider.ideas.single.sections.firstWhere(
+        (section) => section.name == 'Requirements',
+      );
       await tester.tap(
-        find.byKey(const Key('idea-editor-section-tab-requirements')),
+        sectionTab(ideaSection),
       );
       await settleUi(tester);
       await tester.tap(
-        find.byKey(const Key('idea-editor-section-tab-idea')),
-        warnIfMissed: false,
+        sectionTab(requirementsSection),
       );
       await settleUi(tester);
 
@@ -326,6 +441,96 @@ void main() {
       await expectTooltip(Icons.format_italic, 'Italic');
       await expectTooltip(Icons.format_list_bulleted, 'Bullet List');
       await expectTooltip(Icons.code, 'Code Block');
+    });
+
+    testWidgets('shows AI warning after 4000 characters', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        List.filled(4001, 'a').join(),
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-organize')));
+      await settleUi(tester);
+
+      expect(
+        find.byKey(const Key('idea-editor-soft-limit-warning')),
+        findsWidgets,
+      );
+      final confirmButton = tester.widget<FilledButton>(
+        find.byKey(const Key('organize-over-limit-confirm')),
+      );
+      expect(confirmButton.onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const Key('organize-over-limit-cancel')));
+      await settleUi(tester);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+    });
+
+    testWidgets('allows AI organize at 4200 characters', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        List.filled(4200, 'a').join(),
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-organize')));
+      await settleUi(tester);
+
+      expect(
+        find.byKey(const Key('idea-editor-soft-limit-warning')),
+        findsWidgets,
+      );
+      final confirmButton = tester.widget<FilledButton>(
+        find.byKey(const Key('organize-over-limit-confirm')),
+      );
+      expect(confirmButton.onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const Key('organize-over-limit-cancel')));
+      await settleUi(tester);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+    });
+
+    testWidgets('blocks AI organize over 4200 characters', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        List.filled(4201, 'a').join(),
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-organize')));
+      await settleUi(tester);
+
+      expect(
+        find.byKey(const Key('idea-editor-max-limit-warning')),
+        findsWidgets,
+      );
+      final confirmButton = tester.widget<FilledButton>(
+        find.byKey(const Key('organize-over-limit-confirm')),
+      );
+      expect(confirmButton.onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('organize-over-limit-cancel')));
+      await settleUi(tester);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
     });
 
     testWidgets('restores the open editor with preview mode on relaunch',
@@ -730,6 +935,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
       await settleUi(tester);
+      await tester.tap(find.text('Untitled').last);
+      await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-section-name')),
         'Notes',
@@ -737,7 +944,7 @@ void main() {
       await tester.tap(find.byKey(const Key('idea-editor-create-section')));
       await settleUi(tester);
 
-      await tester.tap(find.byKey(const Key('idea-editor-section-tab-notes')));
+      await tester.tap(find.text('Notes'));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-section-name')),
@@ -749,9 +956,7 @@ void main() {
       expect(find.text('Details'), findsOneWidget);
       expect(find.text('Notes'), findsNothing);
 
-      await tester.tap(
-        find.byKey(const Key('idea-editor-section-tab-details')),
-      );
+      await tester.tap(find.text('Details'));
       await settleUi(tester);
       await tester.tap(find.byKey(const Key('idea-editor-delete-section')));
       await settleUi(tester);

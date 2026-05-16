@@ -34,6 +34,20 @@ class InMemoryIdeasRepo extends IdeasRepo {
   }
 
   @override
+  Future<void> updateLastOpenedSectionId({
+    required String ideaId,
+    required String sectionId,
+  }) async {
+    _ideas = [
+      for (final idea in _ideas)
+        if (idea.id == ideaId)
+          _cloneIdea(idea.copyWith(lastOpenedSectionId: sectionId))
+        else
+          _cloneIdea(idea),
+    ];
+  }
+
+  @override
   Future<void> saveIdeas(List<Idea> ideas) async {
     _ideas = ideas.map(_cloneIdea).toList();
   }

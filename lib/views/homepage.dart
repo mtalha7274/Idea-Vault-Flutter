@@ -533,7 +533,7 @@ class _HomepageFab extends StatelessWidget {
   static const double _collapsedWidth = 56;
   static const double _extendedWidth = 144;
   static const BorderRadius _borderRadius = BorderRadius.all(
-    Radius.circular(16),
+    Radius.circular(99),
   );
   static const Duration _duration = Duration(milliseconds: 240);
 
@@ -631,6 +631,8 @@ class _HomeDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final paywall = _maybePaywallViewModel(context);
+    final randomAdditionCount =
+        context.watch<RandomAdditionsProvider>().additions.length;
     return Drawer(
       backgroundColor: theme.surface,
       child: SafeArea(
@@ -703,6 +705,28 @@ class _HomeDrawer extends StatelessWidget {
                   weight: FontWeight.w600,
                 ),
               ),
+              trailing: randomAdditionCount == 0
+                  ? null
+                  : Container(
+                      key: const Key('random-additions-drawer-count'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$randomAdditionCount',
+                        style: ideaVaultLabel(
+                          context,
+                          size: 12,
+                          weight: FontWeight.w800,
+                          color: theme.onPrimary,
+                        ),
+                      ),
+                    ),
               onTap: () {
                 Navigator.of(context).pop();
                 if (!hostContext.mounted) {

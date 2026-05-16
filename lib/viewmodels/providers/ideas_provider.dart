@@ -70,6 +70,7 @@ class IdeasProvider with ChangeNotifier {
     String? ideaId,
     required String title,
     required List<IdeaSection> sections,
+    String? lastOpenedSectionId,
   }) async {
     await ensureLoaded();
 
@@ -88,6 +89,8 @@ class IdeasProvider with ChangeNotifier {
       title: normalizedTitle,
       createdAt: existingIdea?.createdAt ?? now,
       updatedAt: now,
+      lastOpenedSectionId:
+          lastOpenedSectionId ?? existingIdea?.lastOpenedSectionId,
       sections: normalizedSections,
     );
 
@@ -105,6 +108,34 @@ class IdeasProvider with ChangeNotifier {
 
     notifyListeners();
     return savedIdea;
+  }
+
+  Future<void> saveLastOpenedSectionId({
+    required String ideaId,
+    required String sectionId,
+  }) async {
+    await ensureLoaded();
+
+    final existingIndex = _ideas.indexWhere((idea) => idea.id == ideaId);
+    if (existingIndex == -1) {
+      return;
+    }
+
+    final idea = _ideas[existingIndex];
+    if (!idea.sections.any((section) => section.id == sectionId) ||
+        idea.lastOpenedSectionId == sectionId) {
+      return;
+    }
+
+    await _ideasRepo.updateLastOpenedSectionId(
+      ideaId: ideaId,
+      sectionId: sectionId,
+    );
+
+    final nextIdeas = [..._ideas];
+    nextIdeas[existingIndex] = idea.copyWith(lastOpenedSectionId: sectionId);
+    _ideas = nextIdeas;
+    notifyListeners();
   }
 
   Future<void> deleteIdeas(Iterable<String> ideaIds) async {
