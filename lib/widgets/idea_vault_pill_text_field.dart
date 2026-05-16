@@ -61,7 +61,7 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final borderColor = _focusNode.hasFocus
         ? theme.primary.withValues(alpha: 0.6)
-        : theme.primary.withValues(alpha: 0.12);
+        : theme.primary.withValues(alpha: 0.2);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.surface,
