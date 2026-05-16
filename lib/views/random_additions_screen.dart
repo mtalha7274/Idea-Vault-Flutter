@@ -234,48 +234,57 @@ class _RandomAdditionBubble extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 640),
         child: Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.primary,
+          child: Material(
+            color: theme.primary,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(18),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(6),
+            ),
+            child: InkWell(
+              onTap: onFile,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(18),
                 topRight: Radius.circular(18),
                 bottomLeft: Radius.circular(18),
                 bottomRight: Radius.circular(6),
               ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 6, 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      addition.content,
-                      style: ideaVaultBody(
-                        context,
-                        size: 15,
-                        weight: FontWeight.w600,
-                        color: theme.onPrimary,
-                        height: 1.38,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        addition.content,
+                        style: ideaVaultBody(
+                          context,
+                          size: 15,
+                          weight: FontWeight.w600,
+                          color: theme.onPrimary,
+                          height: 1.38,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    key: Key('random-addition-file-${addition.id}'),
-                    onPressed: onFile,
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.onPrimary.withValues(alpha: 0.16),
-                      foregroundColor: theme.onPrimary,
-                      fixedSize: const Size(30, 30),
-                      padding: EdgeInsets.zero,
+                    const SizedBox(width: 8),
+                    Container(
+                      key: Key('random-addition-file-${addition.id}'),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: theme.onPrimary.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.add_rounded,
+                        size: 16,
+                        color: theme.onPrimary,
+                      ),
                     ),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    tooltip: ViewConstants.randomAdditionsFileTooltip.tr(),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

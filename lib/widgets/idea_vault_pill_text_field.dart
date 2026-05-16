@@ -37,7 +37,7 @@ class IdeaVaultPillTextField extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.surface,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: theme.primary.withValues(alpha: 0.12)),
+        border: Border.all(color: theme.primary.withValues(alpha: 0.6)),
         boxShadow: useShadow
             ? [
                 BoxShadow(
@@ -74,7 +74,7 @@ class IdeaVaultPillTextField extends StatelessWidget {
                   hintText: hintText,
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  contentPadding: const EdgeInsets.all(8),
                   hintStyle: ideaVaultBody(
                     context,
                     size: 15,
