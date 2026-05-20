@@ -18,6 +18,7 @@ import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
 import '../widgets/ideas/ideas_layout.dart';
+import '../widgets/premium_crown_icon.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
@@ -40,12 +41,16 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
+  static const double _fabBaseBottomPadding = 60;
+  static const double _composerExtraLineHeight = 15 * 1.35;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _quickAdditionController;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
 
   bool _didHandleResume = false;
+  bool _isQuickAdditionMultiline = false;
   late IdeaSortOption _sortOption;
   late IdeaLayoutOption _layoutOption;
 
@@ -182,8 +187,13 @@ class _HomepageState extends State<Homepage> {
       ),
       floatingActionButton: _isSelectionMode
           ? null
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 60),
+          : AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(
+                bottom: _fabBaseBottomPadding +
+                    (_isQuickAdditionMultiline ? _composerExtraLineHeight : 0),
+              ),
               child: _HomepageFab(
                 isExtended: _layoutOption == IdeaLayoutOption.list,
                 onPressed: () => AppRouter.push(
@@ -224,7 +234,7 @@ class _HomepageState extends State<Homepage> {
                 16,
                 0,
                 16,
-                MediaQuery.of(context).padding.bottom + 4,
+                MediaQuery.of(context).padding.bottom + 8,
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 860),
@@ -233,6 +243,14 @@ class _HomepageState extends State<Homepage> {
                   fieldKey: const Key('homepage-random-addition-field'),
                   sendButtonKey: const Key('homepage-random-addition-send'),
                   onSubmit: _submitQuickAddition,
+                  onMultilineChanged: (isMultiline) {
+                    if (_isQuickAdditionMultiline == isMultiline) {
+                      return;
+                    }
+                    setState(() {
+                      _isQuickAdditionMultiline = isMultiline;
+                    });
+                  },
                 ),
               ),
             ),
@@ -324,6 +342,11 @@ class _HomepageState extends State<Homepage> {
     }
 
     _quickAdditionController.clear();
+    if (_isQuickAdditionMultiline) {
+      setState(() {
+        _isQuickAdditionMultiline = false;
+      });
+    }
     await _openRandomAdditions();
   }
 
@@ -608,10 +631,7 @@ class _HomeDrawer extends StatelessWidget {
           children: [
             if (paywall != null && !paywall.isPro)
               ListTile(
-                leading: Icon(
-                  Icons.workspace_premium_rounded,
-                  color: theme.primary,
-                ),
+                leading: PremiumCrownIcon(size: 24.d),
                 title: TranslatedText(
                   ViewConstants.homepageGetIdeaVaultPro,
                   style: ideaVaultBody(

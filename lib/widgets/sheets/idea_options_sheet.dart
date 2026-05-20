@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/view_constants.dart';
 import '../../viewmodels/providers/theme_provider.dart';
 import '../../views/ideas/idea_vault_theme.dart';
+import '../premium_crown_icon.dart';
 import '../translated_text.dart';
 
 Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
@@ -74,7 +75,7 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
                       children: [
                         _SheetOptionRow(
                           key: const Key('idea-editor-option-export-ai'),
-                          icon: Icons.auto_awesome_rounded,
+                          leading: PremiumCrownIcon(size: 20.d),
                           labelKey: ViewConstants.exportForAiScreenTitle,
                           iconBackgroundColor:
                               sheetTheme.primary.withValues(alpha: 0.12),
@@ -132,15 +133,20 @@ enum IdeaEditorOptionsSheetAction {
 class _SheetOptionRow extends StatelessWidget {
   const _SheetOptionRow({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.labelKey,
     required this.iconBackgroundColor,
     required this.iconColor,
     required this.labelColor,
     required this.onTap,
-  });
+  }) : assert(
+          (icon != null && leading == null) || (icon == null && leading != null),
+          'Exactly one of icon or leading must be set',
+        );
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String labelKey;
   final Color iconBackgroundColor;
   final Color iconColor;
@@ -160,7 +166,10 @@ class _SheetOptionRow extends StatelessWidget {
               SizedBox(
                 width: 38.d,
                 height: 38.d,
-                child: Icon(icon, size: 20.d, color: iconColor),
+                child: Center(
+                  child: leading ??
+                      Icon(icon, size: 20.d, color: iconColor),
+                ),
               ),
               Gap(2.d),
               Expanded(

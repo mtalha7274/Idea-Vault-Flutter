@@ -12,6 +12,7 @@ import '../core/utils/helpers.dart';
 import '../models/premium/paywall_offering.dart';
 import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/premium_crown_icon.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
@@ -142,7 +143,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
     ViewConstants.paywallFeatureCloudBackup,
     ViewConstants.paywallFeatureExportPdf,
     ViewConstants.paywallFeatureEarlyAccess,
-    ViewConstants.paywallFeaturePrioritySupport,
   ];
 
   @override
@@ -179,7 +179,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: 520.w),
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(22.w, 48.h, 22.w, 18.h),
+                        padding: EdgeInsets.fromLTRB(22.w, 18.h, 22.w, 18.h),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -484,6 +484,8 @@ class _HeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        PremiumCrownIcon(size: 48.d),
+        Gap(14.h),
         TranslatedText(
           ViewConstants.paywallTitle,
           textAlign: TextAlign.center,
@@ -536,8 +538,6 @@ class _IncludedPanel extends StatelessWidget {
           _FeatureGroup(
             titleKey: ViewConstants.paywallProUnlocks,
             featureKeys: featureKeys,
-            iconColor: palette.featureCheckForeground,
-            iconBackground: palette.featureCheckBackground,
           ),
         ],
       ),
@@ -549,14 +549,10 @@ class _FeatureGroup extends StatelessWidget {
   const _FeatureGroup({
     required this.titleKey,
     required this.featureKeys,
-    required this.iconColor,
-    required this.iconBackground,
   });
 
   final String titleKey;
   final List<String> featureKeys;
-  final Color iconColor;
-  final Color iconBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -578,8 +574,6 @@ class _FeatureGroup extends StatelessWidget {
         for (var i = 0; i < featureKeys.length; i++) ...[
           _FeatureRow(
             labelKey: featureKeys[i],
-            iconColor: iconColor,
-            iconBackground: iconBackground,
           ),
           if (i < featureKeys.length - 1) Gap(12.h),
         ],
@@ -591,13 +585,9 @@ class _FeatureGroup extends StatelessWidget {
 class _FeatureRow extends StatelessWidget {
   const _FeatureRow({
     required this.labelKey,
-    required this.iconColor,
-    required this.iconBackground,
   });
 
   final String labelKey;
-  final Color iconColor;
-  final Color iconBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -605,24 +595,11 @@ class _FeatureRow extends StatelessWidget {
 
     return Row(
       children: [
-        Container(
+        SizedBox(
           width: 20.d,
           height: 20.d,
-          decoration: BoxDecoration(
-            color: iconBackground.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(6),
-          ),
           child: Center(
-            child: Text(
-              '✓',
-              style: ideaVaultLabel(
-                context,
-                size: 14.f,
-                weight: FontWeight.w700,
-                color: iconColor,
-                height: 1,
-              ),
-            ),
+            child: PremiumCrownIcon(size: 14.d),
           ),
         ),
         Gap(10.d),

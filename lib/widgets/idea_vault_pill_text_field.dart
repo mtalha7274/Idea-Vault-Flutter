@@ -18,6 +18,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
     this.textInputAction,
     this.useShadow = false,
     this.autofocus = false,
+    this.onMultilineChanged,
   });
 
   final TextEditingController controller;
@@ -31,6 +32,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final bool useShadow;
   final bool autofocus;
+  final ValueChanged<bool>? onMultilineChanged;
 
   @override
   State<IdeaVaultPillTextField> createState() => _IdeaVaultPillTextFieldState();
@@ -38,20 +40,90 @@ class IdeaVaultPillTextField extends StatefulWidget {
 
 class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
   late final FocusNode _focusNode;
+  double? _textMaxWidth;
+  bool _isMultiline = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onFocusChange);
+    widget.controller.addListener(_scheduleMultilineCheck);
+  }
+
+  @override
+  void didUpdateWidget(covariant IdeaVaultPillTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_scheduleMultilineCheck);
+      widget.controller.addListener(_scheduleMultilineCheck);
+      _scheduleMultilineCheck();
+    }
   }
 
   void _onFocusChange() {
     setState(() {});
   }
 
+  void _scheduleMultilineCheck() {
+    if (widget.onMultilineChanged == null || widget.maxLines <= 1) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _checkMultiline();
+      }
+    });
+  }
+
+  void _checkMultiline() {
+    if (widget.onMultilineChanged == null || widget.maxLines <= 1) {
+      return;
+    }
+
+    final maxWidth = _textMaxWidth;
+    if (maxWidth == null) {
+      return;
+    }
+
+    final nextIsMultiline = _computeIsMultiline(maxWidth);
+    if (nextIsMultiline == _isMultiline) {
+      return;
+    }
+
+    _isMultiline = nextIsMultiline;
+    widget.onMultilineChanged!.call(nextIsMultiline);
+  }
+
+  bool _computeIsMultiline(double maxWidth) {
+    final text = widget.controller.text;
+    if (text.isEmpty) {
+      return false;
+    }
+    if (text.contains('\n')) {
+      return true;
+    }
+
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: ideaVaultBody(
+          context,
+          size: 15,
+          weight: FontWeight.w600,
+          height: 1.35,
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      maxLines: widget.maxLines,
+    )..layout(maxWidth: maxWidth);
+
+    return painter.computeLineMetrics().length > 1;
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_scheduleMultilineCheck);
     _focusNode
       ..removeListener(_onFocusChange)
       ..dispose();
@@ -94,33 +166,44 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
               const SizedBox(width: 8),
             ],
             Expanded(
-              child: TextField(
-                key: widget.fieldKey,
-                controller: widget.controller,
-                focusNode: _focusNode,
-                autofocus: widget.autofocus,
-                minLines: widget.minLines,
-                maxLines: widget.maxLines,
-                textCapitalization: widget.textCapitalization,
-                textInputAction: widget.textInputAction,
-                decoration: InputDecoration(
-                  hintText: widget.hintText,
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.all(8),
-                  hintStyle: ideaVaultBody(
-                    context,
-                    size: 15,
-                    weight: FontWeight.w500,
-                    color: theme.outline,
-                  ),
-                ),
-                style: ideaVaultBody(
-                  context,
-                  size: 15,
-                  weight: FontWeight.w600,
-                  height: 1.35,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (_textMaxWidth != constraints.maxWidth) {
+                    _textMaxWidth = constraints.maxWidth;
+                    _scheduleMultilineCheck();
+                  }
+                  return TextField(
+                    key: widget.fieldKey,
+                    controller: widget.controller,
+                    focusNode: _focusNode,
+                    autofocus: widget.autofocus,
+                    minLines: widget.minLines,
+                    maxLines: widget.maxLines,
+                    textCapitalization: widget.textCapitalization,
+                    textInputAction: widget.textInputAction,
+                    onChanged: widget.onMultilineChanged == null
+                        ? null
+                        : (_) => _scheduleMultilineCheck(),
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.all(8),
+                      hintStyle: ideaVaultBody(
+                        context,
+                        size: 15,
+                        weight: FontWeight.w500,
+                        color: theme.outline,
+                      ),
+                    ),
+                    style: ideaVaultBody(
+                      context,
+                      size: 15,
+                      weight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  );
+                },
               ),
             ),
             if (widget.trailing != null) ...[

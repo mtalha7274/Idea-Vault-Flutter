@@ -88,8 +88,7 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
                       : results.isEmpty
                           ? const _NoSearchResultsState()
                           : SingleChildScrollView(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                               child: IdeasLayout(
                                 ideas: results,
                                 layoutOption: layoutOption,
@@ -115,19 +114,59 @@ class _SearchEmptyPrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     return Center(
       child: Padding(
-        key: const Key('search-ideas-empty-prompt'),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: TranslatedText(
-          ViewConstants.searchIdeasEmptyPrompt,
-          textAlign: TextAlign.center,
-          style: ideaVaultBody(
-            context,
-            size: 16,
-            weight: FontWeight.w600,
-            color: theme.textMuted,
-            height: 1.5,
+        padding: EdgeInsets.fromLTRB(24, 0, 24, 20 + bottomInset),
+        child: Container(
+          key: const Key('search-ideas-empty-prompt'),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: theme.surface,
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                height: 78,
+                width: 78,
+                decoration: BoxDecoration(
+                  color: theme.accentTint,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.search_rounded,
+                  size: 36,
+                  color: theme.primary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              TranslatedText(
+                ViewConstants.searchIdeasEmptyTitle,
+                textAlign: TextAlign.center,
+                style: ideaVaultHeadline(
+                  context,
+                  size: 24,
+                  weight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TranslatedText(
+                ViewConstants.searchIdeasEmptyPrompt,
+                textAlign: TextAlign.center,
+                style: ideaVaultBody(
+                  context,
+                  size: 15,
+                  weight: FontWeight.w500,
+                  color: theme.textMuted,
+                  height: 1.55,
+                ),
+              ),
+            ],
           ),
         ),
       ),

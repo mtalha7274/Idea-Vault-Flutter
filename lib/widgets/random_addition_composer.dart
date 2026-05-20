@@ -13,12 +13,14 @@ class RandomAdditionComposer extends StatelessWidget {
     required this.onSubmit,
     this.fieldKey,
     this.sendButtonKey,
+    this.onMultilineChanged,
   });
 
   final TextEditingController controller;
   final VoidCallback onSubmit;
   final Key? fieldKey;
   final Key? sendButtonKey;
+  final ValueChanged<bool>? onMultilineChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +34,7 @@ class RandomAdditionComposer extends StatelessWidget {
       textCapitalization: TextCapitalization.sentences,
       textInputAction: TextInputAction.newline,
       useShadow: true,
+      onMultilineChanged: onMultilineChanged,
       trailing: IconButton.filled(
         key: sendButtonKey,
         onPressed: onSubmit,
