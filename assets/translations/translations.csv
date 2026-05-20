@@ -30,7 +30,8 @@ cropImage,Crop Image
 errorOpeningCamera,Error opening camera
 cameraAccessDenied,Camera access denied
 requestTimeout,Request timeout
-organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose the extra information.
+organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose extra information.
+organizeMaxLimitDialogBody,AI Organize works with up to {limit} characters. Shorten this section and try again.
 organizeSectionSheetTitle,Organise section
 organizeSectionSheetDescription,The text in this section will be restructured and clarified with AI. Other sections stay as they are.
 organizeSectionSheetConfirmButton,Organise
@@ -44,6 +45,7 @@ paywallProUnlocks,Pro unlocks
 paywallFeatureAiOrganize,Extended AI Organize
 paywallFeatureAiBrainstorm,Idea Export for any AI
 paywallFeatureSpeechToText,Speech to text dictation
+paywallFeatureImageToText,Image to text
 paywallFeatureCloudBackup,Cloud backup
 paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
@@ -104,6 +106,8 @@ homepageSortSheetSubtitle,Choose how your vault is arranged.
 homepageSortNewestFirst,Newest First
 homepageSortOldestFirst,Oldest First
 homepageSortMostSections,Most Sections
+homepageSwitchToGridTooltip,Switch to grid view
+homepageSwitchToListTooltip,Switch to list view
 homepageGetIdeaVaultPro,Get Idea Vault Pro
 homepageEmptyTitle,Nothing saved yet
 homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
@@ -115,6 +119,20 @@ homepageIdeaCardUpdatedOnDate,Updated {date}
 homepageSearchHint,Search ideas
 homepageNoSearchResults,No ideas match your search
 homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
+randomAdditionsTitle,Random Additions
+randomAdditionsCountOne,1 unfiled addition
+randomAdditionsCountMany,{count} unfiled additions
+randomAdditionsComposerHint,Add a random note...
+randomAdditionsSendTooltip,Add random note
+randomAdditionsFileTooltip,File into an idea
+randomAdditionsEmptyTitle,No random additions yet
+randomAdditionsEmptySubtitle,Drop quick thoughts here and file them into ideas later.
+randomAdditionsChooseIdeaTitle,Choose idea
+randomAdditionsChooseSectionTitle,Choose section
+randomAdditionsAppendToSection,Append to this section
+randomAdditionsNoIdeasTitle,No ideas yet
+randomAdditionsNoIdeasSubtitle,"Create an idea first, then you can file this addition into a section."
+randomAdditionsFiledSnackbar,Added to {idea} / {section}
 ideaEditorUntitledIdea,Untitled Idea
 ideaEditorTitleHint,Enter idea title...
 ideaEditorListening,Listening...
@@ -125,6 +143,15 @@ ideaEditorSnackbarNothingToOrganize,Nothing to organize
 ideaEditorSnackbarOrganizeFailed,Failed to organize. Please try again.
 ideaEditorSnackbarSpeechStopped,Speech recognition stopped. Please try again.
 ideaEditorSnackbarSpeechUnavailable,Speech recognition is unavailable on this device.
+ideaEditorImageTextTakePhoto,Take photo
+ideaEditorImageTextChoosePhoto,Choose from gallery
+ideaEditorImageTextReading,Reading text...
+ideaEditorImageTextPreparing,Preparing image...
+ideaEditorImageTextTooltip,Extract text from image
+ideaEditorImageTextNoText,No readable text found in that image.
+ideaEditorImageTextFailed,Could not read text from that image. Please try again.
+ideaEditorImagePermissionTitle,Image Access Needed
+ideaEditorImagePermissionBody,To extract text from images, please enable camera and photo access in your device settings.
 ideaEditorSnackbarDuplicateSection,That section already exists.
 ideaEditorMicPermissionTitle,Microphone Access Needed
 ideaEditorMicPermissionBody,To use speech to text, please enable microphone access in your device settings.

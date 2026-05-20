@@ -138,6 +138,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     ViewConstants.paywallFeatureAiOrganize,
     ViewConstants.paywallFeatureAiBrainstorm,
     ViewConstants.paywallFeatureSpeechToText,
+    ViewConstants.paywallFeatureImageToText,
     ViewConstants.paywallFeatureCloudBackup,
     ViewConstants.paywallFeatureExportPdf,
     ViewConstants.paywallFeatureEarlyAccess,

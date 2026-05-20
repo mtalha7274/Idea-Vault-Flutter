@@ -26,6 +26,7 @@ void main() {
           title: 'Neighborhood Lab',
           createdAt: DateTime.utc(2026, 4, 20, 10, 30),
           updatedAt: DateTime.utc(2026, 4, 21, 11, 45),
+          lastOpenedSectionId: 'section-2',
           sections: [
             const IdeaSection(
               id: 'section-1',
@@ -52,6 +53,40 @@ void main() {
         loadedIdeas.first.sections.last.content,
         ideas.first.sections.last.content,
       );
+      expect(loadedIdeas.first.lastOpenedSectionId, 'section-2');
+    });
+
+    test('updates an idea last opened section without touching sections',
+        () async {
+      final idea = Idea(
+        id: 'idea-1',
+        title: 'Neighborhood Lab',
+        createdAt: DateTime.utc(2026, 4, 20, 10, 30),
+        updatedAt: DateTime.utc(2026, 4, 21, 11, 45),
+        sections: const [
+          IdeaSection(
+            id: 'section-1',
+            name: 'Idea',
+            content: 'First',
+          ),
+          IdeaSection(
+            id: 'section-2',
+            name: 'Research',
+            content: 'Second',
+          ),
+        ],
+      );
+
+      await repo.upsertIdea(idea);
+      await repo.updateLastOpenedSectionId(
+        ideaId: idea.id,
+        sectionId: 'section-2',
+      );
+
+      final loadedIdeas = await repo.getIdeas();
+
+      expect(loadedIdeas.single.lastOpenedSectionId, 'section-2');
+      expect(loadedIdeas.single.sections, idea.sections);
     });
   });
 }

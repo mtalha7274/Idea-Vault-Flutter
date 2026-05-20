@@ -13,13 +13,17 @@ import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/premium/paywall_view_model.dart';
+import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/idea_vault_pill_text_field.dart';
+import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
+import 'random_additions_screen.dart';
 import 'settings.dart';
 
 class Homepage extends StatefulWidget {
@@ -38,10 +42,12 @@ class _HomepageState extends State<Homepage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _searchController;
+  late final TextEditingController _quickAdditionController;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
 
   bool _didHandleResume = false;
   late IdeaSortOption _sortOption;
+  late IdeaLayoutOption _layoutOption;
 
   bool get _isSelectionMode => _selectedIdeaIds.isNotEmpty;
   String get _searchQuery => _searchController.text.trim();
@@ -52,8 +58,10 @@ class _HomepageState extends State<Homepage> {
     _sortPreferencesRepo =
         widget.sortPreferencesRepo ?? sl<IdeaListPreferencesRepo>();
     _sortOption = _sortPreferencesRepo.getSortOption();
+    _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _searchController = TextEditingController()
       ..addListener(_handleSearchChanged);
+    _quickAdditionController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resumeEditorIfNeeded();
       _checkFreshInstallBackup();
@@ -65,6 +73,7 @@ class _HomepageState extends State<Homepage> {
     _searchController
       ..removeListener(_handleSearchChanged)
       ..dispose();
+    _quickAdditionController.dispose();
     super.dispose();
   }
 
@@ -79,133 +88,180 @@ class _HomepageState extends State<Homepage> {
       key: _scaffoldKey,
       backgroundColor: theme.background,
       drawer: _HomeDrawer(hostContext: context),
-      body: SafeArea(
-        bottom: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: NestedScrollView(
-              floatHeaderSlivers: true,
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
-                final handle =
-                    NestedScrollView.sliverOverlapAbsorberHandleFor(context);
-                return [
-                  SliverOverlapAbsorber(
-                    handle: handle,
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Gap(8.h),
-                          _Header(
-                            ideaCount: ideas.length,
-                            selectedCount: _selectedIdeaIds.length,
-                            onMenuPressed: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                            onDeletePressed: _isSelectionMode
-                                ? _confirmDeleteSelection
-                                : null,
-                            onSortPressed:
-                                _isSelectionMode ? null : _showSortSheet,
-                          ),
-                          SizedBox(height: 18.h),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 24.w),
-                            child: _SearchField(
-                              controller: _searchController,
-                            ),
-                          ),
-                          SizedBox(height: 22.h),
-                          if (_hasCloudBackupProvider(context))
-                            const BackupRestorePromptBanner(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ];
-              },
-              body: Builder(
-                builder: (context) {
-                  return CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverOverlapInjector(
-                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                            context),
-                      ),
-                      if (ideas.isEmpty)
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          sliver: SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: const _EmptyIdeasState(),
-                          ),
-                        )
-                      else if (visibleIdeas.isEmpty)
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          sliver: SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 120),
-                              child: const _NoSearchResultsState(),
-                            ),
-                          ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                if (index.isOdd) {
-                                  return const SizedBox(height: 16);
-                                }
-                                final ideaIndex = index ~/ 2;
-                                final idea = visibleIdeas[ideaIndex];
-                                return _IdeaCard(
-                                  idea: idea,
-                                  isSelected:
-                                      _selectedIdeaIds.contains(idea.id),
-                                  onTap: () => _handleIdeaTap(idea),
-                                  onLongPress: () => _handleIdeaLongPress(idea),
-                                );
-                              },
-                              childCount: visibleIdeas.length * 2 - 1,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: NestedScrollView(
+                    floatHeaderSlivers: true,
+                    headerSliverBuilder: (context, innerBoxIsScrolled) {
+                      final handle =
+                          NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      );
+                      return [
+                        SliverOverlapAbsorber(
+                          handle: handle,
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Gap(8.h),
+                                _Header(
+                                  ideaCount: ideas.length,
+                                  selectedCount: _selectedIdeaIds.length,
+                                  onMenuPressed: () =>
+                                      _scaffoldKey.currentState?.openDrawer(),
+                                  onDeletePressed: _isSelectionMode
+                                      ? _confirmDeleteSelection
+                                      : null,
+                                  onSortPressed:
+                                      _isSelectionMode ? null : _showSortSheet,
+                                  layoutOption: _layoutOption,
+                                  onLayoutPressed: _isSelectionMode
+                                      ? null
+                                      : _toggleLayoutOption,
+                                ),
+                                SizedBox(height: 18.h),
+                                Padding(
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: 24.w),
+                                  child: _SearchField(
+                                    controller: _searchController,
+                                  ),
+                                ),
+                                SizedBox(height: 22.h),
+                                if (_hasCloudBackupProvider(context))
+                                  const BackupRestorePromptBanner(),
+                              ],
                             ),
                           ),
                         ),
-                    ],
-                  );
-                },
+                      ];
+                    },
+                    body: Builder(
+                      builder: (context) {
+                        return CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverOverlapInjector(
+                              handle: NestedScrollView
+                                  .sliverOverlapAbsorberHandleFor(context),
+                            ),
+                            if (ideas.isEmpty)
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                sliver: SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: const _EmptyIdeasState(),
+                                ),
+                              )
+                            else if (visibleIdeas.isEmpty)
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                sliver: SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 180),
+                                    child: const _NoSearchResultsState(),
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 200),
+                                sliver: SliverToBoxAdapter(
+                                  child: _IdeasLayout(
+                                    ideas: visibleIdeas,
+                                    layoutOption: _layoutOption,
+                                    selectedIdeaIds: _selectedIdeaIds,
+                                    onTap: _handleIdeaTap,
+                                    onLongPress: _handleIdeaLongPress,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+            if (!_isSelectionMode) _buildQuickAdditionDock(context),
+          ],
         ),
       ),
       floatingActionButton: _isSelectionMode
           ? null
-          : FloatingActionButton.extended(
-              key: const Key('ideas-fab'),
-              onPressed: () => AppRouter.push(
-                context,
-                const IdeaEditorScreen(),
-              ),
-              backgroundColor: theme.primary,
-              foregroundColor: theme.onPrimary,
-              icon: const Icon(Icons.add_rounded),
-              label: TranslatedText(
-                ViewConstants.homepageFabNewIdea,
-                style: ideaVaultLabel(
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 60),
+              child: _HomepageFab(
+                isExtended: _layoutOption == IdeaLayoutOption.list,
+                onPressed: () => AppRouter.push(
                   context,
-                  size: 14,
-                  weight: FontWeight.w700,
-                  color: theme.onPrimary,
+                  const IdeaEditorScreen(),
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildQuickAdditionDock(BuildContext context) {
+    final theme = context.read<ThemeProvider>().baseTheme;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IgnorePointer(
+            child: Container(
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.background.withValues(alpha: 0),
+                    theme.background,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          ColoredBox(
+            color: theme.background,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                MediaQuery.of(context).padding.bottom + 4,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: RandomAdditionComposer(
+                  controller: _quickAdditionController,
+                  fieldKey: const Key('homepage-random-addition-field'),
+                  sendButtonKey: const Key('homepage-random-addition-send'),
+                  onSubmit: _submitQuickAddition,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -278,6 +334,26 @@ class _HomepageState extends State<Homepage> {
     AppRouter.push(
       context,
       IdeaEditorScreen(ideaId: idea.id),
+    );
+  }
+
+  Future<void> _submitQuickAddition() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final addition = await context
+        .read<RandomAdditionsProvider>()
+        .addAddition(_quickAdditionController.text);
+    if (addition == null || !mounted) {
+      return;
+    }
+
+    _quickAdditionController.clear();
+    await _openRandomAdditions();
+  }
+
+  Future<void> _openRandomAdditions() async {
+    await AppRouter.push(
+      context,
+      const RandomAdditionsScreen(),
     );
   }
 
@@ -441,6 +517,114 @@ class _HomepageState extends State<Homepage> {
     });
     await _sortPreferencesRepo.saveSortOption(selectedSortOption);
   }
+
+  Future<void> _toggleLayoutOption() async {
+    final nextLayoutOption = _layoutOption == IdeaLayoutOption.list
+        ? IdeaLayoutOption.grid
+        : IdeaLayoutOption.list;
+
+    setState(() {
+      _layoutOption = nextLayoutOption;
+    });
+    await _sortPreferencesRepo.saveLayoutOption(nextLayoutOption);
+  }
+}
+
+class _HomepageFab extends StatelessWidget {
+  const _HomepageFab({
+    required this.isExtended,
+    required this.onPressed,
+  });
+
+  static const double _height = 56;
+  static const double _collapsedWidth = 56;
+  static const double _extendedWidth = 144;
+  static const BorderRadius _borderRadius = BorderRadius.all(
+    Radius.circular(99),
+  );
+  static const Duration _duration = Duration(milliseconds: 240);
+
+  final bool isExtended;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final labelStyle = ideaVaultLabel(
+      context,
+      size: 14,
+      weight: FontWeight.w700,
+      color: theme.onPrimary,
+    );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(
+        end: isExtended ? _extendedWidth : _collapsedWidth,
+      ),
+      duration: _duration,
+      curve: Curves.easeOutCubic,
+      builder: (context, width, child) {
+        return Semantics(
+          button: true,
+          label: ViewConstants.homepageFabNewIdea.tr(),
+          child: Material(
+            key: const Key('ideas-fab'),
+            color: theme.primary,
+            elevation: 6,
+            shadowColor: Colors.black.withValues(alpha: 0.24),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _borderRadius,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const RoundedRectangleBorder(
+                borderRadius: _borderRadius,
+              ),
+              onTap: onPressed,
+              child: SizedBox(
+                width: width,
+                height: _height,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.centerLeft,
+                    maxWidth: _extendedWidth,
+                    minWidth: _extendedWidth,
+                    child: SizedBox(
+                      width: _extendedWidth,
+                      height: _height,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 16),
+                          Icon(
+                            Icons.add_rounded,
+                            color: theme.onPrimary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AnimatedOpacity(
+                              opacity: isExtended ? 1 : 0,
+                              duration: const Duration(milliseconds: 120),
+                              curve: Curves.easeOut,
+                              child: Text(
+                                ViewConstants.homepageFabNewIdea.tr(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: labelStyle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _HomeDrawer extends StatelessWidget {
@@ -454,6 +638,8 @@ class _HomeDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final paywall = _maybePaywallViewModel(context);
+    final randomAdditionCount =
+        context.watch<RandomAdditionsProvider>().additions.length;
     return Drawer(
       backgroundColor: theme.surface,
       child: SafeArea(
@@ -513,6 +699,53 @@ class _HomeDrawer extends StatelessWidget {
               },
             ),
             ListTile(
+              key: const Key('random-additions-drawer'),
+              leading: Icon(
+                Icons.chat_bubble_outline_rounded,
+                color: theme.primary,
+              ),
+              title: TranslatedText(
+                ViewConstants.randomAdditionsTitle,
+                style: ideaVaultBody(
+                  context,
+                  size: 16,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              trailing: randomAdditionCount == 0
+                  ? null
+                  : Container(
+                      key: const Key('random-additions-drawer-count'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$randomAdditionCount',
+                        style: ideaVaultLabel(
+                          context,
+                          size: 12,
+                          weight: FontWeight.w800,
+                          color: theme.onPrimary,
+                        ),
+                      ),
+                    ),
+              onTap: () {
+                Navigator.of(context).pop();
+                if (!hostContext.mounted) {
+                  return;
+                }
+                AppRouter.push(
+                  hostContext,
+                  const RandomAdditionsScreen(),
+                );
+              },
+            ),
+            ListTile(
               leading: Icon(
                 Icons.settings_rounded,
                 color: theme.primary,
@@ -558,6 +791,8 @@ class _Header extends StatelessWidget {
     required this.onMenuPressed,
     required this.onDeletePressed,
     required this.onSortPressed,
+    required this.layoutOption,
+    required this.onLayoutPressed,
   });
 
   final int ideaCount;
@@ -565,17 +800,12 @@ class _Header extends StatelessWidget {
   final VoidCallback onMenuPressed;
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSortPressed;
+  final IdeaLayoutOption layoutOption;
+  final VoidCallback? onLayoutPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final paywall = _maybePaywallViewModel(context);
-
-    final menuStyle = IconButton.styleFrom(
-      backgroundColor: theme.surfaceLow,
-      foregroundColor: theme.primary,
-      padding: const EdgeInsets.all(12),
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,14 +836,6 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (paywall?.isPro == true) ...[
-                    Gap(8.w),
-                    Icon(
-                      Icons.workspace_premium_rounded,
-                      color: theme.primary,
-                      size: 24.d,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -646,9 +868,22 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ] else ...[
-              _SavedIdeasCountTipButton(
-                ideaCount: ideaCount,
-                menuStyle: menuStyle,
+              IconButton(
+                key: const Key('ideas-layout-toggle'),
+                tooltip: layoutOption == IdeaLayoutOption.list
+                    ? ViewConstants.homepageSwitchToGridTooltip.tr()
+                    : ViewConstants.homepageSwitchToListTooltip.tr(),
+                onPressed: onLayoutPressed,
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.surfaceLow,
+                  foregroundColor: theme.primary,
+                  padding: const EdgeInsets.all(12),
+                ),
+                icon: Icon(
+                  layoutOption == IdeaLayoutOption.list
+                      ? Icons.grid_view_rounded
+                      : Icons.view_agenda_rounded,
+                ),
               ),
               const SizedBox(width: 10),
               IconButton(
@@ -666,78 +901,6 @@ class _Header extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-
-  PaywallViewModel? _maybePaywallViewModel(BuildContext context) {
-    try {
-      return context.watch<PaywallViewModel>();
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-}
-
-class _SavedIdeasCountTipButton extends StatefulWidget {
-  const _SavedIdeasCountTipButton({
-    required this.ideaCount,
-    required this.menuStyle,
-  });
-
-  final int ideaCount;
-  final ButtonStyle menuStyle;
-
-  @override
-  State<_SavedIdeasCountTipButton> createState() =>
-      _SavedIdeasCountTipButtonState();
-}
-
-class _SavedIdeasCountTipButtonState extends State<_SavedIdeasCountTipButton> {
-  final GlobalKey<TooltipState> _tooltipKey = GlobalKey<TooltipState>();
-
-  String _tooltipMessage() {
-    final n = widget.ideaCount;
-    if (n == 1) {
-      return ViewConstants.homepageSavedIdeasTooltipOne.tr();
-    }
-    return ViewConstants.homepageSavedIdeasTooltipMany
-        .tr(namedArgs: {'count': '$n'});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    return Tooltip(
-      key: _tooltipKey,
-      message: _tooltipMessage(),
-      triggerMode: TooltipTriggerMode.manual,
-      showDuration: const Duration(seconds: 2),
-      child: IconButton(
-        key: const Key('ideas-count-button'),
-        onPressed: () => _tooltipKey.currentState?.ensureTooltipVisible(),
-        style: widget.menuStyle,
-        icon: Badge(
-          backgroundColor: theme.primary,
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.ideaCount > 9 ? 5 : 6,
-            vertical: 2,
-          ),
-          label: Text(
-            '${widget.ideaCount}',
-            style: ideaVaultLabel(
-              context,
-              size: 10,
-              weight: FontWeight.w800,
-              color: theme.onPrimary,
-            ),
-          ),
-          child: Icon(
-            Icons.inventory_2_outlined,
-            size: 22,
-            color: theme.primary,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -807,128 +970,364 @@ class _EmptyIdeasState extends StatelessWidget {
   }
 }
 
+enum _IdeaCardLayout {
+  list,
+  grid,
+}
+
+class _IdeasLayout extends StatelessWidget {
+  const _IdeasLayout({
+    required this.ideas,
+    required this.layoutOption,
+    required this.selectedIdeaIds,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  static const Duration _animationDuration = Duration(milliseconds: 260);
+
+  final List<Idea> ideas;
+  final IdeaLayoutOption layoutOption;
+  final Set<String> selectedIdeaIds;
+  final ValueChanged<Idea> onTap;
+  final ValueChanged<Idea> onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = _IdeaLayoutMetrics.calculate(
+          maxWidth: constraints.maxWidth,
+          itemCount: ideas.length,
+          layoutOption: layoutOption,
+        );
+
+        return AnimatedSize(
+          duration: _animationDuration,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: metrics.height,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var index = 0; index < ideas.length; index++)
+                  AnimatedPositioned(
+                    key: ValueKey('idea-layout-${ideas[index].id}'),
+                    duration: _animationDuration,
+                    curve: Curves.easeOutCubic,
+                    left: metrics.rects[index].left,
+                    top: metrics.rects[index].top,
+                    width: metrics.rects[index].width,
+                    height: metrics.rects[index].height,
+                    child: _IdeaCard(
+                      idea: ideas[index],
+                      layout: metrics.cardLayout,
+                      isSelected: selectedIdeaIds.contains(ideas[index].id),
+                      onTap: () => onTap(ideas[index]),
+                      onLongPress: () => onLongPress(ideas[index]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _IdeaLayoutMetrics {
+  const _IdeaLayoutMetrics({
+    required this.height,
+    required this.rects,
+    required this.cardLayout,
+  });
+
+  static const double _listGap = 16;
+  static const double _gridGap = 12;
+  static const double _listCardHeight = 224;
+  static const double _gridCardHeight = 218;
+  static const double _minimumTwoColumnWidth = 340;
+
+  final double height;
+  final List<Rect> rects;
+  final _IdeaCardLayout cardLayout;
+
+  static _IdeaLayoutMetrics calculate({
+    required double maxWidth,
+    required int itemCount,
+    required IdeaLayoutOption layoutOption,
+  }) {
+    if (itemCount == 0) {
+      return const _IdeaLayoutMetrics(
+        height: 0,
+        rects: [],
+        cardLayout: _IdeaCardLayout.list,
+      );
+    }
+
+    final useGrid = layoutOption == IdeaLayoutOption.grid &&
+        maxWidth >= _minimumTwoColumnWidth;
+    if (!useGrid) {
+      final rects = List<Rect>.generate(itemCount, (index) {
+        final top = index * (_listCardHeight + _listGap);
+        return Rect.fromLTWH(0, top, maxWidth, _listCardHeight);
+      });
+      return _IdeaLayoutMetrics(
+        height: itemCount * _listCardHeight + (itemCount - 1) * _listGap,
+        rects: rects,
+        cardLayout: _IdeaCardLayout.list,
+      );
+    }
+
+    final cardWidth = (maxWidth - _gridGap) / 2;
+    final rowCount = (itemCount / 2).ceil();
+    final rects = List<Rect>.generate(itemCount, (index) {
+      final row = index ~/ 2;
+      final column = index % 2;
+      return Rect.fromLTWH(
+        column * (cardWidth + _gridGap),
+        row * (_gridCardHeight + _gridGap),
+        cardWidth,
+        _gridCardHeight,
+      );
+    });
+
+    return _IdeaLayoutMetrics(
+      height: rowCount * _gridCardHeight + (rowCount - 1) * _gridGap,
+      rects: rects,
+      cardLayout: _IdeaCardLayout.grid,
+    );
+  }
+}
+
 class _IdeaCard extends StatelessWidget {
   const _IdeaCard({
     required this.idea,
+    required this.layout,
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
   });
 
   final Idea idea;
+  final _IdeaCardLayout layout;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  bool get _isGrid => layout == _IdeaCardLayout.grid;
+
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final radius = BorderRadius.circular(_isGrid ? 22 : 28);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         key: Key('idea-card-${idea.id}'),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: radius,
         onTap: onTap,
         onLongPress: onLongPress,
         child: Ink(
           decoration: BoxDecoration(
             color: isSelected ? theme.accentTint : theme.surface,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: radius,
             border: Border.all(
               color: isSelected
                   ? theme.primary.withValues(alpha: 0.32)
                   : Colors.transparent,
             ),
           ),
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      idea.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: ideaVaultHeadline(
-                        context,
-                        size: 24,
-                        weight: FontWeight.w800,
-                        height: 1.15,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.surfaceLow,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      idea.sections.length == 1
-                          ? ViewConstants.homepageIdeaCardOneSection.tr()
-                          : ViewConstants.homepageIdeaCardSectionsMany.tr(
-                              namedArgs: {
-                                'count': '${idea.sections.length}',
-                              },
-                            ),
-                      style: ideaVaultLabel(
-                        context,
-                        size: 12,
-                        weight: FontWeight.w700,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                _ideaPreview(idea),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: ideaVaultBody(
-                  context,
-                  size: 15,
-                  weight: FontWeight.w500,
-                  color: theme.textMuted,
-                  height: 1.65,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Icon(
-                    Icons.schedule_rounded,
-                    size: 18,
-                    color: theme.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatUpdatedAt(context, idea.updatedAt),
-                    style: ideaVaultLabel(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w600,
-                      color: theme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          padding: EdgeInsets.all(_isGrid ? 14 : 22),
+          child:
+              _isGrid ? _buildGridContent(context) : _buildListContent(context),
         ),
       ),
     );
   }
 
+  Widget _buildListContent(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                idea.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ideaVaultHeadline(
+                  context,
+                  size: 24,
+                  weight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            _SectionCountPill(idea: idea),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          _ideaPreview(idea),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: ideaVaultBody(
+            context,
+            size: 15,
+            weight: FontWeight.w500,
+            color: theme.textMuted,
+            height: 1.65,
+          ),
+        ),
+        const Spacer(),
+        _UpdatedAtLabel(
+          updatedAt: idea.updatedAt,
+          iconSize: 18,
+          textSize: 13,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridContent(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          idea.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: ideaVaultHeadline(
+            context,
+            size: 17,
+            weight: FontWeight.w800,
+            height: 1.18,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _SectionCountPill(
+          idea: idea,
+          compact: true,
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: Text(
+            _ideaPreview(idea),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: ideaVaultBody(
+              context,
+              size: 13,
+              weight: FontWeight.w500,
+              color: theme.textMuted,
+              height: 1.45,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _UpdatedAtLabel(
+          updatedAt: idea.updatedAt,
+          iconSize: 16,
+          textSize: 11,
+        ),
+      ],
+    );
+  }
+
   String _ideaPreview(Idea idea) {
     return ideaPreviewText(idea);
+  }
+}
+
+class _SectionCountPill extends StatelessWidget {
+  const _SectionCountPill({
+    required this.idea,
+    this.compact = false,
+  });
+
+  final Idea idea;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: compact ? 128 : 120),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 6 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: theme.surfaceLow,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          idea.sections.length == 1
+              ? ViewConstants.homepageIdeaCardOneSection.tr()
+              : ViewConstants.homepageIdeaCardSectionsMany.tr(
+                  namedArgs: {
+                    'count': '${idea.sections.length}',
+                  },
+                ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: ideaVaultLabel(
+            context,
+            size: compact ? 11 : 12,
+            weight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdatedAtLabel extends StatelessWidget {
+  const _UpdatedAtLabel({
+    required this.updatedAt,
+    required this.iconSize,
+    required this.textSize,
+  });
+
+  final DateTime updatedAt;
+  final double iconSize;
+  final double textSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Row(
+      children: [
+        Icon(
+          Icons.schedule_rounded,
+          size: iconSize,
+          color: theme.textMuted,
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            _formatUpdatedAt(context, updatedAt),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ideaVaultLabel(
+              context,
+              size: textSize,
+              weight: FontWeight.w600,
+              color: theme.textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   String _formatUpdatedAt(BuildContext context, DateTime updatedAt) {
@@ -969,34 +1368,17 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return TextField(
-      key: const Key('ideas-search-field'),
+    return IdeaVaultPillTextField(
+      fieldKey: const Key('ideas-search-field'),
       controller: controller,
-      textCapitalization: TextCapitalization.sentences,
-      decoration: InputDecoration(
-        hintText: ViewConstants.homepageSearchHint.tr(),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          color: theme.textMuted,
-        ),
-        filled: true,
-        fillColor: theme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        hintStyle: ideaVaultBody(
-          context,
-          size: 15,
-          weight: FontWeight.w500,
-          color: theme.outline,
-        ),
+      hintText: ViewConstants.homepageSearchHint.tr(),
+      leading: Icon(
+        Icons.search_rounded,
+        color: theme.textMuted,
+        size: 22,
       ),
-      style: ideaVaultBody(
-        context,
-        size: 15,
-        weight: FontWeight.w600,
-      ),
+      textInputAction: TextInputAction.search,
+      useShadow: false,
     );
   }
 }

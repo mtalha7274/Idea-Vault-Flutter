@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:idea_vault/config/router/app_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/extensions/int.dart';
@@ -6,7 +7,8 @@ import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 import 'translated_text.dart';
 
-class IdeaVaultSubpageAppBar extends StatelessWidget implements PreferredSizeWidget {
+class IdeaVaultSubpageAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   const IdeaVaultSubpageAppBar({
     super.key,
     required this.titleKey,
@@ -33,7 +35,14 @@ class IdeaVaultSubpageAppBar extends StatelessWidget implements PreferredSizeWid
       shadowColor: Colors.transparent,
       leadingWidth: 52.w,
       leading: IconButton(
-        onPressed: onPop ?? () => Navigator.of(context).pop(),
+        onPressed: () {
+          FocusManager.instance.primaryFocus?.unfocus();
+          if (onPop != null) {
+            onPop!();
+          } else {
+            AppRouter.pop(context);
+          }
+        },
         icon: Icon(
           Icons.arrow_back_ios_new_rounded,
           size: 18.d,

@@ -70,6 +70,7 @@ class IdeasProvider with ChangeNotifier {
     String? ideaId,
     required String title,
     required List<IdeaSection> sections,
+    String? lastOpenedSectionId,
   }) async {
     await ensureLoaded();
 
@@ -88,6 +89,8 @@ class IdeasProvider with ChangeNotifier {
       title: normalizedTitle,
       createdAt: existingIdea?.createdAt ?? now,
       updatedAt: now,
+      lastOpenedSectionId:
+          lastOpenedSectionId ?? existingIdea?.lastOpenedSectionId,
       sections: normalizedSections,
     );
 
@@ -105,6 +108,34 @@ class IdeasProvider with ChangeNotifier {
 
     notifyListeners();
     return savedIdea;
+  }
+
+  Future<void> saveLastOpenedSectionId({
+    required String ideaId,
+    required String sectionId,
+  }) async {
+    await ensureLoaded();
+
+    final existingIndex = _ideas.indexWhere((idea) => idea.id == ideaId);
+    if (existingIndex == -1) {
+      return;
+    }
+
+    final idea = _ideas[existingIndex];
+    if (!idea.sections.any((section) => section.id == sectionId) ||
+        idea.lastOpenedSectionId == sectionId) {
+      return;
+    }
+
+    await _ideasRepo.updateLastOpenedSectionId(
+      ideaId: ideaId,
+      sectionId: sectionId,
+    );
+
+    final nextIdeas = [..._ideas];
+    nextIdeas[existingIndex] = idea.copyWith(lastOpenedSectionId: sectionId);
+    _ideas = nextIdeas;
+    notifyListeners();
   }
 
   Future<void> deleteIdeas(Iterable<String> ideaIds) async {
@@ -133,6 +164,55 @@ class IdeasProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<Idea?> appendContentToSection({
+    required String ideaId,
+    required String sectionId,
+    required String content,
+  }) async {
+    await ensureLoaded();
+
+    final trimmedContent = content.trim();
+    if (trimmedContent.isEmpty) {
+      return null;
+    }
+
+    final idea = findById(ideaId);
+    if (idea == null) {
+      return null;
+    }
+
+    var didFindSection = false;
+    final nextSections = [
+      for (final section in idea.sections)
+        if (section.id == sectionId)
+          section.copyWith(
+            content: _appendSectionContent(
+              section.content,
+              trimmedContent,
+            ),
+          )
+        else
+          section,
+    ];
+
+    for (final section in idea.sections) {
+      if (section.id == sectionId) {
+        didFindSection = true;
+        break;
+      }
+    }
+
+    if (!didFindSection) {
+      return null;
+    }
+
+    return saveIdea(
+      ideaId: idea.id,
+      title: idea.title,
+      sections: nextSections,
+    );
+  }
+
   Future<void> _loadIdeas() async {
     _isLoading = true;
     final loadedIdeas = await _ideasRepo.getIdeas();
@@ -145,5 +225,14 @@ class IdeasProvider with ChangeNotifier {
     final sortedIdeas = [...ideas];
     sortedIdeas.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return sortedIdeas;
+  }
+
+  String _appendSectionContent(String existingContent, String addition) {
+    final trimmedExistingContent = existingContent.trimRight();
+    if (trimmedExistingContent.isEmpty) {
+      return addition;
+    }
+
+    return '$trimmedExistingContent\n\n$addition';
   }
 }

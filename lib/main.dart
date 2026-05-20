@@ -19,6 +19,7 @@ import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
 import 'viewmodels/providers/premium/paywall_view_model.dart';
+import 'viewmodels/providers/random_additions_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
 import 'core/utils/helpers.dart';
 
@@ -70,6 +71,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(providers: [
       ChangeNotifierProvider<IdeasProvider>(create: (_) => sl()),
+      ChangeNotifierProvider<RandomAdditionsProvider>(create: (_) => sl()),
       ChangeNotifierProvider<CloudBackupProvider>(create: (_) => sl()),
       ChangeNotifierProvider<PaywallViewModel>(
         create: (_) => sl<PaywallViewModel>()..initialize(),

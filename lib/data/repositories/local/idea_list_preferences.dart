@@ -7,6 +7,11 @@ enum IdeaSortOption {
   mostSections,
 }
 
+enum IdeaLayoutOption {
+  list,
+  grid,
+}
+
 class IdeaListPreferencesRepo {
   const IdeaListPreferencesRepo(this._manager);
 
@@ -26,6 +31,23 @@ class IdeaListPreferencesRepo {
     await _manager.setString(
       key: AppConstants.ideaListSort,
       value: sortOption.name,
+    );
+  }
+
+  IdeaLayoutOption getLayoutOption() {
+    final rawValue = _manager.getString(key: AppConstants.ideaListLayout);
+    for (final option in IdeaLayoutOption.values) {
+      if (option.name == rawValue) {
+        return option;
+      }
+    }
+    return IdeaLayoutOption.list;
+  }
+
+  Future<void> saveLayoutOption(IdeaLayoutOption layoutOption) async {
+    await _manager.setString(
+      key: AppConstants.ideaListLayout,
+      value: layoutOption.name,
     );
   }
 }

@@ -36,9 +36,12 @@ class ViewConstants {
   static const String cropImage = "cropImage";
   static const String requestTimeout = "requestTimeout";
 
-  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiSoftCharacterLimit]).
+  /// `{limit}` = formatted warning character count (keep in sync with [ideaSectionAiWarningCharacterLimit]).
   static const String organizeOverLimitDialogBody =
       'organizeOverLimitDialogBody';
+
+  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiMaxCharacterLimit]).
+  static const String organizeMaxLimitDialogBody = 'organizeMaxLimitDialogBody';
 
   static const String organizeSectionSheetTitle = 'organizeSectionSheetTitle';
   static const String organizeSectionSheetDescription =
@@ -59,6 +62,7 @@ class ViewConstants {
   static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
   static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
   static const String paywallFeatureSpeechToText = 'paywallFeatureSpeechToText';
+  static const String paywallFeatureImageToText = 'paywallFeatureImageToText';
   static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
   static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
   static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';
@@ -139,6 +143,10 @@ class ViewConstants {
   static const String homepageSortNewestFirst = 'homepageSortNewestFirst';
   static const String homepageSortOldestFirst = 'homepageSortOldestFirst';
   static const String homepageSortMostSections = 'homepageSortMostSections';
+  static const String homepageSwitchToGridTooltip =
+      'homepageSwitchToGridTooltip';
+  static const String homepageSwitchToListTooltip =
+      'homepageSwitchToListTooltip';
   static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
   static const String homepageEmptyTitle = 'homepageEmptyTitle';
   static const String homepageEmptySubtitle = 'homepageEmptySubtitle';
@@ -155,6 +163,29 @@ class ViewConstants {
   static const String homepageNoSearchResults = 'homepageNoSearchResults';
   static const String homepageIdeaCardPreviewPlaceholder =
       'homepageIdeaCardPreviewPlaceholder';
+
+  static const String randomAdditionsTitle = 'randomAdditionsTitle';
+  static const String randomAdditionsCountOne = 'randomAdditionsCountOne';
+  static const String randomAdditionsCountMany = 'randomAdditionsCountMany';
+  static const String randomAdditionsComposerHint =
+      'randomAdditionsComposerHint';
+  static const String randomAdditionsSendTooltip = 'randomAdditionsSendTooltip';
+  static const String randomAdditionsFileTooltip = 'randomAdditionsFileTooltip';
+  static const String randomAdditionsEmptyTitle = 'randomAdditionsEmptyTitle';
+  static const String randomAdditionsEmptySubtitle =
+      'randomAdditionsEmptySubtitle';
+  static const String randomAdditionsChooseIdeaTitle =
+      'randomAdditionsChooseIdeaTitle';
+  static const String randomAdditionsChooseSectionTitle =
+      'randomAdditionsChooseSectionTitle';
+  static const String randomAdditionsAppendToSection =
+      'randomAdditionsAppendToSection';
+  static const String randomAdditionsNoIdeasTitle =
+      'randomAdditionsNoIdeasTitle';
+  static const String randomAdditionsNoIdeasSubtitle =
+      'randomAdditionsNoIdeasSubtitle';
+  static const String randomAdditionsFiledSnackbar =
+      'randomAdditionsFiledSnackbar';
 
   static const String ideaEditorUntitledIdea = 'ideaEditorUntitledIdea';
   static const String ideaEditorTitleHint = 'ideaEditorTitleHint';
@@ -173,6 +204,20 @@ class ViewConstants {
       'ideaEditorSnackbarSpeechStopped';
   static const String ideaEditorSnackbarSpeechUnavailable =
       'ideaEditorSnackbarSpeechUnavailable';
+  static const String ideaEditorImageTextTakePhoto =
+      'ideaEditorImageTextTakePhoto';
+  static const String ideaEditorImageTextChoosePhoto =
+      'ideaEditorImageTextChoosePhoto';
+  static const String ideaEditorImageTextReading = 'ideaEditorImageTextReading';
+  static const String ideaEditorImageTextPreparing =
+      'ideaEditorImageTextPreparing';
+  static const String ideaEditorImageTextTooltip = 'ideaEditorImageTextTooltip';
+  static const String ideaEditorImageTextNoText = 'ideaEditorImageTextNoText';
+  static const String ideaEditorImageTextFailed = 'ideaEditorImageTextFailed';
+  static const String ideaEditorImagePermissionTitle =
+      'ideaEditorImagePermissionTitle';
+  static const String ideaEditorImagePermissionBody =
+      'ideaEditorImagePermissionBody';
   static const String ideaEditorSnackbarDuplicateSection =
       'ideaEditorSnackbarDuplicateSection';
   static const String ideaEditorMicPermissionTitle =

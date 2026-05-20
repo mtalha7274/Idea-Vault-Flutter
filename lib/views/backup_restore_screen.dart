@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
@@ -474,9 +475,14 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     _setActiveBackupAction(_BackupRestoreAction.backup);
     try {
       final ideasProvider = context.read<IdeasProvider>();
+      final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
       final backupProvider = context.read<CloudBackupProvider>();
       await ideasProvider.ensureLoaded();
-      await backupProvider.backUpNow(ideasProvider.ideas);
+      await randomAdditionsProvider.ensureLoaded();
+      await backupProvider.backUpNow(
+        ideasProvider.ideas,
+        randomAdditions: randomAdditionsProvider.additions,
+      );
       _showTranslatedSnackBar(ViewConstants.backupRestoreBackupComplete);
     } catch (error, stackTrace) {
       printLog('Manual cloud backup failed: $error\n$stackTrace');
@@ -519,12 +525,14 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     try {
       final backupProvider = context.read<CloudBackupProvider>();
       final ideasProvider = context.read<IdeasProvider>();
+      final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
       final snapshot = await backupProvider.fetchRestoreSnapshot();
       if (snapshot == null) {
         _showTranslatedSnackBar(ViewConstants.backupRestoreNoBackupFound);
         return;
       }
       await ideasProvider.replaceIdeas(snapshot.ideas);
+      await randomAdditionsProvider.replaceAdditions(snapshot.randomAdditions);
       if (!mounted) {
         return;
       }

@@ -95,6 +95,7 @@ class Idea extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     required List<IdeaSection> sections,
+    this.lastOpenedSectionId,
   }) : sections = List.unmodifiable(
           sections.map((section) => section.copyWith()).toList(),
         );
@@ -108,6 +109,7 @@ class Idea extends Equatable {
           DateTime.now(),
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),
+      lastOpenedSectionId: json['lastOpenedSectionId'] as String?,
       sections: rawSections
           .whereType<Map<String, dynamic>>()
           .map(IdeaSection.fromJson)
@@ -119,6 +121,7 @@ class Idea extends Equatable {
   final String title;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? lastOpenedSectionId;
   final List<IdeaSection> sections;
 
   Idea copyWith({
@@ -126,6 +129,7 @@ class Idea extends Equatable {
     String? title,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? lastOpenedSectionId,
     List<IdeaSection>? sections,
   }) {
     return Idea(
@@ -133,6 +137,7 @@ class Idea extends Equatable {
       title: title ?? this.title,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastOpenedSectionId: lastOpenedSectionId ?? this.lastOpenedSectionId,
       sections: sections ?? this.sections,
     );
   }
@@ -143,12 +148,20 @@ class Idea extends Equatable {
       'title': title,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'lastOpenedSectionId': lastOpenedSectionId,
       'sections': sections.map((section) => section.toJson()).toList(),
     };
   }
 
   @override
-  List<Object> get props => [id, title, createdAt, updatedAt, sections];
+  List<Object?> get props => [
+        id,
+        title,
+        createdAt,
+        updatedAt,
+        lastOpenedSectionId,
+        sections,
+      ];
 }
 
 List<IdeaSection> buildDefaultIdeaSections() {
