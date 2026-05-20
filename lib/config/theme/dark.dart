@@ -19,7 +19,7 @@ class DarkTheme implements BaseTheme {
   @override
   final Color onSurface = const Color(0xFFAFB3B7);
   @override
-  final Color overlay = const Color(0xFFFFFFFF).withOpacity(0.08);
+  final Color overlay = const Color(0xFFFFFFFF).withValues(alpha: 0.08);
   @override
   final Color surfaceLow = const Color(0xFF23272A);
   @override

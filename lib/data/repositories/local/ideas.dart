@@ -42,6 +42,7 @@ class IdeasRepo {
         title: row['title'] as String,
         createdAt: DateTime.parse(row['created_at'] as String),
         updatedAt: DateTime.parse(row['updated_at'] as String),
+        lastOpenedSectionId: row['last_opened_section_id'] as String?,
         sections: sectionsByIdeaId[ideaId] ?? const [],
       );
     }).toList();
@@ -57,6 +58,7 @@ class IdeasRepo {
           'title': idea.title,
           'created_at': idea.createdAt.toIso8601String(),
           'updated_at': idea.updatedAt.toIso8601String(),
+          'last_opened_section_id': idea.lastOpenedSectionId,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -82,6 +84,19 @@ class IdeasRepo {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  Future<void> updateLastOpenedSectionId({
+    required String ideaId,
+    required String sectionId,
+  }) async {
+    final db = await _databaseManager.database;
+    await db.update(
+      IdeasDatabaseManager.ideasTable,
+      {'last_opened_section_id': sectionId},
+      where: 'id = ?',
+      whereArgs: [ideaId],
+    );
   }
 
   Future<void> deleteIdeas(Iterable<String> ideaIds) async {
@@ -112,6 +127,7 @@ class IdeasRepo {
             'title': idea.title,
             'created_at': idea.createdAt.toIso8601String(),
             'updated_at': idea.updatedAt.toIso8601String(),
+            'last_opened_section_id': idea.lastOpenedSectionId,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );

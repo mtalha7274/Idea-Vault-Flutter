@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../../models/backup/cloud_backup_account.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
 import '../../../models/idea.dart';
+import '../../../models/random_addition.dart';
 import 'cloud_backup_store.dart';
 import 'google_drive_backup_store.dart';
 import 'icloud_backup_store.dart';
@@ -32,8 +33,14 @@ class CloudBackupService {
     return _store.backupExists();
   }
 
-  Future<int> backUpIdeas(List<Idea> ideas) async {
-    final snapshot = CloudBackupSnapshot.fromIdeas(ideas);
+  Future<int> backUpIdeas(
+    List<Idea> ideas, {
+    List<RandomAddition> randomAdditions = const [],
+  }) async {
+    final snapshot = CloudBackupSnapshot.fromContent(
+      ideas: ideas,
+      randomAdditions: randomAdditions,
+    );
     final encoded = const JsonEncoder.withIndent('  ').convert(snapshot);
     return _store.writeBackup(encoded);
   }

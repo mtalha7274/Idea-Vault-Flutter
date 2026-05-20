@@ -7,10 +7,11 @@ class IdeasDatabaseManager {
   });
 
   static const String databaseName = 'idea_vault.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 3;
 
   static const String ideasTable = 'ideas';
   static const String sectionsTable = 'idea_sections';
+  static const String randomAdditionsTable = 'random_additions';
 
   final String? databasePath;
   Database? _database;
@@ -38,7 +39,8 @@ class IdeasDatabaseManager {
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            last_opened_section_id TEXT
           )
         ''');
 
@@ -62,10 +64,37 @@ class IdeasDatabaseManager {
           CREATE INDEX idx_ideas_updated_at
           ON $ideasTable (updated_at)
         ''');
+
+        await _createRandomAdditionsTable(db);
+      },
+      onUpgrade: (db, oldVersion, _) async {
+        if (oldVersion < 2) {
+          await _createRandomAdditionsTable(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            'ALTER TABLE $ideasTable ADD COLUMN last_opened_section_id TEXT',
+          );
+        }
       },
     );
 
     return _database!;
+  }
+
+  Future<void> _createRandomAdditionsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $randomAdditionsTable (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_random_additions_created_at
+      ON $randomAdditionsTable (created_at)
+    ''');
   }
 
   Future<void> close() async {

@@ -6,6 +6,7 @@ import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
 import '../../../models/backup/cloud_backup_state.dart';
 import '../../../models/idea.dart';
+import '../../../models/random_addition.dart';
 
 class CloudBackupProvider with ChangeNotifier {
   CloudBackupProvider(
@@ -69,9 +70,15 @@ class CloudBackupProvider with ChangeNotifier {
     }
   }
 
-  Future<void> backUpNow(List<Idea> ideas) async {
+  Future<void> backUpNow(
+    List<Idea> ideas, {
+    List<RandomAddition> randomAdditions = const [],
+  }) async {
     await _runBusy(() async {
-      final sizeBytes = await _backupService.backUpIdeas(ideas);
+      final sizeBytes = await _backupService.backUpIdeas(
+        ideas,
+        randomAdditions: randomAdditions,
+      );
       _state = _state.copyWith(
         lastBackupAt: DateTime.now(),
         lastBackupSizeBytes: sizeBytes,

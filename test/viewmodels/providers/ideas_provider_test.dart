@@ -89,6 +89,33 @@ void main() {
       );
     });
 
+    test('appends content to a section with a blank line separator', () async {
+      final provider = IdeasProvider(repo, editorStateRepo);
+      await provider.ensureLoaded();
+
+      final savedIdea = await provider.saveIdea(
+        title: 'Append target',
+        sections: [
+          const IdeaSection(
+            id: 'section-1',
+            name: 'Idea',
+            content: 'Existing content\n\n',
+          ),
+        ],
+      );
+
+      await provider.appendContentToSection(
+        ideaId: savedIdea!.id,
+        sectionId: 'section-1',
+        content: '  First dictated line\nSecond dictated line  ',
+      );
+
+      expect(
+        provider.ideas.single.sections.single.content,
+        'Existing content\n\nFirst dictated line\nSecond dictated line',
+      );
+    });
+
     test('keeps the list sorted by newest updatedAt', () async {
       final provider = IdeasProvider(repo, editorStateRepo);
       await provider.ensureLoaded();
@@ -139,6 +166,40 @@ void main() {
         savedIdea.sections.first.id,
       );
       expect(restoredProvider.resumeEditorState!.isPreviewMode, isTrue);
+    });
+
+    test('persists last opened section for an idea', () async {
+      final provider = IdeasProvider(repo, editorStateRepo);
+      await provider.ensureLoaded();
+
+      final savedIdea = await provider.saveIdea(
+        title: 'Resume section',
+        sections: const [
+          IdeaSection(
+            id: 'section-1',
+            name: 'Idea',
+            content: '',
+          ),
+          IdeaSection(
+            id: 'section-2',
+            name: 'Notes',
+            content: '',
+          ),
+        ],
+      );
+
+      await provider.saveLastOpenedSectionId(
+        ideaId: savedIdea!.id,
+        sectionId: 'section-2',
+      );
+
+      final restoredProvider = IdeasProvider(repo, editorStateRepo);
+      await restoredProvider.ensureLoaded();
+
+      expect(
+        restoredProvider.ideas.single.lastOpenedSectionId,
+        'section-2',
+      );
     });
   });
 }

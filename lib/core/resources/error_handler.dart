@@ -33,8 +33,8 @@ class ErrorHandler {
   }
 
   static void _showErrorInConsole<T>({
-    error,
-    stackTrace,
+    required Object error,
+    required StackTrace stackTrace,
   }) {
     printLog('$error\n$stackTrace');
   }

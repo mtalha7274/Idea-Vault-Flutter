@@ -8,12 +8,13 @@ Flutter with SQLite for local storage
 Firebase Functions (TypeScript) for backend
 Supabase for cloud backup (planned)
 Markdown editor with preview mode for section content
+OCR for image-to-text via camera or gallery (Google ML Kit Text Recognition, Latin script)
 Flutter native splash screen configured
 AI Feature — Organize Section: Firebase onCall function in functions/src/organizeSection.ts using OpenAI SDK pointed at OpenRouter. Currently using google/gemini-2.5-flash-lite model. Takes raw markdown section content, reorganizes grammar and structure, returns clean markdown. Secrets stored in Firebase Secret Manager as OPENROUTER_API_KEY. Local emulator uses .env.local file. Includes retry logic with exponential backoff, AbortController timeout, and input validation with 2000 character soft guidance.
 
-IdeaPreprocessor: Local Dart class that compresses section content before AI calls. Removes filler words, redundant words, normalizes whitespace, cleans punctuation, removes duplicate sentences using Jaccard similarity with stop word filtering. Achieves ~21% compression. Applied before sending content to Firebase function.
+Editor: Plain markdown editor with preview mode. Toolbar has Title, Bold, Italic, Bullet List, Code Block buttons. Auto-save implemented with 800ms debounce timer. Saves on dispose and app lifecycle pause. Save button replaced with subtle "Saved" checkmark indicator. OCR from camera or gallery inserts recognized text into the section at the cursor.
 
-Editor: Switched from Flutter Quill (bad experience) back to plain markdown editor with preview mode. Toolbar has Title, Bold, Italic, Bullet List, Code Block buttons. Auto-save implemented with 800ms debounce timer. Saves on dispose and app lifecycle pause. Save button replaced with subtle "Saved" checkmark indicator.
+Random additions: Quick-capture flow for stray thoughts before filing into an idea. Homepage shows a bottom pill composer (same widget as the dedicated screen) anchored with a solid background and fade so list content does not show through. Drawer entry below Backup & Restore opens lib/views/random_additions_screen.dart, which shows a reverse-ordered list of chat-style bubbles; tapping a bubble opens a bottom sheet to choose an idea and section, appends the text to that section, and deletes the addition.
 
 Bottom Sheet (more_vert icon in editor): Three options — Export for AI, Export to PDF, Delete Idea.
 

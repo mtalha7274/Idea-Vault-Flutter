@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/extensions/int.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
+import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
@@ -76,19 +77,23 @@ class _BackupRestorePromptBannerState extends State<BackupRestorePromptBanner> {
   }
 
   Future<void> _restore() async {
+    final backupProvider = context.read<CloudBackupProvider>();
+    final ideasProvider = context.read<IdeasProvider>();
+    final additionsProvider = context.read<RandomAdditionsProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _isRestoring = true);
     try {
-      final snapshot =
-          await context.read<CloudBackupProvider>().fetchRestoreSnapshot();
+      final snapshot = await backupProvider.fetchRestoreSnapshot();
       if (snapshot == null || !mounted) {
         return;
       }
-      await context.read<IdeasProvider>().replaceIdeas(snapshot.ideas);
+      await ideasProvider.replaceIdeas(snapshot.ideas);
+      await additionsProvider.replaceAdditions(snapshot.randomAdditions);
       if (!mounted) {
         return;
       }
-      context.read<CloudBackupProvider>().dismissRestorePrompt();
-      ScaffoldMessenger.of(context).showSnackBar(
+      backupProvider.dismissRestorePrompt();
+      messenger.showSnackBar(
         const SnackBar(content: Text('Backup restored.')),
       );
     } finally {

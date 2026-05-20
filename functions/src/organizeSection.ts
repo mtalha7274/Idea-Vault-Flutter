@@ -8,6 +8,9 @@ const RETRY_BACKOFF_MS = [1000, 2000, 4000];
 /** Per-attempt timeout for the chat completion HTTP request. */
 const COMPLETION_TIMEOUT_MS = 30_000;
 
+/** Maximum section content accepted by the app and backend. */
+const SECTION_CONTENT_MAX_CHARS = 4200;
+
 /** Lazily-built singleton so the same client is reused across warm
  *  invocations. */
 let openaiClient: OpenAI | undefined;
@@ -86,11 +89,11 @@ export const organizeSection = onCall(
         "Section content cannot be empty.",
       );
     }
-    if (sectionContent.length > 2000) {
+    if (sectionContent.length > SECTION_CONTENT_MAX_CHARS) {
       throw new HttpsError(
         "invalid-argument",
         "Section content exceeds the maximum allowed length of " +
-          "2000 characters.",
+          `${SECTION_CONTENT_MAX_CHARS} characters.`,
       );
     }
 
@@ -98,26 +101,45 @@ export const organizeSection = onCall(
       const systemPrompt = [
         "You are an AI writing assistant for Idea Vault, a productivity app.",
         "",
-        "Task: Reorganize and refine raw, unstructured markdown notes.",
+        "Task: Reorganize and refine raw, unstructured notes while " +
+          "strictly preserving the user's original formatting style.",
         "",
-        "Guidelines:",
+        "Editing guidelines:",
         "- Fix grammar, spelling, and punctuation errors",
         "- Improve sentence clarity and flow",
         "- Group related ideas together logically",
-        "- Use proper markdown formatting (headings, lists, emphasis)",
         "- Preserve all original ideas and key information",
         "- Maintain the user's voice, tone, and intent",
         "- Consolidate duplicate points if present",
         "- Break up run-on thoughts into clear, digestible points",
-        "- Keep content concise and coherent - avoid over-explaining or " +
-          "adding unnecessary elaboration",
+        "- Make any new wording coherent with the surrounding text",
+        "- Keep content concise - avoid over-explaining or adding " +
+          "unnecessary elaboration",
         "",
-        "Constraints:",
+        "Markdown formatting rules (STRICT):",
+        "- Preserve the user's existing markdown EXACTLY as they wrote " +
+          "it (headings with #, bold **text**, italic *text*, bullets " +
+          "with * or -, numbered lists, code blocks, blockquotes, etc.)",
+        "- Do NOT introduce any markdown formatting the user did not " +
+          "already use, except for the two cases below",
+        "- You MAY introduce a new bullet list using \"-\" (never \"*\" " +
+          "or \"+\") when grouping related items makes the content clearer",
+        "- You MAY introduce a numbered list (1., 2., 3.) only when the " +
+          "items have a meaningful order or sequence",
+        "- If a heading would help separate sections, write it as plain " +
+          "text on its own line followed by a blank line - do NOT use " +
+          "\"#\" markdown",
+        "- Do NOT introduce new bold (**) or italic (*) emphasis " +
+          "anywhere",
+        "- Do NOT wrap content in code blocks or blockquotes unless the " +
+          "user already did",
+        "",
+        "Content constraints:",
         "- Do NOT add new ideas, facts, or information",
         "- Do NOT remove meaningful content",
         "- Do NOT provide explanations or meta-commentary",
         "",
-        "Output: Return ONLY the reorganized markdown content.",
+        "Output: Return ONLY the reorganized content.",
       ].join("\n");
 
       const completion = await withOpenRouterRetry(async () => {

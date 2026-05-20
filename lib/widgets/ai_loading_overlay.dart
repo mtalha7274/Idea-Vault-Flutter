@@ -7,7 +7,19 @@ import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 class AiLoadingOverlay extends StatefulWidget {
-  const AiLoadingOverlay({super.key});
+  const AiLoadingOverlay({
+    super.key,
+    this.icon = Icons.auto_awesome,
+    this.statusMessages = const [
+      'Analyzing...',
+      'Organizing...',
+      'Refining...',
+      'Almost there...',
+    ],
+  });
+
+  final IconData icon;
+  final List<String> statusMessages;
 
   @override
   State<AiLoadingOverlay> createState() => _AiLoadingOverlayState();
@@ -21,13 +33,6 @@ class _AiLoadingOverlayState extends State<AiLoadingOverlay>
   late Animation<double> _fadeAnimation;
   Timer? _statusTimer;
   int _currentStatusIndex = 0;
-
-  final List<String> _statusMessages = [
-    'Analyzing...',
-    'Organizing...',
-    'Refining...',
-    'Almost there...',
-  ];
 
   @override
   void initState() {
@@ -59,7 +64,7 @@ class _AiLoadingOverlayState extends State<AiLoadingOverlay>
       if (mounted) {
         setState(() {
           _currentStatusIndex =
-              (_currentStatusIndex + 1) % _statusMessages.length;
+              (_currentStatusIndex + 1) % widget.statusMessages.length;
         });
       }
     });
@@ -101,7 +106,7 @@ class _AiLoadingOverlayState extends State<AiLoadingOverlay>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.auto_awesome,
+                      widget.icon,
                       size: 44,
                       color: theme.primary,
                     ),
@@ -123,7 +128,7 @@ class _AiLoadingOverlayState extends State<AiLoadingOverlay>
                     );
                   },
                   child: Text(
-                    _statusMessages[_currentStatusIndex],
+                    widget.statusMessages[_currentStatusIndex],
                     key: ValueKey<int>(_currentStatusIndex),
                     style: ideaVaultBody(
                       context,

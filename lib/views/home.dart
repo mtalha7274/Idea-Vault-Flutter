@@ -21,27 +21,44 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final paywallVm = context.read<PaywallViewModel>();
-      void tryShowStartupPaywall() {
-        if (!mounted || _startupPaywallHandled) {
-          return;
-        }
-        if (paywallVm.isLoading) {
-          return;
-        }
-        _startupPaywallHandled = true;
-        paywallVm.removeListener(tryShowStartupPaywall);
-        if (!paywallVm.isPro) {
-          unawaited(AppRouter.showPaywall(context));
-        }
-      }
-
-      paywallVm.addListener(tryShowStartupPaywall);
-      tryShowStartupPaywall();
+      unawaited(_scheduleStartupPaywall());
     });
+  }
+
+  Future<void> _waitForPaywallIdle(PaywallViewModel vm) async {
+    if (!vm.isLoading) {
+      return;
+    }
+    final completer = Completer<void>();
+    late VoidCallback listener;
+    listener = () {
+      if (!vm.isLoading) {
+        vm.removeListener(listener);
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      }
+    };
+    vm.addListener(listener);
+    await completer.future;
+  }
+
+  Future<void> _scheduleStartupPaywall() async {
+    if (!mounted) {
+      return;
+    }
+    final paywallVm = context.read<PaywallViewModel>();
+    await Future.wait<void>([
+      Future<void>.delayed(const Duration(milliseconds: 1000)),
+      _waitForPaywallIdle(paywallVm),
+    ]);
+    if (!mounted || _startupPaywallHandled) {
+      return;
+    }
+    _startupPaywallHandled = true;
+    if (!paywallVm.isPro) {
+      unawaited(AppRouter.showPaywall(context));
+    }
   }
 
   @override
