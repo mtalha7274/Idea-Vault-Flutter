@@ -17,6 +17,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
     this.textCapitalization = TextCapitalization.sentences,
     this.textInputAction,
     this.useShadow = false,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -29,6 +30,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
   final TextCapitalization textCapitalization;
   final TextInputAction? textInputAction;
   final bool useShadow;
+  final bool autofocus;
 
   @override
   State<IdeaVaultPillTextField> createState() => _IdeaVaultPillTextFieldState();
@@ -96,6 +98,7 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
                 key: widget.fieldKey,
                 controller: widget.controller,
                 focusNode: _focusNode,
+                autofocus: widget.autofocus,
                 minLines: widget.minLines,
                 maxLines: widget.maxLines,
                 textCapitalization: widget.textCapitalization,

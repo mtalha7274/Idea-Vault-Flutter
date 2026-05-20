@@ -43,6 +43,10 @@ void main() {
     setUp(() async {
       storage = MemoryLocalStorageManager();
       sortPreferencesRepo = IdeaListPreferencesRepo(storage);
+      if (sl.isRegistered<IdeaListPreferencesRepo>()) {
+        await sl.unregister<IdeaListPreferencesRepo>();
+      }
+      sl.registerSingleton<IdeaListPreferencesRepo>(sortPreferencesRepo);
       themeProvider = ThemeProvider(ThemeRepo(storage));
       provider = IdeasProvider(
         InMemoryIdeasRepo(),
@@ -639,6 +643,14 @@ void main() {
 
       await pumpIdeasApp(tester);
 
+      expect(find.byKey(const Key('ideas-search-field')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('ideas-search-button')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('search-ideas-screen')), findsOneWidget);
+      expect(find.byKey(const Key('search-ideas-empty-prompt')), findsOneWidget);
+
       await tester.enterText(
         find.byKey(const Key('ideas-search-field')),
         'rooftop',
@@ -655,6 +667,64 @@ void main() {
       await settleUi(tester);
 
       expect(find.text('homepageNoSearchResults'), findsOneWidget);
+    });
+
+    testWidgets('search screen uses the saved grid layout for results',
+        (tester) async {
+      late String firstIdeaId;
+      late String secondIdeaId;
+      await tester.runAsync(() async {
+        await sortPreferencesRepo.saveLayoutOption(IdeaLayoutOption.grid);
+        final firstIdea = await provider.saveIdea(
+          title: 'Grid search alpha',
+          sections: [
+            const IdeaSection(
+              id: 'grid-search-alpha',
+              name: 'Idea',
+              content: 'Alpha content for grid search layout test.',
+            ),
+          ],
+        );
+        firstIdeaId = firstIdea!.id;
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+        final secondIdea = await provider.saveIdea(
+          title: 'Grid search beta',
+          sections: [
+            const IdeaSection(
+              id: 'grid-search-beta',
+              name: 'Idea',
+              content: 'Beta content for grid search layout test.',
+            ),
+          ],
+        );
+        secondIdeaId = secondIdea!.id;
+      });
+
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-search-button')));
+      await settleUi(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('ideas-search-field')),
+        'grid search',
+      );
+      await settleUi(tester);
+
+      final firstCard = find.byKey(Key('idea-card-$firstIdeaId'));
+      final secondCard = find.byKey(Key('idea-card-$secondIdeaId'));
+
+      expect(firstCard, findsOneWidget);
+      expect(secondCard, findsOneWidget);
+      expect(
+        tester.getTopLeft(firstCard).dx,
+        greaterThan(tester.getTopLeft(secondCard).dx),
+      );
+      expect(
+        (tester.getTopLeft(firstCard).dy - tester.getTopLeft(secondCard).dy)
+            .abs(),
+        lessThan(1),
+      );
     });
 
     testWidgets('sorts ideas and remembers the selected preference',
@@ -686,7 +756,9 @@ void main() {
             tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy),
       );
 
-      await tester.tap(find.byKey(const Key('ideas-sort-button')));
+      await tester.tap(find.byKey(const Key('ideas-more-menu')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('ideas-menu-filter')));
       await settleUi(tester);
       await tester.tap(find.byKey(const Key('ideas-sort-most-sections')));
       await settlePersistenceAction(tester);
@@ -751,7 +823,9 @@ void main() {
         greaterThan(tester.getTopLeft(secondCard).dy),
       );
 
-      await tester.tap(find.byKey(const Key('ideas-layout-toggle')));
+      await tester.tap(find.byKey(const Key('ideas-more-menu')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('ideas-menu-layout')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 320));
 
@@ -777,7 +851,9 @@ void main() {
         lessThan(1),
       );
 
-      await tester.tap(find.byKey(const Key('ideas-layout-toggle')));
+      await tester.tap(find.byKey(const Key('ideas-more-menu')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(const Key('ideas-menu-layout')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 320));
 

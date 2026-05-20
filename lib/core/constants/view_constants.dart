@@ -161,6 +161,10 @@ class ViewConstants {
       'homepageIdeaCardUpdatedOnDate';
   static const String homepageSearchHint = 'homepageSearchHint';
   static const String homepageNoSearchResults = 'homepageNoSearchResults';
+  static const String homepageMenuChangeLayout = 'homepageMenuChangeLayout';
+  static const String homepageMenuFilter = 'homepageMenuFilter';
+  static const String searchIdeasScreenTitle = 'searchIdeasScreenTitle';
+  static const String searchIdeasEmptyPrompt = 'searchIdeasEmptyPrompt';
   static const String homepageIdeaCardPreviewPlaceholder =
       'homepageIdeaCardPreviewPlaceholder';
 
