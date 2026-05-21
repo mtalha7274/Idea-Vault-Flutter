@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/view_constants.dart';
 import '../core/extensions/int.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import 'premium_crown_icon.dart';
+import 'translated_text.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 const double _editorBodyTextSize = 17;
@@ -540,7 +540,25 @@ class _ToolbarOrganizeButton extends StatelessWidget {
               top: 3.d,
               left: 3.d,
               child: IgnorePointer(
-                child: PremiumCrownIcon(size: 16.d),
+                child: Container(
+                  width: 16.d,
+                  height: 16.d,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Colors.purple,
+                    shape: BoxShape.circle,
+                  ),
+                  child: TranslatedText(
+                    ViewConstants.organizeToolbarAiBadge,
+                    style: TextStyle(
+                      fontSize: 8.f,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      height: 1,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
