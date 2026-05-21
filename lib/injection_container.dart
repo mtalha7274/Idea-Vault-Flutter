@@ -16,6 +16,7 @@ import 'data/managers/remote/dio_api_manager.dart';
 import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/ideas.dart';
+import 'data/repositories/local/paid_feature_usage.dart';
 import 'data/repositories/local/random_additions.dart';
 import 'data/repositories/local/cloud_backup_settings.dart';
 import 'data/repositories/local/language.dart';
@@ -80,6 +81,8 @@ Future<void> initializeDependencies() async {
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CloudBackupSettingsRepo>(
       CloudBackupSettingsRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<PaidFeatureUsageRepo>(
+      PaidFeatureUsageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
@@ -105,7 +108,9 @@ Future<void> initializeDependencies() async {
   sl.registerFactory<PaywallViewModel>(() => PaywallViewModel(
         sl<SubscriptionService>(),
         sl<PaywallProvider>(),
+        sl<PaidFeatureUsageRepo>(),
         sl<CloudBackupSettingsRepo>(),
+        sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
       ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));

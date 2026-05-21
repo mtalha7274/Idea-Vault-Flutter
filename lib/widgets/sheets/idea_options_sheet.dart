@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../core/constants/view_constants.dart';
 import '../../viewmodels/providers/theme_provider.dart';
 import '../../views/ideas/idea_vault_theme.dart';
-import '../premium_crown_icon.dart';
 import '../translated_text.dart';
 
 Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
@@ -75,7 +74,7 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
                       children: [
                         _SheetOptionRow(
                           key: const Key('idea-editor-option-export-ai'),
-                          leading: PremiumCrownIcon(size: 20.d),
+                          icon: Icons.auto_awesome_rounded,
                           labelKey: ViewConstants.exportForAiScreenTitle,
                           iconBackgroundColor:
                               sheetTheme.primary.withValues(alpha: 0.12),

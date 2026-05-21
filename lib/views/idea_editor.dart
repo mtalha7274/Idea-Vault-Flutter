@@ -646,11 +646,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _onOrganizeToolbarPressed() async {
-    final hasAccess = await _ensurePremiumAccess(PremiumFeature.aiOrganize);
-    if (!hasAccess || !mounted) {
-      return;
-    }
-
     if (_contentPlainTextForEditing().trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -658,6 +653,22 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
         ),
       );
+      return;
+    }
+
+    if (_sectionExceedsAiMaxCharacterLimit) {
+      await showOrganizeSectionSheet(
+        context,
+        warningCharacterLimit: ideaSectionAiWarningCharacterLimit,
+        maxCharacterLimit: ideaSectionAiMaxCharacterLimit,
+        exceedsWarningLimit: _sectionExceedsAiWarningCharacterLimit,
+        exceedsMaxLimit: true,
+      );
+      return;
+    }
+
+    final hasAccess = await _ensurePremiumAccess(PremiumFeature.aiOrganize);
+    if (!hasAccess || !mounted) {
       return;
     }
 
@@ -934,12 +945,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Future<void> _handleMicSingleTap() async {
     if (_isListening) {
-      return;
-    }
-
-    final paywall = context.read<PaywallViewModel>();
-    if (!paywall.isPro) {
-      await AppRouter.showPaywall(context);
       return;
     }
 
@@ -1434,14 +1439,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     switch (action) {
       case IdeaEditorOptionsSheetAction.exportForAI:
-        if (await _ensurePremiumAccess(PremiumFeature.exportForAi)) {
-          await _openExportScreen(ExportMode.aiExport);
-        }
+        await _openExportScreen(ExportMode.aiExport);
         break;
       case IdeaEditorOptionsSheetAction.exportToPDF:
-        if (await _ensurePremiumAccess(PremiumFeature.exportPdf)) {
-          await _openExportScreen(ExportMode.pdfExport);
-        }
+        await _openExportScreen(ExportMode.pdfExport);
         break;
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();

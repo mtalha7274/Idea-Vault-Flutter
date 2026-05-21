@@ -4,6 +4,7 @@ class Config {
   static final bool debug = dotenv.env['DEBUG'] == 'true';
 
   static const bool bypassPaywall = false;
+  static final int paidFeatureFreeUsageLimit = Config.debug ? 3 : 50;
 
   // Themes
   static const String light = 'light';
