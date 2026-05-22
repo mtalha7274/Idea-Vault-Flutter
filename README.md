@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.3
+
+- Same build as **v1.0.2** — version bump only to publish updated **App Store screenshots**
+
 ## v1.0.2
 
 - **Homepage layout** refresh — cleaner header with **search** and **layout/filter** moved into dedicated controls
