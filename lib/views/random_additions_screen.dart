@@ -131,7 +131,7 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
                     16,
                     4,
                     16,
-                    MediaQuery.of(context).padding.bottom + 4,
+                    MediaQuery.of(context).padding.bottom + 8,
                   ),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 860),
@@ -496,11 +496,20 @@ class _IdeaPickerSheet extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (ideas.isEmpty) _NoIdeasForFiling(theme: theme),
                 ],
               ),
             ),
-            if (ideas.isNotEmpty)
+            if (ideas.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 20 + bottomInset),
+                  child: Center(
+                    child: _NoIdeasForFiling(theme: theme),
+                  ),
+                ),
+              )
+            else
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottomInset),
                 sliver: SliverList.separated(
@@ -637,9 +646,10 @@ class _NoIdeasForFiling extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       key: const Key('random-additions-no-ideas'),
-      padding: const EdgeInsets.fromLTRB(4, 24, 4, 28),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.lightbulb_outline_rounded,

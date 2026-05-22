@@ -544,7 +544,7 @@ class _ToolbarOrganizeButton extends StatelessWidget {
                   width: 16.d,
                   height: 16.d,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.purple,
                     shape: BoxShape.circle,
                   ),
