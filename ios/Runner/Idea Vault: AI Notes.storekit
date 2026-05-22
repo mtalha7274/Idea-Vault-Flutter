@@ -24,7 +24,7 @@
     "_developerTeamID" : "595NP5FM8M",
     "_disableDialogs" : false,
     "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 799497147.91750801,
+    "_lastSynchronizedDate" : 801079320.68484199,
     "_locale" : "en_US",
     "_renewalBillingIssuesEnabled" : false,
     "_storefront" : "USA",
@@ -37,7 +37,11 @@
     {
       "id" : "22065322",
       "localizations" : [
-
+        {
+          "description" : "",
+          "displayName" : "Idea Vault Pro",
+          "locale" : "en_US"
+        }
       ],
       "name" : "pro",
       "subscriptions" : [
@@ -84,7 +88,7 @@
           "internalID" : "6766045116",
           "introductoryOffer" : {
             "billingPlanType" : "BILLED_UPFRONT",
-            "internalID" : "536B75F4",
+            "internalID" : "AABA0C88",
             "numberOfPeriods" : 1,
             "paymentMode" : "free",
             "subscriptionPeriod" : "P3D"
@@ -92,7 +96,7 @@
           "introductoryOffers" : [
             {
               "billingPlanType" : "BILLED_UPFRONT",
-              "internalID" : "536B75F4",
+              "internalID" : "AABA0C88",
               "numberOfPeriods" : 1,
               "paymentMode" : "free",
               "subscriptionPeriod" : "P3D"

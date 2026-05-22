@@ -18,4 +18,5 @@ class AppAssets {
   static const String galleryButton = "$_icons/galleryButton.svg";
   static const String captureButton = "$_icons/captureButton.svg";
   static const String backButton = "$_icons/backButton.svg";
+  static const String crown = "$_icons/crown.png";
 }

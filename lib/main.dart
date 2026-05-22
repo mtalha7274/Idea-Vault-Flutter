@@ -8,6 +8,7 @@ import 'package:idea_vault/views/home.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'config/config.dart';
 import 'config/languages/language_config.dart';
 import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';
@@ -118,7 +119,7 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
     final themeProvider = context.watch<ThemeProvider>();
     return MaterialApp(
       navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: Config.debug,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,

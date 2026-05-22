@@ -118,6 +118,11 @@ homepageIdeaCardUpdatedYesterday,Updated yesterday
 homepageIdeaCardUpdatedOnDate,Updated {date}
 homepageSearchHint,Search ideas
 homepageNoSearchResults,No ideas match your search
+homepageMenuChangeLayout,Layout
+homepageMenuFilter,Filter
+searchIdeasScreenTitle,Search ideas
+searchIdeasEmptyTitle,Find an idea fast
+searchIdeasEmptyPrompt,Search by idea title or section content
 homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
 randomAdditionsTitle,Random Additions
 randomAdditionsCountOne,1 unfiled addition
@@ -127,7 +132,7 @@ randomAdditionsSendTooltip,Add random note
 randomAdditionsFileTooltip,File into an idea
 randomAdditionsEmptyTitle,No random additions yet
 randomAdditionsEmptySubtitle,Drop quick thoughts here and file them into ideas later.
-randomAdditionsChooseIdeaTitle,Choose idea
+randomAdditionsChooseIdeaTitle,Add note to idea
 randomAdditionsChooseSectionTitle,Choose section
 randomAdditionsAppendToSection,Append to this section
 randomAdditionsNoIdeasTitle,No ideas yet

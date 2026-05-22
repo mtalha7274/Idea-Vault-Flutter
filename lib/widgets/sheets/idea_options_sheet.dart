@@ -132,15 +132,20 @@ enum IdeaEditorOptionsSheetAction {
 class _SheetOptionRow extends StatelessWidget {
   const _SheetOptionRow({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.labelKey,
     required this.iconBackgroundColor,
     required this.iconColor,
     required this.labelColor,
     required this.onTap,
-  });
+  }) : assert(
+          (icon != null && leading == null) || (icon == null && leading != null),
+          'Exactly one of icon or leading must be set',
+        );
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String labelKey;
   final Color iconBackgroundColor;
   final Color iconColor;
@@ -160,7 +165,10 @@ class _SheetOptionRow extends StatelessWidget {
               SizedBox(
                 width: 38.d,
                 height: 38.d,
-                child: Icon(icon, size: 20.d, color: iconColor),
+                child: Center(
+                  child: leading ??
+                      Icon(icon, size: 20.d, color: iconColor),
+                ),
               ),
               Gap(2.d),
               Expanded(

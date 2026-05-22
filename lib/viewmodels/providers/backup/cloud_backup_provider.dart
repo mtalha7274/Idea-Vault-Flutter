@@ -48,6 +48,17 @@ class CloudBackupProvider with ChangeNotifier {
     });
   }
 
+  Future<void> disableCloudBackupForUsageLimit() async {
+    await _runBusy(() async {
+      try {
+        await _backupService.disconnect();
+      } catch (_) {}
+      await _scheduler.cancelDailyBackup();
+      _state = const CloudBackupState.initial();
+      await _settingsRepo.clear();
+    });
+  }
+
   Future<void> changeAccount() async {
     await _runBusy(() async {
       final account = await _backupService.connect(forceAccountPicker: true);
