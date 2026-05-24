@@ -11,7 +11,7 @@ class LightTheme implements BaseTheme {
   @override
   final Color onPrimary = const Color(0xFFFFFFFF);
   @override
-  final Color background = const Color(0xFFF4F6F5);
+  final Color background = const Color(0xFFF3F4F6);
   @override
   final Color primaryText = const Color(0xFF1A1C1E);
   @override
