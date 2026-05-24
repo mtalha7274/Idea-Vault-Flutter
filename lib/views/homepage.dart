@@ -86,7 +86,10 @@ class _HomepageState extends State<Homepage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: theme.background,
-      drawer: _HomeDrawer(hostContext: context),
+      drawer: _HomeDrawer(
+        hostContext: context,
+        onBackupPressed: _openBackupRestore,
+      ),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -133,8 +136,12 @@ class _HomepageState extends State<Homepage> {
                                       : _toggleLayoutOption,
                                 ),
                                 SizedBox(height: 18.h),
-                                if (_hasCloudBackupProvider(context))
+                                if (_hasCloudBackupProvider(context)) ...[
+                                  _BackupOffIndicator(
+                                    onTap: _openBackupRestore,
+                                  ),
                                   const BackupRestorePromptBanner(),
+                                ],
                               ],
                             ),
                           ),
@@ -320,6 +327,14 @@ class _HomepageState extends State<Homepage> {
     }
   }
 
+  PaywallViewModel? _maybePaywallViewModel(BuildContext context) {
+    try {
+      return context.read<PaywallViewModel>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
   void _handleIdeaTap(Idea idea) {
     if (_isSelectionMode) {
       _toggleIdeaSelection(idea.id);
@@ -361,6 +376,28 @@ class _HomepageState extends State<Homepage> {
     await AppRouter.push(
       context,
       const RandomAdditionsScreen(),
+    );
+  }
+
+  Future<void> _openBackupRestore() async {
+    if (!mounted) {
+      return;
+    }
+
+    final paywall = _maybePaywallViewModel(context);
+    if (paywall != null) {
+      final hasAccess = await paywall.ensureAccess(
+        context,
+        PremiumFeature.cloudBackup,
+      );
+      if (!hasAccess || !mounted) {
+        return;
+      }
+    }
+
+    await AppRouter.push(
+      context,
+      const BackupRestoreScreen(),
     );
   }
 
@@ -513,6 +550,95 @@ class _HomepageState extends State<Homepage> {
   }
 }
 
+class _BackupOffIndicator extends StatelessWidget {
+  const _BackupOffIndicator({
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final backupState = context.watch<CloudBackupProvider>().state;
+    if (backupState.enabled) {
+      return const SizedBox.shrink();
+    }
+
+    final isDarkMode = theme.themeData.brightness == Brightness.dark;
+    final indicatorColor = theme.warning.withValues(
+      alpha: isDarkMode ? 0.18 : 0.14,
+    );
+    final borderColor = theme.warning.withValues(
+      alpha: isDarkMode ? 0.38 : 0.32,
+    );
+    final foregroundColor = isDarkMode ? theme.warning : theme.primaryText;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 12.h),
+      child: Material(
+        key: const Key('homepage-backup-off-indicator'),
+        color: indicatorColor,
+        borderRadius: BorderRadius.circular(99),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(99),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: borderColor),
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(14.w, 10.h, 12.w, 10.h),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    color: foregroundColor,
+                    size: 20.d,
+                  ),
+                  Gap(10.w),
+                  Expanded(
+                    child: TranslatedText(
+                      ViewConstants.homepageBackupOffIndicator,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ideaVaultBody(
+                        context,
+                        size: 14,
+                        weight: FontWeight.w700,
+                        color: theme.primaryText,
+                      ),
+                    ),
+                  ),
+                  Gap(10.w),
+                  TranslatedText(
+                    ViewConstants.homepageBackupOffAction,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ideaVaultLabel(
+                      context,
+                      size: 13,
+                      weight: FontWeight.w800,
+                      color: foregroundColor,
+                    ),
+                  ),
+                  Gap(2.w),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: foregroundColor,
+                    size: 20.d,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HomepageFab extends StatelessWidget {
   const _HomepageFab({
     required this.isExtended,
@@ -613,9 +739,11 @@ class _HomepageFab extends StatelessWidget {
 class _HomeDrawer extends StatelessWidget {
   const _HomeDrawer({
     required this.hostContext,
+    required this.onBackupPressed,
   });
 
   final BuildContext hostContext;
+  final Future<void> Function() onBackupPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -663,19 +791,10 @@ class _HomeDrawer extends StatelessWidget {
               ),
               onTap: () async {
                 Navigator.of(context).pop();
-                if (paywall != null) {
-                  final hasAccess = await paywall.ensureAccess(
-                    hostContext,
-                    PremiumFeature.cloudBackup,
-                  );
-                  if (!hasAccess || !hostContext.mounted) {
-                    return;
-                  }
+                if (!hostContext.mounted) {
+                  return;
                 }
-                AppRouter.push(
-                  hostContext,
-                  const BackupRestoreScreen(),
-                );
+                await onBackupPressed();
               },
             ),
             ListTile(
@@ -788,6 +907,10 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final iconBackgroundColor =
+        theme.themeData.brightness == Brightness.light
+            ? theme.surfaceHigh
+            : theme.surfaceLow;
     final menuItemBodyStyle = ideaVaultBody(
       context,
       size: 15,
@@ -831,7 +954,7 @@ class _Header extends StatelessWidget {
                 key: const Key('ideas-delete-button'),
                 onPressed: onDeletePressed,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -859,7 +982,7 @@ class _Header extends StatelessWidget {
                 key: const Key('ideas-search-button'),
                 onPressed: onSearchPressed,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding: const EdgeInsets.all(12),
                 ),
@@ -869,9 +992,10 @@ class _Header extends StatelessWidget {
               PopupMenuButton<_HomepageMenuAction>(
                 key: const Key('ideas-more-menu'),
                 icon: const Icon(Icons.more_vert),
+                color: theme.surface,
                 padding: EdgeInsets.zero,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding: const EdgeInsets.all(12),
                 ),

@@ -132,7 +132,10 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
+    final themeProvider = context.watch<ThemeProvider>();
+    final theme = themeProvider.baseTheme;
+    final hintColor = theme.textMuted;
+    const hintWeight = FontWeight.w600;
     final borderColor = _focusNode.hasFocus
         ? theme.primary.withValues(alpha: 0.6)
         : theme.primary.withValues(alpha: 0.2);
@@ -192,8 +195,8 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
                       hintStyle: ideaVaultBody(
                         context,
                         size: 15,
-                        weight: FontWeight.w500,
-                        color: theme.outline,
+                        weight: hintWeight,
+                        color: hintColor,
                       ),
                     ),
                     style: ideaVaultBody(

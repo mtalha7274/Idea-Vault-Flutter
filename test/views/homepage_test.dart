@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
+import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
+import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
 import 'package:idea_vault/data/repositories/remote/idea_organization_repository.dart';
 import 'package:idea_vault/injection_container.dart';
+import 'package:idea_vault/models/backup/cloud_backup_account.dart';
+import 'package:idea_vault/models/backup/cloud_backup_state.dart';
 import 'package:idea_vault/main.dart' show navigatorKey;
 import 'package:idea_vault/models/idea.dart';
+import 'package:idea_vault/viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
 import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
@@ -76,7 +82,10 @@ void main() {
       await settleUi(tester);
     }
 
-    Future<void> pumpIdeasApp(WidgetTester tester) async {
+    Future<void> pumpIdeasApp(
+      WidgetTester tester, {
+      CloudBackupProvider? backupProvider,
+    }) async {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -84,6 +93,10 @@ void main() {
             ChangeNotifierProvider<RandomAdditionsProvider>.value(
               value: randomAdditionsProvider,
             ),
+            if (backupProvider != null)
+              ChangeNotifierProvider<CloudBackupProvider>.value(
+                value: backupProvider,
+              ),
             ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
           ],
           child: MaterialApp(
@@ -105,6 +118,14 @@ void main() {
       await settleUi(tester);
     }
 
+    CloudBackupProvider buildCloudBackupProvider() {
+      return CloudBackupProvider(
+        CloudBackupSettingsRepo(storage),
+        _FakeCloudBackupService(),
+        _FakeCloudBackupScheduler(),
+      );
+    }
+
     Finder sectionTab(IdeaSection section) {
       return find.byKey(Key('idea-editor-section-tab-${section.id}'));
     }
@@ -121,6 +142,45 @@ void main() {
 
       expect(find.byKey(const Key('ideas-empty-state')), findsOneWidget);
       expect(find.byKey(const Key('ideas-fab')), findsOneWidget);
+    });
+
+    testWidgets('hides backup-off indicator without backup provider',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('shows backup-off indicator when backup is disabled',
+        (tester) async {
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsOneWidget,
+      );
+      expect(find.text('homepageBackupOffIndicator'), findsOneWidget);
+      expect(find.text('homepageBackupOffAction'), findsOneWidget);
+    });
+
+    testWidgets('hides backup-off indicator when backup is enabled',
+        (tester) async {
+      await CloudBackupSettingsRepo(storage).saveState(
+        const CloudBackupState.initial().copyWith(
+          enabled: true,
+          email: 'writer@example.com',
+        ),
+      );
+
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsNothing,
+      );
     });
 
     testWidgets('opens the editor from the fab', (tester) async {
@@ -649,7 +709,8 @@ void main() {
       await settleUi(tester);
 
       expect(find.byKey(const Key('search-ideas-screen')), findsOneWidget);
-      expect(find.byKey(const Key('search-ideas-empty-prompt')), findsOneWidget);
+      expect(
+          find.byKey(const Key('search-ideas-empty-prompt')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const Key('ideas-search-field')),
@@ -1191,6 +1252,30 @@ void main() {
       expect(provider.ideas.single.title, 'Failure recovered');
     });
   });
+}
+
+class _FakeCloudBackupService extends CloudBackupService {
+  @override
+  Future<bool> backupExists() async => false;
+
+  @override
+  Future<CloudBackupAccount?> connect({bool forceAccountPicker = false}) async {
+    return const CloudBackupAccount(
+      email: 'writer@example.com',
+      provider: 'test',
+    );
+  }
+
+  @override
+  Future<void> disconnect() async {}
+}
+
+class _FakeCloudBackupScheduler extends CloudBackupScheduler {
+  @override
+  Future<void> cancelDailyBackup() async {}
+
+  @override
+  Future<void> scheduleDailyBackup() async {}
 }
 
 class _FailingIdeasRepo extends InMemoryIdeasRepo {

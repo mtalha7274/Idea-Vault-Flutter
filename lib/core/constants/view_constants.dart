@@ -148,6 +148,8 @@ class ViewConstants {
   static const String homepageSwitchToListTooltip =
       'homepageSwitchToListTooltip';
   static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
+  static const String homepageBackupOffIndicator = 'homepageBackupOffIndicator';
+  static const String homepageBackupOffAction = 'homepageBackupOffAction';
   static const String homepageEmptyTitle = 'homepageEmptyTitle';
   static const String homepageEmptySubtitle = 'homepageEmptySubtitle';
   static const String homepageIdeaCardOneSection = 'homepageIdeaCardOneSection';

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.4
+
+- **Search** and **quick-capture** hints are easier to read
+- **Backup off** indicator added on the homepage
+- **Rate app** prompt now checks during the middle of free **Pro feature** usage
+- **Paywall** feature copy now labels speech and image text tools as **AI**
+
 ## v1.0.3
 
 - Same build as **v1.0.2** — version bump only to publish updated **App Store screenshots**
