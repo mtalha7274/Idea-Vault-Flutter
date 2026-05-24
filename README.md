@@ -4,6 +4,7 @@
 
 - **Search** and **quick-capture** hints are easier to read
 - **Backup off** indicator added on the homepage
+- **Free Pro uses** gift intro and drawer progress added for new users
 - **Rate app** prompt now checks during the middle of free **Pro feature** usage
 - **Paywall** feature copy now labels speech and image text tools as **AI**
 

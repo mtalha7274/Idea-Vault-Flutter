@@ -111,6 +111,15 @@ homepageSwitchToListTooltip,Switch to list view
 homepageGetIdeaVaultPro,Get Idea Vault Pro
 homepageBackupOffIndicator,Backup is off
 homepageBackupOffAction,Turn on
+freeUsageDrawerTitle,Free Pro uses
+freeUsageScreenTitle,Your free Pro uses are ready
+freeUsageScreenBody,Try Idea Vault Pro features with free uses before you choose whether to upgrade.
+freeUsageScreenAction,Start creating
+freeUsageScreenDrawerTitle,Enjoy your free Pro usage
+freeUsageScreenDrawerBody,Keep trying Pro features with your remaining free usage before deciding whether to upgrade.
+freeUsageScreenDrawerAction,Continue
+freeUsageCurrentUsageTitle,Current Pro usage
+freeUsageProgressSemantic,{used} of {limit} free Pro uses used
 homepageEmptyTitle,Nothing saved yet
 homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
 homepageIdeaCardOneSection,1 section

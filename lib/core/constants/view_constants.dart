@@ -150,6 +150,16 @@ class ViewConstants {
   static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
   static const String homepageBackupOffIndicator = 'homepageBackupOffIndicator';
   static const String homepageBackupOffAction = 'homepageBackupOffAction';
+  static const String freeUsageDrawerTitle = 'freeUsageDrawerTitle';
+  static const String freeUsageScreenTitle = 'freeUsageScreenTitle';
+  static const String freeUsageScreenBody = 'freeUsageScreenBody';
+  static const String freeUsageScreenAction = 'freeUsageScreenAction';
+  static const String freeUsageScreenDrawerTitle = 'freeUsageScreenDrawerTitle';
+  static const String freeUsageScreenDrawerBody = 'freeUsageScreenDrawerBody';
+  static const String freeUsageScreenDrawerAction =
+      'freeUsageScreenDrawerAction';
+  static const String freeUsageCurrentUsageTitle = 'freeUsageCurrentUsageTitle';
+  static const String freeUsageProgressSemantic = 'freeUsageProgressSemantic';
   static const String homepageEmptyTitle = 'homepageEmptyTitle';
   static const String homepageEmptySubtitle = 'homepageEmptySubtitle';
   static const String homepageIdeaCardOneSection = 'homepageIdeaCardOneSection';

@@ -5,8 +5,11 @@ import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
 
+import '../config/config.dart';
 import '../config/router/app_router.dart';
+import '../core/constants/app_assets.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
+import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/premium/premium_feature.dart';
@@ -17,11 +20,13 @@ import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/free_usage_progress_ring.dart';
 import '../widgets/ideas/ideas_layout.dart';
 import '../widgets/premium_crown_icon.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
+import 'free_usage_screen.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 import 'random_additions_screen.dart';
@@ -50,6 +55,7 @@ class _HomepageState extends State<Homepage> {
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
 
   bool _didHandleResume = false;
+  bool _didCheckFreeUsageIntro = false;
   bool _isQuickAdditionMultiline = false;
   late IdeaSortOption _sortOption;
   late IdeaLayoutOption _layoutOption;
@@ -65,8 +71,7 @@ class _HomepageState extends State<Homepage> {
     _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _quickAdditionController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _resumeEditorIfNeeded();
-      _checkFreshInstallBackup();
+      _handleInitialHomeEffects();
     });
   }
 
@@ -267,6 +272,18 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
+  Future<void> _handleInitialHomeEffects() async {
+    await _resumeEditorIfNeeded();
+    if (!mounted) {
+      return;
+    }
+    await _checkFreshInstallBackup();
+    if (!mounted) {
+      return;
+    }
+    await _showFreeUsageIntroIfNeeded();
+  }
+
   Future<void> _resumeEditorIfNeeded() async {
     if (_didHandleResume || !mounted) {
       return;
@@ -333,6 +350,55 @@ class _HomepageState extends State<Homepage> {
     } on ProviderNotFoundException {
       return null;
     }
+  }
+
+  Future<void> _showFreeUsageIntroIfNeeded() async {
+    if (_didCheckFreeUsageIntro || !mounted) {
+      return;
+    }
+    _didCheckFreeUsageIntro = true;
+
+    final paywall = _maybePaywallViewModel(context);
+    final usageRepo = _maybePaidFeatureUsageRepo();
+    if (paywall == null ||
+        usageRepo == null ||
+        usageRepo.usageCount != 0 ||
+        usageRepo.hasFreeUsageIntroMetadata) {
+      return;
+    }
+
+    if (!paywall.isPro && paywall.isLoading) {
+      try {
+        await paywall.refreshSubscription();
+      } catch (_) {}
+    }
+    if (!mounted || paywall.isPro) {
+      return;
+    }
+
+    final ideasProvider = context.read<IdeasProvider>();
+    final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+    await ideasProvider.ensureLoaded();
+    await randomAdditionsProvider.ensureLoaded();
+    if (!mounted ||
+        ideasProvider.ideas.isNotEmpty ||
+        randomAdditionsProvider.additions.isNotEmpty) {
+      return;
+    }
+
+    await usageRepo.initializeFreeUsageGrantIfNeeded();
+    await usageRepo.markFreeUsageIntroSeen();
+    if (!mounted) {
+      return;
+    }
+
+    await AppRouter.push(
+      context,
+      FreeUsageScreen(
+        usageCount: usageRepo.usageCount,
+        usageLimit: Config.paidFeatureFreeUsageLimit,
+      ),
+    );
   }
 
   void _handleIdeaTap(Idea idea) {
@@ -749,6 +815,12 @@ class _HomeDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final paywall = _maybePaywallViewModel(context);
+    final usageRepo = _maybePaidFeatureUsageRepo();
+    final showFreeUsageRow = paywall != null &&
+        !paywall.isPro &&
+        usageRepo != null &&
+        !usageRepo.hasReachedFreeLimit;
+    final showProRow = paywall != null && !paywall.isPro && !showFreeUsageRow;
     final randomAdditionCount =
         context.watch<RandomAdditionsProvider>().additions.length;
     return Drawer(
@@ -757,7 +829,12 @@ class _HomeDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (paywall != null && !paywall.isPro)
+            if (showFreeUsageRow)
+              _FreeUsageDrawerTile(
+                usageRepo: usageRepo,
+                hostContext: hostContext,
+              )
+            else if (showProRow)
               ListTile(
                 leading: PremiumCrownIcon(size: 24.d),
                 title: TranslatedText(
@@ -883,6 +960,71 @@ class _HomeDrawer extends StatelessWidget {
   }
 }
 
+class _FreeUsageDrawerTile extends StatelessWidget {
+  const _FreeUsageDrawerTile({
+    required this.usageRepo,
+    required this.hostContext,
+  });
+
+  final PaidFeatureUsageRepo usageRepo;
+  final BuildContext hostContext;
+
+  @override
+  Widget build(BuildContext context) {
+    final usageLimit = Config.paidFeatureFreeUsageLimit;
+    final progress = usageLimit <= 0 ? 1.0 : usageRepo.usageCount / usageLimit;
+
+    return ListTile(
+      key: const Key('homepage-free-usage-drawer'),
+      leading: Image.asset(
+        AppAssets.gift,
+        width: 24.d,
+        height: 24.d,
+      ),
+      title: TranslatedText(
+        ViewConstants.freeUsageDrawerTitle,
+        style: ideaVaultBody(
+          context,
+          size: 16,
+          weight: FontWeight.w700,
+        ),
+      ),
+      trailing: FreeUsageProgressRing(
+        progress: progress,
+        size: 20.d,
+        strokeWidth: 2.4,
+        semanticLabel: ViewConstants.freeUsageProgressSemantic.tr(
+          namedArgs: {
+            'used': usageRepo.usageCount.toString(),
+            'limit': usageLimit.toString(),
+          },
+        ),
+      ),
+      onTap: () {
+        Navigator.of(context).pop();
+        if (!hostContext.mounted) {
+          return;
+        }
+        AppRouter.push(
+          hostContext,
+          FreeUsageScreen(
+            usageCount: usageRepo.usageCount,
+            usageLimit: usageLimit,
+            animationCompleted: true,
+          ),
+        );
+      },
+    );
+  }
+}
+
+PaidFeatureUsageRepo? _maybePaidFeatureUsageRepo() {
+  if (!sl.isRegistered<PaidFeatureUsageRepo>()) {
+    return null;
+  }
+  return sl<PaidFeatureUsageRepo>();
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.ideaCount,
@@ -907,10 +1049,9 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    final iconBackgroundColor =
-        theme.themeData.brightness == Brightness.light
-            ? theme.surfaceHigh
-            : theme.surfaceLow;
+    final iconBackgroundColor = theme.themeData.brightness == Brightness.light
+        ? theme.surfaceHigh
+        : theme.surfaceLow;
     final menuItemBodyStyle = ideaVaultBody(
       context,
       size: 15,
