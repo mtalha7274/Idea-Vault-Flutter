@@ -5,8 +5,11 @@ import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:provider/provider.dart';
 
+import '../config/config.dart';
 import '../config/router/app_router.dart';
+import '../core/constants/app_assets.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
+import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/premium/premium_feature.dart';
@@ -17,11 +20,13 @@ import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/free_usage_progress_ring.dart';
 import '../widgets/ideas/ideas_layout.dart';
 import '../widgets/premium_crown_icon.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
+import 'free_usage_screen.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
 import 'random_additions_screen.dart';
@@ -50,6 +55,7 @@ class _HomepageState extends State<Homepage> {
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
 
   bool _didHandleResume = false;
+  bool _didCheckFreeUsageIntro = false;
   bool _isQuickAdditionMultiline = false;
   late IdeaSortOption _sortOption;
   late IdeaLayoutOption _layoutOption;
@@ -65,8 +71,7 @@ class _HomepageState extends State<Homepage> {
     _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _quickAdditionController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _resumeEditorIfNeeded();
-      _checkFreshInstallBackup();
+      _handleInitialHomeEffects();
     });
   }
 
@@ -86,7 +91,10 @@ class _HomepageState extends State<Homepage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: theme.background,
-      drawer: _HomeDrawer(hostContext: context),
+      drawer: _HomeDrawer(
+        hostContext: context,
+        onBackupPressed: _openBackupRestore,
+      ),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -133,8 +141,12 @@ class _HomepageState extends State<Homepage> {
                                       : _toggleLayoutOption,
                                 ),
                                 SizedBox(height: 18.h),
-                                if (_hasCloudBackupProvider(context))
+                                if (_hasCloudBackupProvider(context)) ...[
+                                  _BackupOffIndicator(
+                                    onTap: _openBackupRestore,
+                                  ),
                                   const BackupRestorePromptBanner(),
+                                ],
                               ],
                             ),
                           ),
@@ -260,6 +272,18 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
+  Future<void> _handleInitialHomeEffects() async {
+    await _resumeEditorIfNeeded();
+    if (!mounted) {
+      return;
+    }
+    await _checkFreshInstallBackup();
+    if (!mounted) {
+      return;
+    }
+    await _showFreeUsageIntroIfNeeded();
+  }
+
   Future<void> _resumeEditorIfNeeded() async {
     if (_didHandleResume || !mounted) {
       return;
@@ -320,6 +344,63 @@ class _HomepageState extends State<Homepage> {
     }
   }
 
+  PaywallViewModel? _maybePaywallViewModel(BuildContext context) {
+    try {
+      return context.read<PaywallViewModel>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  Future<void> _showFreeUsageIntroIfNeeded() async {
+    if (_didCheckFreeUsageIntro || !mounted) {
+      return;
+    }
+    _didCheckFreeUsageIntro = true;
+
+    final paywall = _maybePaywallViewModel(context);
+    final usageRepo = _maybePaidFeatureUsageRepo();
+    if (paywall == null ||
+        usageRepo == null ||
+        usageRepo.usageCount != 0 ||
+        usageRepo.hasFreeUsageIntroMetadata) {
+      return;
+    }
+
+    if (!paywall.isPro && paywall.isLoading) {
+      try {
+        await paywall.refreshSubscription();
+      } catch (_) {}
+    }
+    if (!mounted || paywall.isPro) {
+      return;
+    }
+
+    final ideasProvider = context.read<IdeasProvider>();
+    final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+    await ideasProvider.ensureLoaded();
+    await randomAdditionsProvider.ensureLoaded();
+    if (!mounted ||
+        ideasProvider.ideas.isNotEmpty ||
+        randomAdditionsProvider.additions.isNotEmpty) {
+      return;
+    }
+
+    await usageRepo.initializeFreeUsageGrantIfNeeded();
+    await usageRepo.markFreeUsageIntroSeen();
+    if (!mounted) {
+      return;
+    }
+
+    await AppRouter.push(
+      context,
+      FreeUsageScreen(
+        usageCount: usageRepo.usageCount,
+        usageLimit: Config.paidFeatureFreeUsageLimit,
+      ),
+    );
+  }
+
   void _handleIdeaTap(Idea idea) {
     if (_isSelectionMode) {
       _toggleIdeaSelection(idea.id);
@@ -361,6 +442,28 @@ class _HomepageState extends State<Homepage> {
     await AppRouter.push(
       context,
       const RandomAdditionsScreen(),
+    );
+  }
+
+  Future<void> _openBackupRestore() async {
+    if (!mounted) {
+      return;
+    }
+
+    final paywall = _maybePaywallViewModel(context);
+    if (paywall != null) {
+      final hasAccess = await paywall.ensureAccess(
+        context,
+        PremiumFeature.cloudBackup,
+      );
+      if (!hasAccess || !mounted) {
+        return;
+      }
+    }
+
+    await AppRouter.push(
+      context,
+      const BackupRestoreScreen(),
     );
   }
 
@@ -513,6 +616,95 @@ class _HomepageState extends State<Homepage> {
   }
 }
 
+class _BackupOffIndicator extends StatelessWidget {
+  const _BackupOffIndicator({
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final backupState = context.watch<CloudBackupProvider>().state;
+    if (backupState.enabled) {
+      return const SizedBox.shrink();
+    }
+
+    final isDarkMode = theme.themeData.brightness == Brightness.dark;
+    final indicatorColor = theme.warning.withValues(
+      alpha: isDarkMode ? 0.18 : 0.14,
+    );
+    final borderColor = theme.warning.withValues(
+      alpha: isDarkMode ? 0.38 : 0.32,
+    );
+    final foregroundColor = isDarkMode ? theme.warning : theme.primaryText;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 12.h),
+      child: Material(
+        key: const Key('homepage-backup-off-indicator'),
+        color: indicatorColor,
+        borderRadius: BorderRadius.circular(99),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(99),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: borderColor),
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(14.w, 10.h, 12.w, 10.h),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    color: foregroundColor,
+                    size: 20.d,
+                  ),
+                  Gap(10.w),
+                  Expanded(
+                    child: TranslatedText(
+                      ViewConstants.homepageBackupOffIndicator,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ideaVaultBody(
+                        context,
+                        size: 14,
+                        weight: FontWeight.w700,
+                        color: theme.primaryText,
+                      ),
+                    ),
+                  ),
+                  Gap(10.w),
+                  TranslatedText(
+                    ViewConstants.homepageBackupOffAction,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ideaVaultLabel(
+                      context,
+                      size: 13,
+                      weight: FontWeight.w800,
+                      color: foregroundColor,
+                    ),
+                  ),
+                  Gap(2.w),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: foregroundColor,
+                    size: 20.d,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HomepageFab extends StatelessWidget {
   const _HomepageFab({
     required this.isExtended,
@@ -613,14 +805,22 @@ class _HomepageFab extends StatelessWidget {
 class _HomeDrawer extends StatelessWidget {
   const _HomeDrawer({
     required this.hostContext,
+    required this.onBackupPressed,
   });
 
   final BuildContext hostContext;
+  final Future<void> Function() onBackupPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final paywall = _maybePaywallViewModel(context);
+    final usageRepo = _maybePaidFeatureUsageRepo();
+    final showFreeUsageRow = paywall != null &&
+        !paywall.isPro &&
+        usageRepo != null &&
+        !usageRepo.hasReachedFreeLimit;
+    final showProRow = paywall != null && !paywall.isPro && !showFreeUsageRow;
     final randomAdditionCount =
         context.watch<RandomAdditionsProvider>().additions.length;
     return Drawer(
@@ -629,7 +829,12 @@ class _HomeDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (paywall != null && !paywall.isPro)
+            if (showFreeUsageRow)
+              _FreeUsageDrawerTile(
+                usageRepo: usageRepo,
+                hostContext: hostContext,
+              )
+            else if (showProRow)
               ListTile(
                 leading: PremiumCrownIcon(size: 24.d),
                 title: TranslatedText(
@@ -663,19 +868,10 @@ class _HomeDrawer extends StatelessWidget {
               ),
               onTap: () async {
                 Navigator.of(context).pop();
-                if (paywall != null) {
-                  final hasAccess = await paywall.ensureAccess(
-                    hostContext,
-                    PremiumFeature.cloudBackup,
-                  );
-                  if (!hasAccess || !hostContext.mounted) {
-                    return;
-                  }
+                if (!hostContext.mounted) {
+                  return;
                 }
-                AppRouter.push(
-                  hostContext,
-                  const BackupRestoreScreen(),
-                );
+                await onBackupPressed();
               },
             ),
             ListTile(
@@ -764,6 +960,71 @@ class _HomeDrawer extends StatelessWidget {
   }
 }
 
+class _FreeUsageDrawerTile extends StatelessWidget {
+  const _FreeUsageDrawerTile({
+    required this.usageRepo,
+    required this.hostContext,
+  });
+
+  final PaidFeatureUsageRepo usageRepo;
+  final BuildContext hostContext;
+
+  @override
+  Widget build(BuildContext context) {
+    final usageLimit = Config.paidFeatureFreeUsageLimit;
+    final progress = usageLimit <= 0 ? 1.0 : usageRepo.usageCount / usageLimit;
+
+    return ListTile(
+      key: const Key('homepage-free-usage-drawer'),
+      leading: Image.asset(
+        AppAssets.gift,
+        width: 24.d,
+        height: 24.d,
+      ),
+      title: TranslatedText(
+        ViewConstants.freeUsageDrawerTitle,
+        style: ideaVaultBody(
+          context,
+          size: 16,
+          weight: FontWeight.w700,
+        ),
+      ),
+      trailing: FreeUsageProgressRing(
+        progress: progress,
+        size: 20.d,
+        strokeWidth: 2.4,
+        semanticLabel: ViewConstants.freeUsageProgressSemantic.tr(
+          namedArgs: {
+            'used': usageRepo.usageCount.toString(),
+            'limit': usageLimit.toString(),
+          },
+        ),
+      ),
+      onTap: () {
+        Navigator.of(context).pop();
+        if (!hostContext.mounted) {
+          return;
+        }
+        AppRouter.push(
+          hostContext,
+          FreeUsageScreen(
+            usageCount: usageRepo.usageCount,
+            usageLimit: usageLimit,
+            animationCompleted: true,
+          ),
+        );
+      },
+    );
+  }
+}
+
+PaidFeatureUsageRepo? _maybePaidFeatureUsageRepo() {
+  if (!sl.isRegistered<PaidFeatureUsageRepo>()) {
+    return null;
+  }
+  return sl<PaidFeatureUsageRepo>();
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.ideaCount,
@@ -788,6 +1049,9 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final iconBackgroundColor = theme.themeData.brightness == Brightness.light
+        ? theme.surfaceHigh
+        : theme.surfaceLow;
     final menuItemBodyStyle = ideaVaultBody(
       context,
       size: 15,
@@ -831,7 +1095,7 @@ class _Header extends StatelessWidget {
                 key: const Key('ideas-delete-button'),
                 onPressed: onDeletePressed,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -859,7 +1123,7 @@ class _Header extends StatelessWidget {
                 key: const Key('ideas-search-button'),
                 onPressed: onSearchPressed,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding: const EdgeInsets.all(12),
                 ),
@@ -869,9 +1133,10 @@ class _Header extends StatelessWidget {
               PopupMenuButton<_HomepageMenuAction>(
                 key: const Key('ideas-more-menu'),
                 icon: const Icon(Icons.more_vert),
+                color: theme.surface,
                 padding: EdgeInsets.zero,
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.surfaceLow,
+                  backgroundColor: iconBackgroundColor,
                   foregroundColor: theme.primary,
                   padding: const EdgeInsets.all(12),
                 ),
