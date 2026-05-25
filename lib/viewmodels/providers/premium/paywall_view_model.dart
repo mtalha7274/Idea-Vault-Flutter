@@ -7,6 +7,7 @@ import '../../../core/services/backup/cloud_backup_scheduler.dart';
 import '../../../core/services/backup/cloud_backup_service.dart';
 import '../../../core/services/premium/paywall_provider.dart';
 import '../../../core/services/premium/subscription_service.dart';
+import '../../../core/services/rate_app.dart';
 import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../data/repositories/local/paid_feature_usage.dart';
 import '../../../models/premium/paywall_offering.dart';
@@ -15,6 +16,7 @@ import '../../../models/premium/subscription_state.dart';
 import '../backup/cloud_backup_provider.dart';
 
 typedef ShowPaywall = Future<bool> Function(BuildContext context);
+typedef RequestRateAppReview = Future<bool> Function();
 
 class PaywallViewModel with ChangeNotifier {
   PaywallViewModel(
@@ -25,7 +27,9 @@ class PaywallViewModel with ChangeNotifier {
     this._backupService,
     this._backupScheduler, {
     ShowPaywall? showPaywall,
+    RequestRateAppReview? requestRateAppReview,
   })  : _showPaywall = showPaywall ?? AppRouter.showPaywall,
+        _requestRateAppReview = requestRateAppReview ?? rateApp,
         _subscriptionState = const SubscriptionState.initial() {
     _subscriptionService.addListener(_handleSubscriptionStateChanged);
   }
@@ -37,6 +41,7 @@ class PaywallViewModel with ChangeNotifier {
   final CloudBackupService _backupService;
   final CloudBackupScheduler _backupScheduler;
   final ShowPaywall _showPaywall;
+  final RequestRateAppReview _requestRateAppReview;
 
   SubscriptionState _subscriptionState;
   PaywallOffering? _offering;
@@ -97,6 +102,7 @@ class PaywallViewModel with ChangeNotifier {
 
     if (!_paidFeatureUsageRepo.hasReachedFreeLimit) {
       final usageCount = await _paidFeatureUsageRepo.incrementUsage();
+      await _maybeRequestHalfLimitReview(usageCount);
       if (usageCount >= Config.paidFeatureFreeUsageLimit) {
         if (!context.mounted) {
           await _disableCloudBackupIfNeeded();
@@ -113,6 +119,29 @@ class PaywallViewModel with ChangeNotifier {
     }
 
     return _showPaywallAndRefresh(context);
+  }
+
+  Future<void> _maybeRequestHalfLimitReview(int usageCount) async {
+    if (_paidFeatureUsageRepo.hasRequestedHalfLimitReview) {
+      return;
+    }
+
+    final reviewStartCount = (Config.paidFeatureFreeUsageLimit / 2).ceil();
+    final reviewStopCount = (Config.paidFeatureFreeUsageLimit * 0.9).ceil();
+    if (usageCount < reviewStartCount || usageCount >= reviewStopCount) {
+      return;
+    }
+
+    bool didRequestReview;
+    try {
+      didRequestReview = await _requestRateAppReview();
+    } catch (_) {
+      didRequestReview = false;
+    }
+
+    if (didRequestReview) {
+      await _paidFeatureUsageRepo.markHalfLimitReviewRequested();
+    }
   }
 
   void selectPlan(PaywallPlan plan) {

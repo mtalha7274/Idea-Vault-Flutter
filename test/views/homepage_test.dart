@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart' hide Config;
+import 'package:idea_vault/config/config.dart';
+import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
+import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
+import 'package:idea_vault/core/services/premium/paywall_provider.dart';
+import 'package:idea_vault/core/services/premium/subscription_service.dart';
+import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
+import 'package:idea_vault/data/repositories/local/paid_feature_usage.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
 import 'package:idea_vault/data/repositories/remote/idea_organization_repository.dart';
 import 'package:idea_vault/injection_container.dart';
+import 'package:idea_vault/models/backup/cloud_backup_account.dart';
+import 'package:idea_vault/models/backup/cloud_backup_state.dart';
 import 'package:idea_vault/main.dart' show navigatorKey;
 import 'package:idea_vault/models/idea.dart';
+import 'package:idea_vault/models/premium/paywall_offering.dart';
+import 'package:idea_vault/models/premium/subscription_state.dart';
+import 'package:idea_vault/viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
+import 'package:idea_vault/viewmodels/providers/premium/paywall_view_model.dart';
 import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
@@ -22,6 +36,7 @@ import '../helpers/in_memory_random_additions_repo.dart';
 import '../helpers/memory_local_storage.dart';
 
 void main() {
+  dotenv.loadFromString(envString: 'DEBUG=false');
   GoogleFonts.config.allowRuntimeFetching = false;
 
   group('Homepage ideas flow', () {
@@ -30,6 +45,7 @@ void main() {
     late RandomAdditionsProvider randomAdditionsProvider;
     late ThemeProvider themeProvider;
     late IdeaListPreferencesRepo sortPreferencesRepo;
+    late PaidFeatureUsageRepo paidFeatureUsageRepo;
 
     setUpAll(() {
       VisibilityDetectorController.instance.updateInterval = Duration.zero;
@@ -47,6 +63,11 @@ void main() {
         await sl.unregister<IdeaListPreferencesRepo>();
       }
       sl.registerSingleton<IdeaListPreferencesRepo>(sortPreferencesRepo);
+      paidFeatureUsageRepo = PaidFeatureUsageRepo(storage);
+      if (sl.isRegistered<PaidFeatureUsageRepo>()) {
+        await sl.unregister<PaidFeatureUsageRepo>();
+      }
+      sl.registerSingleton<PaidFeatureUsageRepo>(paidFeatureUsageRepo);
       themeProvider = ThemeProvider(ThemeRepo(storage));
       provider = IdeasProvider(
         InMemoryIdeasRepo(),
@@ -76,7 +97,11 @@ void main() {
       await settleUi(tester);
     }
 
-    Future<void> pumpIdeasApp(WidgetTester tester) async {
+    Future<void> pumpIdeasApp(
+      WidgetTester tester, {
+      CloudBackupProvider? backupProvider,
+      PaywallViewModel? paywallViewModel,
+    }) async {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -84,6 +109,14 @@ void main() {
             ChangeNotifierProvider<RandomAdditionsProvider>.value(
               value: randomAdditionsProvider,
             ),
+            if (backupProvider != null)
+              ChangeNotifierProvider<CloudBackupProvider>.value(
+                value: backupProvider,
+              ),
+            if (paywallViewModel != null)
+              ChangeNotifierProvider<PaywallViewModel>.value(
+                value: paywallViewModel,
+              ),
             ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
           ],
           child: MaterialApp(
@@ -105,6 +138,30 @@ void main() {
       await settleUi(tester);
     }
 
+    CloudBackupProvider buildCloudBackupProvider() {
+      return CloudBackupProvider(
+        CloudBackupSettingsRepo(storage),
+        _FakeCloudBackupService(),
+        _FakeCloudBackupScheduler(),
+      );
+    }
+
+    PaywallViewModel buildPaywallViewModel({bool isPro = false}) {
+      final subscriptionService = _FakeSubscriptionService(
+        state: const SubscriptionState.initial().copyWith(isPro: isPro),
+      );
+      return PaywallViewModel(
+        subscriptionService,
+        LocalPaywallProvider(subscriptionService),
+        paidFeatureUsageRepo,
+        CloudBackupSettingsRepo(storage),
+        _FakeCloudBackupService(),
+        _FakeCloudBackupScheduler(),
+        showPaywall: (_) async => false,
+        requestRateAppReview: () async => false,
+      );
+    }
+
     Finder sectionTab(IdeaSection section) {
       return find.byKey(Key('idea-editor-section-tab-${section.id}'));
     }
@@ -121,6 +178,179 @@ void main() {
 
       expect(find.byKey(const Key('ideas-empty-state')), findsOneWidget);
       expect(find.byKey(const Key('ideas-fab')), findsOneWidget);
+    });
+
+    testWidgets('hides backup-off indicator without backup provider',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('shows backup-off indicator when backup is disabled',
+        (tester) async {
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsOneWidget,
+      );
+      expect(find.text('homepageBackupOffIndicator'), findsOneWidget);
+      expect(find.text('homepageBackupOffAction'), findsOneWidget);
+    });
+
+    testWidgets('hides backup-off indicator when backup is enabled',
+        (tester) async {
+      await CloudBackupSettingsRepo(storage).saveState(
+        const CloudBackupState.initial().copyWith(
+          enabled: true,
+          email: 'writer@example.com',
+        ),
+      );
+
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('shows free usage intro for new non-pro installs',
+        (tester) async {
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsOneWidget);
+      expect(paidFeatureUsageRepo.hasSeenFreeUsageIntro, isTrue);
+      expect(
+        paidFeatureUsageRepo.freeUsageGrantLimit,
+        Config.paidFeatureFreeUsageLimit,
+      );
+      expect(paidFeatureUsageRepo.usageCount, 0);
+    });
+
+    testWidgets('does not show free usage intro after it has been seen',
+        (tester) async {
+      await paidFeatureUsageRepo.initializeFreeUsageGrantIfNeeded();
+      await paidFeatureUsageRepo.markFreeUsageIntroSeen();
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsNothing);
+    });
+
+    testWidgets('does not show free usage intro for pro users', (tester) async {
+      final paywallViewModel = buildPaywallViewModel(isPro: true);
+      await paywallViewModel.refreshSubscription();
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: paywallViewModel,
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsNothing);
+    });
+
+    testWidgets('does not show free usage intro when local ideas exist',
+        (tester) async {
+      await tester.runAsync(() async {
+        await provider.saveIdea(
+          title: 'Existing idea',
+          sections: provider.createDefaultSections(),
+        );
+      });
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsNothing);
+      expect(paidFeatureUsageRepo.hasFreeUsageIntroMetadata, isFalse);
+    });
+
+    testWidgets('does not show free usage intro when additions exist',
+        (tester) async {
+      await tester.runAsync(() async {
+        await randomAdditionsProvider.addAddition('Inbox thought');
+      });
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsNothing);
+      expect(paidFeatureUsageRepo.hasFreeUsageIntroMetadata, isFalse);
+    });
+
+    testWidgets('does not show free usage intro after usage has started',
+        (tester) async {
+      await paidFeatureUsageRepo.incrementUsage();
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      expect(find.byKey(const Key('free-usage-screen')), findsNothing);
+      expect(paidFeatureUsageRepo.hasFreeUsageIntroMetadata, isFalse);
+    });
+
+    testWidgets('shows free usage drawer row while under the limit',
+        (tester) async {
+      await paidFeatureUsageRepo.markFreeUsageIntroSeen();
+      await paidFeatureUsageRepo.incrementUsage();
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      await tester.tap(find.byKey(const Key('ideas-menu-button')));
+      await settleUi(tester);
+
+      expect(
+        find.byKey(const Key('homepage-free-usage-drawer')),
+        findsOneWidget,
+      );
+      expect(find.text('freeUsageDrawerTitle'), findsOneWidget);
+      expect(find.text('homepageGetIdeaVaultPro'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('homepage-free-usage-drawer')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('free-usage-screen')), findsOneWidget);
+    });
+
+    testWidgets('shows pro drawer row after free usage is exhausted',
+        (tester) async {
+      for (var i = 0; i < Config.paidFeatureFreeUsageLimit; i += 1) {
+        await paidFeatureUsageRepo.incrementUsage();
+      }
+
+      await pumpIdeasApp(
+        tester,
+        paywallViewModel: buildPaywallViewModel(),
+      );
+
+      await tester.tap(find.byKey(const Key('ideas-menu-button')));
+      await settleUi(tester);
+
+      expect(
+        find.byKey(const Key('homepage-free-usage-drawer')),
+        findsNothing,
+      );
+      expect(find.text('homepageGetIdeaVaultPro'), findsOneWidget);
     });
 
     testWidgets('opens the editor from the fab', (tester) async {
@@ -649,7 +879,8 @@ void main() {
       await settleUi(tester);
 
       expect(find.byKey(const Key('search-ideas-screen')), findsOneWidget);
-      expect(find.byKey(const Key('search-ideas-empty-prompt')), findsOneWidget);
+      expect(
+          find.byKey(const Key('search-ideas-empty-prompt')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const Key('ideas-search-field')),
@@ -1191,6 +1422,60 @@ void main() {
       expect(provider.ideas.single.title, 'Failure recovered');
     });
   });
+}
+
+class _FakeCloudBackupService extends CloudBackupService {
+  @override
+  Future<bool> backupExists() async => false;
+
+  @override
+  Future<CloudBackupAccount?> connect({bool forceAccountPicker = false}) async {
+    return const CloudBackupAccount(
+      email: 'writer@example.com',
+      provider: 'test',
+    );
+  }
+
+  @override
+  Future<void> disconnect() async {}
+}
+
+class _FakeCloudBackupScheduler extends CloudBackupScheduler {
+  @override
+  Future<void> cancelDailyBackup() async {}
+
+  @override
+  Future<void> scheduleDailyBackup() async {}
+}
+
+class _FakeSubscriptionService implements SubscriptionService {
+  _FakeSubscriptionService({required this.state});
+
+  SubscriptionState state;
+
+  @override
+  void addListener(SubscriptionStateListener listener) {}
+
+  @override
+  Future<PaywallOffering?> getOffering() async => null;
+
+  @override
+  Future<SubscriptionState> getSubscriptionState() async => state;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<SubscriptionState> purchasePackage(PaywallPackage package) async {
+    state = state.copyWith(isPro: true);
+    return state;
+  }
+
+  @override
+  Future<SubscriptionState> restorePurchases() async {
+    state = state.copyWith(isPro: true);
+    return state;
+  }
 }
 
 class _FailingIdeasRepo extends InMemoryIdeasRepo {

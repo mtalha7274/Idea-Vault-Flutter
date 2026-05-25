@@ -1,22 +1,20 @@
 import 'package:in_app_review/in_app_review.dart';
-import 'package:provider/provider.dart';
 
 import '../../config/config.dart';
-import '../../main.dart';
-import '../../viewmodels/providers/info_provider.dart';
+import '../utils/helpers.dart';
 
-Future<void> rateApp() async {
-  if (Config.debug) return;
+Future<bool> rateApp() async {
+  if (Config.debug) return false;
 
-  final context = navigatorKey.currentContext;
-  if (context == null) return;
-
-  final infoStore = context.read<InfoProvider>();
-  if (infoStore.rateAppCount == 0) {
+  try {
     final InAppReview inAppReview = InAppReview.instance;
-    if (await inAppReview.isAvailable()) {
-      infoStore.rateAppCount++;
-      await inAppReview.requestReview();
+    if (!await inAppReview.isAvailable()) {
+      return false;
     }
+    await inAppReview.requestReview();
+    return true;
+  } catch (error, stackTrace) {
+    printLog('Rate app request failed: $error\n$stackTrace');
+    return false;
   }
 }

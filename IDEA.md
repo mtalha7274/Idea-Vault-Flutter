@@ -1,77 +1,140 @@
-Idea Vault — Full Project Summary
+# Idea Vault - AI Context Brief
 
-App Overview: Idea Vault is a Flutter app for capturing and developing random ideas. Users create ideas with multiple sections, each section has a title and markdown content. Available on iOS and Android. Built by Talha under Pocket Micros.
+## Purpose
 
-Tech Stack:
+This file is the handoff brief for AI agents working on Idea Vault. It explains the shipped app behavior, main architecture, feature flows, and where to start in the codebase. Treat this as engineering context, not marketing copy or a roadmap.
 
-Flutter with SQLite for local storage
-Firebase Functions (TypeScript) for backend
-Supabase for cloud backup (planned)
-Markdown editor with preview mode for section content
-OCR for image-to-text via camera or gallery (Google ML Kit Text Recognition, Latin script)
-Flutter native splash screen configured
-AI Feature — Organize Section: Firebase onCall function in functions/src/organizeSection.ts using OpenAI SDK pointed at OpenRouter. Currently using google/gemini-2.5-flash-lite model. Takes raw markdown section content, reorganizes grammar and structure, returns clean markdown. Secrets stored in Firebase Secret Manager as OPENROUTER_API_KEY. Local emulator uses .env.local file. Includes retry logic with exponential backoff, AbortController timeout, and input validation with 2000 character soft guidance.
+## App Overview
 
-Editor: Plain markdown editor with preview mode. Toolbar has Title, Bold, Italic, Bullet List, Code Block buttons. Auto-save implemented with 800ms debounce timer. Saves on dispose and app lifecycle pause. Save button replaced with subtle "Saved" checkmark indicator. OCR from camera or gallery inserts recognized text into the section at the cursor.
+Idea Vault is a Flutter app for capturing, organizing, and exporting ideas. Users create ideas with multiple sections; each section has a title and Markdown content. The app supports local-first editing, quick random additions, AI organization, speech-to-text, image-to-text OCR, PDF export, AI-friendly text export, cloud backup, and subscriptions.
 
-Random additions: Quick-capture flow for stray thoughts before filing into an idea. Homepage shows a bottom pill composer (same widget as the dedicated screen) anchored with a solid background and fade so list content does not show through. Drawer entry below Backup & Restore opens lib/views/random_additions_screen.dart, which shows a reverse-ordered list of chat-style bubbles; tapping a bubble opens a bottom sheet to choose an idea and section, appends the text to that section, and deletes the addition.
+The app is available for iOS and Android and is built under Pocket Micros.
 
-Bottom Sheet (more_vert icon in editor): Three options — Export for AI, Export to PDF, Delete Idea.
+## Architecture
 
-Export for AI: Opens ExportForAIScreen with ExportMode.aiExport. Reorderable list of sections with checkboxes, all checked by default. Fixed Copy to Clipboard button at bottom. Copies formatted text in this format:
+- Flutter app entrypoint is `lib/main.dart`.
+- Dependency injection is configured in `lib/injection_container.dart` using GetIt.
+- App navigation helpers live in `lib/config/router/app_router.dart`.
+- Local structured data uses SQLite through `lib/data/managers/local/ideas_database.dart`.
+- Lightweight local settings and counters use SharedPreferences through `lib/data/managers/local/local_storage.dart` and `lib/data/managers/local/shared_preference.dart`.
+- State is mostly Provider / ChangeNotifier based, with providers under `lib/viewmodels/providers/`.
+- Firebase Functions backend code lives under `functions/src/`.
+- UI text keys live in `lib/core/constants/view_constants.dart`; translations are in `assets/translations/`.
+- Theme definitions live in `lib/config/theme/` and shared app UI style helpers live in `lib/views/ideas/idea_vault_theme.dart`.
 
-Idea: [Title]
+## Feature Map
 
-[Section 1 Title]
-[Section 1 Content]
-Shows toast "Copied! Paste into any AI chat." Feature is called "Idea Export for any AI" in marketing.
+### Home, Ideas, and Search
 
-Export to PDF: Reuses ExportForAIScreen with ExportMode.pdfExport. Same reorderable section selection screen. Bottom button says Export to PDF. Uses markdown package to convert to HTML, printing package for native share/save dialog. Styled HTML with clean typography.
+- `lib/views/home.dart` is a thin root widget that opens `Homepage`; it does not show the paywall on startup.
+- `lib/views/homepage.dart` shows the idea list, layout/filter controls, drawer, empty state, and bottom quick-capture composer.
+- `lib/views/search_ideas_screen.dart` provides idea search using `lib/core/utils/idea_search.dart`.
+- Idea cards and responsive list/grid layout are in `lib/widgets/ideas/ideas_layout.dart`.
+- Idea persistence is handled by `IdeasProvider` in `lib/viewmodels/providers/ideas_provider.dart` and `IdeasRepo` in `lib/data/repositories/local/ideas.dart`.
+- Core idea models are in `lib/models/idea.dart`.
 
-Delete Idea: Confirmation dialog reused from homepage.dart. On confirm deletes from SQLite and navigates back to listing screen.
+### Editor
 
-Paywall — Idea Vault Pro: Full screen paywall shown 1-2 seconds after app launch. Yearly plan selected by default showing $1.67/month, billed $19.99/year, Save 44% badge, 3 day free trial. Monthly plan $2.99/month no trial. CTA says "Start Free Trial" on yearly and "Get Pro Monthly" on monthly. Restore Purchases, Privacy Policy, Terms of Service at bottom. Close X button top right.
+- Main editor screen is `lib/views/idea_editor.dart`.
+- Markdown editing UI and toolbar widgets are in `lib/widgets/idea_markdown_editor.dart`.
+- Section add/edit/delete sheet is `lib/widgets/sheets/idea_editor_section_sheet.dart`.
+- Organize confirmation and character-limit messaging are in `lib/widgets/sheets/organise_section_sheet.dart`.
+- The editor autosaves with a 700ms debounce, saves on close/dispose/lifecycle pause, and persists resume state through `lib/data/repositories/local/idea_editor_state.dart`.
+- AI organize warning starts around 4,000 characters and has a 4,200 character hard limit, aligned with the backend function.
 
-Pro Features:
+### AI Organize
 
-Extended AI Organize
-Extended AI Brainstorm Chat
-Speech to text dictation
-Cloud backup via Supabase
-Export to PDF
-Idea Export for any AI
-Priority support
-Free Tier:
+- Frontend entrypoint is the editor toolbar in `lib/views/idea_editor.dart`.
+- Flutter calls `IdeaOrganizationRepository` in `lib/data/repositories/remote/idea_organization_repository.dart`.
+- Backend function is `functions/src/organizeSection.ts`, exported from `functions/src/index.ts`.
+- The function calls OpenRouter via the OpenAI SDK and currently uses `google/gemini-2.5-flash-lite`.
+- Secrets use Firebase Secret Manager with `OPENROUTER_API_KEY`; local emulator uses `.env.local` in the functions project.
 
-Unlimited ideas and sections
-Basic markdown editor
-Limited AI Organize
-Limited AI Brainstorm Chat
-Local storage only
-Monetization:
+### Speech to Text
 
-Yearly: $19.99/year ($1.67/month) with 3 day free trial
-Monthly: $2.99/month no trial
-Apple/Google take 15% (small developer tier)
-API costs per heavy user: ~$0.11/year organize only
-Net per user after fees and API costs: ~$16.88/year
-AI Limits Strategy: Vague limits — say "Extended" not specific numbers. Show progress indicator like "3 of 5 remaining" without specifying reset period. Free users get enough to feel value but not enough to rely on it.
+- Speech dictation is handled inside `lib/views/idea_editor.dart` using the `speech_to_text` package.
+- Users long-press the mic control to dictate into the active section.
+- A normal mic tap only shows the long-press tooltip and does not trigger paywall access.
+- Permission prompts are handled in the editor with `permission_handler`.
 
-UI Notes:
+### Image to Text OCR
 
-App uses dark green primary color, rounded cards, clean typography, light background
-Empty state is centered on listing screen
-Grammar fix: "1 section" not "1 sections"
-Paywall checkmarks are dark filled, "Most popular" badge on yearly plan
-IdeaPreprocessor max input 2000 characters before truncation
-Pending / Planned:
+- OCR is launched from the editor toolbar in `lib/views/idea_editor.dart`.
+- Image picking/cropping uses `image_picker` and `image_cropper`.
+- Text recognition service abstraction is in `lib/core/services/image_text_recognition_service.dart`.
+- Current implementation uses Google ML Kit text recognition for Latin script.
+- Recognized text is inserted into the current section at the cursor, or appended in a clean line position.
 
-Supabase authentication and cloud backup
-RevenueCat or in_app_purchase integration for actual subscriptions
-App Check enforcement once app is live on both stores
-AI Brainstorm Chat feature (future, after launch)
-Search bar on listing screen
-Sort options on listing screen
-Add Section tab rename from "+"
-Auto-title prompt on new idea creation
+### Random Additions
 
+- Quick-capture composer is `lib/widgets/random_addition_composer.dart`.
+- Drawer screen is `lib/views/random_additions_screen.dart`.
+- Provider and local repository are `lib/viewmodels/providers/random_additions_provider.dart` and `lib/data/repositories/local/random_additions.dart`.
+- Model is `lib/models/random_addition.dart`.
+- Users can capture stray thoughts, then file each one into an existing idea section; filing appends text and deletes the random addition.
+
+### Export
+
+- Editor more-options sheet is `lib/widgets/sheets/idea_options_sheet.dart`.
+- Export screen is `lib/views/export_for_ai_screen.dart`.
+- `ExportMode.aiExport` copies selected/reordered sections to the clipboard in an AI-friendly text format.
+- `ExportMode.pdfExport` converts selected/reordered sections from Markdown to styled HTML and uses the `printing` package for native PDF share/save.
+- Export paid-feature usage is counted when the primary export/copy button is tapped after section-selection validation.
+
+### Cloud Backup
+
+- User-facing screen is `lib/views/backup_restore_screen.dart`.
+- Provider is `lib/viewmodels/providers/backup/cloud_backup_provider.dart`.
+- Settings are persisted by `lib/data/repositories/local/cloud_backup_settings.dart`.
+- Backup orchestration is in `lib/core/services/backup/cloud_backup_service.dart`.
+- Android backup store is `lib/core/services/backup/google_drive_backup_store.dart`.
+- iOS backup store is `lib/core/services/backup/icloud_backup_store.dart`.
+- Daily scheduling and background task support live in `lib/core/services/backup/cloud_backup_scheduler.dart` and `lib/core/services/backup/cloud_backup_background_task.dart`.
+- Backup snapshots are serialized with `lib/models/backup/cloud_backup_snapshot.dart`.
+
+## Monetization / Paywall Rules
+
+- Startup paywall is removed; the app opens directly to the idea vault.
+- Paywall UI is `lib/views/paywall_screen.dart`.
+- Paywall and access policy live in `lib/viewmodels/providers/premium/paywall_view_model.dart`.
+- Subscription abstractions and RevenueCat implementation live in `lib/core/services/premium/`.
+- Premium feature enum is `lib/models/premium/premium_feature.dart`.
+- Free-use counter is `lib/data/repositories/local/paid_feature_usage.dart`.
+- Adjustable free-use limit is `Config.paidFeatureFreeUsageLimit` in `lib/config/config.dart`.
+- Non-Pro users get 30 local lifetime paid-feature uses shared across AI Organize, speech to text, image to text, Export for AI, and Export to PDF.
+- Pro users bypass the free-use counter.
+- The 30th counted use is allowed; the 31st counted use shows the paywall.
+- Cloud backup does not increment the counter.
+- Cloud backup is allowed for non-Pro users while they are under the free-use limit.
+- When a non-Pro user reaches the limit, cloud backup is disabled and scheduled backup is cancelled.
+- After a successful purchase or restore, `AppRouter.showPaywall` opens `BackupRestoreScreen` so the user can re-enable cloud backup.
+- Debug bypass support is in `lib/core/services/premium/bypass_paywall_subscription_service.dart` and is controlled by `Config.debug` plus `Config.bypassPaywall`.
+
+## Key File Map
+
+- Boot and dependency setup: `lib/main.dart`, `lib/injection_container.dart`
+- Routing: `lib/config/router/app_router.dart`
+- Global config: `lib/config/config.dart`
+- Home/list/search: `lib/views/home.dart`, `lib/views/homepage.dart`, `lib/views/search_ideas_screen.dart`
+- Editor: `lib/views/idea_editor.dart`, `lib/widgets/idea_markdown_editor.dart`
+- Editor sheets: `lib/widgets/sheets/idea_editor_section_sheet.dart`, `lib/widgets/sheets/idea_options_sheet.dart`, `lib/widgets/sheets/organise_section_sheet.dart`
+- Idea data: `lib/models/idea.dart`, `lib/data/repositories/local/ideas.dart`, `lib/viewmodels/providers/ideas_provider.dart`
+- Random additions: `lib/views/random_additions_screen.dart`, `lib/widgets/random_addition_composer.dart`, `lib/data/repositories/local/random_additions.dart`
+- AI organize: `lib/data/repositories/remote/idea_organization_repository.dart`, `functions/src/organizeSection.ts`
+- OCR: `lib/core/services/image_text_recognition_service.dart`
+- Export: `lib/views/export_for_ai_screen.dart`
+- Backup: `lib/views/backup_restore_screen.dart`, `lib/viewmodels/providers/backup/cloud_backup_provider.dart`, `lib/core/services/backup/`
+- Paywall/subscriptions: `lib/views/paywall_screen.dart`, `lib/viewmodels/providers/premium/paywall_view_model.dart`, `lib/core/services/premium/`
+- Local usage counter: `lib/data/repositories/local/paid_feature_usage.dart`
+- Themes and visual style: `lib/config/theme/`, `lib/views/ideas/idea_vault_theme.dart`
+
+## Testing Notes
+
+- Flutter tests live under `test/`.
+- Idea persistence tests: `test/data/repositories/local/ideas_repo_test.dart`
+- Provider tests: `test/viewmodels/providers/ideas_provider_test.dart`, `test/viewmodels/providers/random_additions_provider_test.dart`, `test/viewmodels/providers/paywall_view_model_test.dart`
+- Free-use counter tests: `test/data/repositories/local/paid_feature_usage_test.dart`
+- Backup snapshot tests: `test/models/backup/cloud_backup_snapshot_test.dart`
+- Homepage/editor flow widget tests: `test/views/homepage_test.dart`
+- Editor text insertion utility tests: `test/core/utils/editor_text_insertion_test.dart`
+- Usual verification commands are `flutter analyze` and `flutter test`.

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:idea_vault/config/config.dart';
@@ -20,6 +21,7 @@ import 'package:provider/provider.dart';
 import '../../helpers/memory_local_storage.dart';
 
 void main() {
+  dotenv.loadFromString(envString: 'DEBUG=false');
   GoogleFonts.config.allowRuntimeFetching = false;
 
   group('PaywallViewModel access policy', () {
@@ -31,6 +33,8 @@ void main() {
     late _FakeCloudBackupScheduler cloudBackupScheduler;
     late PaywallViewModel viewModel;
     late int paywallShowCount;
+    late int reviewRequestCount;
+    late bool reviewRequestResult;
 
     setUp(() {
       storage = MemoryLocalStorageManager();
@@ -40,6 +44,8 @@ void main() {
       cloudBackupService = _FakeCloudBackupService();
       cloudBackupScheduler = _FakeCloudBackupScheduler();
       paywallShowCount = 0;
+      reviewRequestCount = 0;
+      reviewRequestResult = true;
       viewModel = PaywallViewModel(
         subscriptionService,
         LocalPaywallProvider(subscriptionService),
@@ -51,10 +57,14 @@ void main() {
           paywallShowCount += 1;
           return false;
         },
+        requestRateAppReview: () async {
+          reviewRequestCount += 1;
+          return reviewRequestResult;
+        },
       );
     });
 
-    testWidgets('allows the first 30 counted feature uses', (tester) async {
+    testWidgets('allows the free counted feature uses', (tester) async {
       final context = await _pumpPolicyTestApp(tester, viewModel, storage);
 
       for (var i = 0; i < Config.paidFeatureFreeUsageLimit; i += 1) {
@@ -68,7 +78,86 @@ void main() {
       expect(usageRepo.usageCount, Config.paidFeatureFreeUsageLimit);
     });
 
-    testWidgets('gates the 31st counted feature use behind the paywall',
+    testWidgets('requests app review at half of the free-use limit',
+        (tester) async {
+      for (var i = 1; i < _reviewStartCount; i += 1) {
+        await usageRepo.incrementUsage();
+      }
+      final context = await _pumpPolicyTestApp(tester, viewModel, storage);
+
+      final hasAccess = await viewModel.ensureAccess(
+        context,
+        PremiumFeature.aiOrganize,
+      );
+
+      expect(hasAccess, isTrue);
+      expect(usageRepo.usageCount, _reviewStartCount);
+      expect(reviewRequestCount, 1);
+      expect(usageRepo.hasRequestedHalfLimitReview, isTrue);
+    });
+
+    testWidgets('retries app review while native prompt is unavailable',
+        (tester) async {
+      reviewRequestResult = false;
+      for (var i = 1; i < _reviewStartCount; i += 1) {
+        await usageRepo.incrementUsage();
+      }
+      final context = await _pumpPolicyTestApp(tester, viewModel, storage);
+
+      await viewModel.ensureAccess(context, PremiumFeature.aiOrganize);
+      await viewModel.ensureAccess(context, PremiumFeature.exportForAi);
+
+      expect(reviewRequestCount, 2);
+      expect(usageRepo.hasRequestedHalfLimitReview, isFalse);
+    });
+
+    testWidgets('stops checking app review at 90 percent of the free limit',
+        (tester) async {
+      reviewRequestResult = false;
+      for (var i = 1; i < _reviewStopCount; i += 1) {
+        await usageRepo.incrementUsage();
+      }
+      final context = await _pumpPolicyTestApp(tester, viewModel, storage);
+
+      await viewModel.ensureAccess(context, PremiumFeature.aiOrganize);
+
+      expect(usageRepo.usageCount, _reviewStopCount);
+      expect(reviewRequestCount, 0);
+      expect(usageRepo.hasRequestedHalfLimitReview, isFalse);
+    });
+
+    testWidgets('does not retry app review after a successful request',
+        (tester) async {
+      for (var i = 1; i < _reviewStartCount; i += 1) {
+        await usageRepo.incrementUsage();
+      }
+      final context = await _pumpPolicyTestApp(tester, viewModel, storage);
+
+      await viewModel.ensureAccess(context, PremiumFeature.aiOrganize);
+      await viewModel.ensureAccess(context, PremiumFeature.exportPdf);
+
+      expect(reviewRequestCount, 1);
+      expect(usageRepo.hasRequestedHalfLimitReview, isTrue);
+    });
+
+    testWidgets('does not request app review for cloud backup access',
+        (tester) async {
+      for (var i = 0; i < _reviewStartCount; i += 1) {
+        await usageRepo.incrementUsage();
+      }
+      final context = await _pumpPolicyTestApp(tester, viewModel, storage);
+
+      final hasAccess = await viewModel.ensureAccess(
+        context,
+        PremiumFeature.cloudBackup,
+      );
+
+      expect(hasAccess, isTrue);
+      expect(reviewRequestCount, 0);
+      expect(usageRepo.usageCount, _reviewStartCount);
+    });
+
+    testWidgets('gates the next counted feature use behind the paywall',
         (tester) async {
       for (var i = 0; i < Config.paidFeatureFreeUsageLimit; i += 1) {
         await usageRepo.incrementUsage();
@@ -98,6 +187,7 @@ void main() {
 
       expect(hasAccess, isTrue);
       expect(usageRepo.usageCount, 0);
+      expect(reviewRequestCount, 0);
     });
 
     testWidgets('allows cloud backup while under the free limit',
@@ -113,7 +203,7 @@ void main() {
       expect(usageRepo.usageCount, 0);
     });
 
-    testWidgets('turns cloud backup off on the 30th counted use',
+    testWidgets('turns cloud backup off on the final free counted use',
         (tester) async {
       for (var i = 1; i < Config.paidFeatureFreeUsageLimit; i += 1) {
         await usageRepo.incrementUsage();
@@ -140,6 +230,10 @@ void main() {
     });
   });
 }
+
+int get _reviewStartCount => (Config.paidFeatureFreeUsageLimit / 2).ceil();
+
+int get _reviewStopCount => (Config.paidFeatureFreeUsageLimit * 0.9).ceil();
 
 Future<BuildContext> _pumpPolicyTestApp(
   WidgetTester tester,
