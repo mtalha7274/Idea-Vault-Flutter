@@ -75,27 +75,45 @@ class _SettingsState extends State<Settings> {
             Gap(AppConstants.gap18Px + 1),
             Expanded(
               child: SingleChildScrollView(
-                child: Wrap(
-                  runSpacing: AppConstants.gap10Px,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    appearanceTile(themeProvider),
-                    if (_hasPinSetup)
-                      _changePinTile(themeProvider),
-                    actionTile(themeProvider, ViewConstants.privacyPolicy,
-                        AppAssets.privacyPolicy,
-                        size: 18.0, onTap: privacyPolicy),
-                    actionTile(themeProvider, ViewConstants.termsAndConditions,
-                        AppAssets.termsAndConditions,
-                        size: 16.0, onTap: termsAndConditions),
-                    actionTile(
-                        themeProvider, ViewConstants.rateApp, AppAssets.rateApp,
-                        onTap: rateApp),
-                    actionTile(themeProvider, ViewConstants.shareApp,
-                        AppAssets.shareApp,
-                        onTap: shareApp),
-                    actionTile(themeProvider, ViewConstants.contactUs,
-                        AppAssets.contactUs,
-                        onTap: contactUs),
+                    _settingsGroup(
+                      themeProvider,
+                      [
+                        appearanceTile(themeProvider),
+                        if (_hasPinSetup) _changePinTile(themeProvider),
+                      ],
+                    ),
+                    Gap(AppConstants.gap10Px),
+                    _settingsGroup(
+                      themeProvider,
+                      [
+                        actionTile(themeProvider, ViewConstants.privacyPolicy,
+                            AppAssets.privacyPolicy,
+                            size: 18.0,
+                            onTap: privacyPolicy,
+                            trailingIcon: Icons.open_in_new_rounded),
+                        actionTile(
+                            themeProvider,
+                            ViewConstants.termsAndConditions,
+                            AppAssets.termsAndConditions,
+                            size: 16.0,
+                            onTap: termsAndConditions,
+                            trailingIcon: Icons.open_in_new_rounded),
+                        actionTile(themeProvider, ViewConstants.rateApp,
+                            AppAssets.rateApp,
+                            onTap: rateApp,
+                            trailingIcon: Icons.open_in_new_rounded),
+                        actionTile(themeProvider, ViewConstants.shareApp,
+                            AppAssets.shareApp,
+                            onTap: shareApp, trailingIcon: Icons.share_rounded),
+                        actionTile(themeProvider, ViewConstants.contactUs,
+                            AppAssets.contactUs,
+                            onTap: contactUs,
+                            trailingIcon: Icons.mail_outline_rounded),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -106,17 +124,42 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Widget _settingsGroup(ThemeProvider themeProvider, List<Widget> tiles) {
+    if (tiles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final base = themeProvider.baseTheme;
+    final dividerColor = base.outline.withValues(alpha: 0.3);
+    return Container(
+      decoration: BoxDecoration(
+        color: base.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var index = 0; index < tiles.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1.5,
+                thickness: 1.5,
+                color: dividerColor,
+              ),
+            tiles[index],
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget appearanceTile(ThemeProvider themeProvider) {
     final base = themeProvider.baseTheme;
     final isDark = themeProvider.themeType == Config.dark;
-    return Container(
+    return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: (AppConstants.gap14Px).w,
         vertical: (AppConstants.gap12Px).h,
-      ),
-      decoration: BoxDecoration(
-        color: base.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
       ),
       child: Row(
         children: [
@@ -250,15 +293,11 @@ class _SettingsState extends State<Settings> {
     final base = themeProvider.baseTheme;
     return GestureDetector(
       onTap: _changePin,
-      child: Container(
-        padding: EdgeInsets.only(
-          left: (AppConstants.gap14Px + 1).w,
-          top: (AppConstants.gap12Px + 1).h,
-          bottom: AppConstants.gap12Px,
-        ),
-        decoration: BoxDecoration(
-          color: base.surface,
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: (AppConstants.gap14Px + 1).w,
+          vertical: (AppConstants.gap12Px + 1).h,
         ),
         child: Row(
           children: [
@@ -277,13 +316,20 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             Gap((AppConstants.gap10Px + 1.6).w),
-            TranslatedText(
-              ViewConstants.settingsChangePin,
-              style: TextStyle(
-                color: base.settings.tileTitle,
-                fontSize: AppConstants.font14Px,
-                fontWeight: FontWeight.w500,
+            Expanded(
+              child: TranslatedText(
+                ViewConstants.settingsChangePin,
+                style: TextStyle(
+                  color: base.settings.tileTitle,
+                  fontSize: AppConstants.font14Px,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+            ),
+            _settingsTrailingIcon(
+              themeProvider,
+              Icons.chevron_right_rounded,
+              size: 22,
             ),
           ],
         ),
@@ -309,19 +355,30 @@ class _SettingsState extends State<Settings> {
     }
   }
 
+  Widget _settingsTrailingIcon(
+    ThemeProvider themeProvider,
+    IconData icon, {
+    double size = 18,
+  }) {
+    final base = themeProvider.baseTheme;
+    return Icon(
+      icon,
+      size: size.h,
+      color: base.textMuted.withValues(alpha: 0.75),
+    );
+  }
+
   GestureDetector actionTile(
       ThemeProvider themeProvider, String title, String icon,
-      {double size = 17.0, Function()? onTap}) {
+      {double size = 17.0, Function()? onTap, IconData? trailingIcon}) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.only(
-            left: (AppConstants.gap14Px + 1).w,
-            top: (AppConstants.gap12Px + 1).h,
-            bottom: AppConstants.gap12Px),
-        decoration: BoxDecoration(
-            color: themeProvider.baseTheme.surface,
-            borderRadius: const BorderRadius.all(Radius.circular(10))),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: (AppConstants.gap14Px + 1).w,
+          vertical: (AppConstants.gap12Px + 1).h,
+        ),
         child: Row(
           children: [
             Container(
@@ -342,13 +399,20 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             Gap((AppConstants.gap10Px + 1.6).w),
-            TranslatedText(
-              title,
-              style: TextStyle(
-                  color: themeProvider.baseTheme.settings.tileTitle,
-                  fontSize: AppConstants.font14Px,
-                  fontWeight: FontWeight.w500),
-            )
+            Expanded(
+              child: TranslatedText(
+                title,
+                style: TextStyle(
+                    color: themeProvider.baseTheme.settings.tileTitle,
+                    fontSize: AppConstants.font14Px,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            if (trailingIcon != null)
+              _settingsTrailingIcon(
+                themeProvider,
+                trailingIcon,
+              ),
           ],
         ),
       ),
