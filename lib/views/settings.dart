@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:idea_vault/core/extensions/double.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -11,13 +12,17 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/config.dart';
+import '../config/router/app_router.dart';
 import '../config/theme/base.dart';
 import '../core/constants/app_assets.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/view_constants.dart';
+import '../core/services/note_lock_auth_service.dart';
 import '../core/utils/helpers.dart';
+import '../injection_container.dart';
 import '../main.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../views/note_lock_pin_screen.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
 
@@ -30,6 +35,26 @@ class Settings extends StatefulWidget {
 
 class _SettingsState extends State<Settings> {
   final ValueNotifier<bool> inAsyncCall = ValueNotifier(false);
+  late final NoteLockAuthService _authService;
+  bool _hasPinSetup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
+    _loadPinStatus();
+  }
+
+  Future<void> _loadPinStatus() async {
+    final hasPin = await _authService.hasPin();
+    if (mounted) {
+      setState(() {
+        _hasPinSetup = hasPin;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +79,8 @@ class _SettingsState extends State<Settings> {
                   runSpacing: AppConstants.gap10Px,
                   children: [
                     appearanceTile(themeProvider),
+                    if (_hasPinSetup)
+                      _changePinTile(themeProvider),
                     actionTile(themeProvider, ViewConstants.privacyPolicy,
                         AppAssets.privacyPolicy,
                         size: 18.0, onTap: privacyPolicy),
@@ -217,6 +244,69 @@ class _SettingsState extends State<Settings> {
         ),
       ),
     );
+  }
+
+  Widget _changePinTile(ThemeProvider themeProvider) {
+    final base = themeProvider.baseTheme;
+    return GestureDetector(
+      onTap: _changePin,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: (AppConstants.gap14Px + 1).w,
+          top: (AppConstants.gap12Px + 1).h,
+          bottom: AppConstants.gap12Px,
+        ),
+        decoration: BoxDecoration(
+          color: base.surface,
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 31.h,
+              width: 31.4.w,
+              decoration: BoxDecoration(
+                color: base.settings.iconBackground,
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.lock_reset_rounded,
+                size: 17.h,
+                color: base.settings.icon,
+              ),
+            ),
+            Gap((AppConstants.gap10Px + 1.6).w),
+            TranslatedText(
+              ViewConstants.settingsChangePin,
+              style: TextStyle(
+                color: base.settings.tileTitle,
+                fontSize: AppConstants.font14Px,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changePin() async {
+    final ctx = context;
+    final result = await AppRouter.push<bool>(
+      ctx,
+      NoteLockPinScreen(
+        mode: NoteLockPinMode.changePin,
+        authService: _authService,
+      ),
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ViewConstants.noteLockChangePinSuccess.tr()),
+        ),
+      );
+    }
   }
 
   GestureDetector actionTile(

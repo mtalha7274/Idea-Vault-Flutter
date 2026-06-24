@@ -18,6 +18,7 @@ import 'ideas/idea_vault_theme.dart';
 enum NoteLockPinMode {
   setup,
   unlock,
+  changePin,
 }
 
 class NoteLockPinScreen extends StatefulWidget {
@@ -25,16 +26,21 @@ class NoteLockPinScreen extends StatefulWidget {
     super.key,
     required this.mode,
     required this.authService,
+    this.ideaId,
+    this.nextRoute,
   });
 
   final NoteLockPinMode mode;
   final NoteLockAuthService authService;
+  final String? ideaId;
+  final Widget Function()? nextRoute;
 
   @override
   State<NoteLockPinScreen> createState() => _NoteLockPinScreenState();
 }
 
-class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
+class _NoteLockPinScreenState extends State<NoteLockPinScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _pinFocusNode = FocusNode();
   String _pin = '';
@@ -43,11 +49,24 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   bool _canUseBiometrics = false;
   bool _isCheckingBiometrics = true;
   bool _didScheduleInitialKeyboard = false;
+  bool _currentPinVerified = false;
+  bool _isError = false;
+  late final AnimationController _shakeController;
+  late final Animation<double> _shakeAnimation;
 
   bool get _isSetup => widget.mode == NoteLockPinMode.setup;
+  bool get _isChangePin => widget.mode == NoteLockPinMode.changePin;
   bool get _isConfirming => _isSetup && _firstPin != null;
 
   String get _titleKey {
+    if (_isChangePin) {
+      if (!_currentPinVerified) {
+        return ViewConstants.noteLockVerifyCurrentPinTitle;
+      }
+      return _firstPin == null
+          ? ViewConstants.noteLockNewPinTitle
+          : ViewConstants.noteLockConfirmPinTitle;
+    }
     if (!_isSetup) {
       return ViewConstants.noteLockEnterPinTitle;
     }
@@ -57,6 +76,14 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   }
 
   String get _bodyKey {
+    if (_isChangePin) {
+      if (!_currentPinVerified) {
+        return ViewConstants.noteLockVerifyCurrentPinBody;
+      }
+      return _firstPin == null
+          ? ViewConstants.noteLockNewPinBody
+          : ViewConstants.noteLockConfirmPinBody;
+    }
     if (!_isSetup) {
       return ViewConstants.noteLockUnlockBody;
     }
@@ -68,6 +95,37 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   @override
   void initState() {
     super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween:
+            Tween<double>(begin: 0, end: 8).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 8, end: -8)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -8, end: 8)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 8, end: -6)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween:
+            Tween<double>(begin: -6, end: 0).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 1,
+      ),
+    ]).animate(_shakeController);
     _pinController.addListener(_handlePinChanged);
     _loadBiometrics();
     _scheduleInitialKeyboard();
@@ -98,6 +156,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
 
   @override
   void dispose() {
+    _shakeController.dispose();
     _pinController
       ..removeListener(_handlePinChanged)
       ..dispose();
@@ -106,7 +165,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   }
 
   Future<void> _loadBiometrics() async {
-    if (_isSetup) {
+    if (_isSetup || _isChangePin) {
       setState(() {
         _isCheckingBiometrics = false;
       });
@@ -135,7 +194,11 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
     });
 
     if (nextPin.length == 4) {
-      _submitPin(nextPin);
+      Future<void>.delayed(const Duration(milliseconds: 150), () {
+        if (mounted) {
+          _submitPin(nextPin);
+        }
+      });
     }
   }
 
@@ -145,15 +208,40 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
       return;
     }
 
+    if (_isChangePin) {
+      await _submitChangePinStep(pin);
+      return;
+    }
+
     final isValid = await widget.authService.verifyPin(pin);
     if (!mounted) {
       return;
     }
     if (isValid) {
-      AppRouter.pop(context, true);
+      await _onPinSuccess();
       return;
     }
     _showError(ViewConstants.noteLockWrongPin);
+  }
+
+  Future<void> _submitChangePinStep(String pin) async {
+    if (!_currentPinVerified) {
+      final isValid = await widget.authService.verifyPin(pin);
+      if (!mounted) {
+        return;
+      }
+      if (!isValid) {
+        _showError(ViewConstants.noteLockWrongPin);
+        return;
+      }
+      setState(() {
+        _currentPinVerified = true;
+      });
+      _clearPin();
+      return;
+    }
+
+    await _submitSetupPin(pin);
   }
 
   Future<void> _submitSetupPin(String pin) async {
@@ -178,8 +266,17 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   }
 
   void _showError(String errorKey) {
+    HapticFeedback.heavyImpact();
     setState(() {
       _errorKey = errorKey;
+      _isError = true;
+    });
+    _shakeController.forward(from: 0).then((_) {
+      if (mounted) {
+        setState(() {
+          _isError = false;
+        });
+      }
     });
     _clearPin();
   }
@@ -193,10 +290,35 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
   }
 
   Future<void> _authenticateWithBiometrics() async {
+    _dismissKeyboard();
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!mounted) {
+      return;
+    }
     final didAuthenticate = await widget.authService.authenticateWithBiometrics(
       ViewConstants.noteLockBiometricReason.tr(),
     );
-    if (mounted && didAuthenticate) {
+    if (!mounted || !didAuthenticate) {
+      return;
+    }
+    await _onPinSuccess();
+  }
+
+  Future<void> _onPinSuccess() async {
+    final ideaId = widget.ideaId;
+    final nextRoute = widget.nextRoute;
+    if (nextRoute != null) {
+      if (ideaId != null) {
+        widget.authService.markIdeaUnlocked(ideaId);
+      }
+      if (!mounted) {
+        return;
+      }
+      await AppRouter.pushReplacement(context, nextRoute());
+      if (ideaId != null) {
+        widget.authService.markIdeaLocked(ideaId);
+      }
+    } else {
       AppRouter.pop(context, true);
     }
   }
@@ -267,9 +389,17 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
                         ),
                       ),
                       Gap(34.h),
-                      _PinDots(
-                        filledCount: _pin.length,
-                        onTap: _openKeyboard,
+                      AnimatedBuilder(
+                        animation: _shakeAnimation,
+                        builder: (context, child) => Transform.translate(
+                          offset: Offset(_shakeAnimation.value, 0),
+                          child: child,
+                        ),
+                        child: _PinDots(
+                          filledCount: _pin.length,
+                          isError: _isError,
+                          onTap: _openKeyboard,
+                        ),
                       ),
                       if (_errorKey != null) ...[
                         Gap(18.h),
@@ -284,7 +414,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
                           ),
                         ),
                       ],
-                      if (!_isSetup &&
+                      if (widget.mode == NoteLockPinMode.unlock &&
                           !_isCheckingBiometrics &&
                           _canUseBiometrics) ...[
                         Gap(28.h),
@@ -335,15 +465,19 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen> {
 class _PinDots extends StatelessWidget {
   const _PinDots({
     required this.filledCount,
+    required this.isError,
     required this.onTap,
   });
 
   final int filledCount;
+  final bool isError;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final errorColor = Theme.of(context).colorScheme.error;
+    final activeColor = isError ? errorColor : theme.primary;
     return GestureDetector(
       key: const Key('note-lock-pin-dots'),
       behavior: HitTestBehavior.opaque,
@@ -361,10 +495,11 @@ class _PinDots extends StatelessWidget {
                 height: 18.d,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color:
-                      index < filledCount ? theme.primary : Colors.transparent,
+                  color: index < filledCount || isError
+                      ? activeColor
+                      : Colors.transparent,
                   border: Border.all(
-                    color: theme.primary,
+                    color: activeColor,
                     width: 1.8,
                   ),
                 ),

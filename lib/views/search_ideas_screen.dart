@@ -114,24 +114,21 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
   }
 
   Future<void> _openIdea(Idea idea) async {
-    if (idea.isLocked) {
-      final didAuthenticate = await authenticateForNoteLock(
-        context,
-        _noteLockAuthService,
-        ideaId: idea.id,
-      );
-      if (!mounted || !didAuthenticate) {
-        return;
-      }
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      return;
     }
 
-    await AppRouter.push(
-      context,
-      IdeaEditorScreen(ideaId: idea.id),
-    );
-    if (idea.isLocked) {
-      _noteLockAuthService.markIdeaLocked(idea.id);
+    if (!mounted) {
+      return;
     }
+
+    await authenticateAndOpenNote(
+      context,
+      _noteLockAuthService,
+      ideaId: idea.id,
+      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
+    );
   }
 }
 

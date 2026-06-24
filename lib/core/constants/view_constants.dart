@@ -137,6 +137,14 @@ class ViewConstants {
   static const String noteLockEditorBackAction = 'noteLockEditorBackAction';
   static const String noteLockLockedSnackbar = 'noteLockLockedSnackbar';
   static const String noteLockUnlockedSnackbar = 'noteLockUnlockedSnackbar';
+  static const String noteLockVerifyCurrentPinTitle =
+      'noteLockVerifyCurrentPinTitle';
+  static const String noteLockVerifyCurrentPinBody =
+      'noteLockVerifyCurrentPinBody';
+  static const String noteLockNewPinTitle = 'noteLockNewPinTitle';
+  static const String noteLockNewPinBody = 'noteLockNewPinBody';
+  static const String noteLockChangePinSuccess = 'noteLockChangePinSuccess';
+  static const String settingsChangePin = 'settingsChangePin';
 
   static const String homepageSavedIdeasTooltipOne =
       'homepageSavedIdeasTooltipOne';

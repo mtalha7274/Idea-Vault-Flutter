@@ -187,14 +187,22 @@ class IdeaCard extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: radius,
-            child: idea.isLocked
-                ? _buildLockedCard(context)
-                : Padding(
-                    padding: EdgeInsets.all(_isGrid ? 14 : 22),
-                    child: _isGrid
-                        ? _buildGridContent(context)
-                        : _buildListContent(context),
-                  ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+              child: idea.isLocked
+                  ? _buildLockedCard(context)
+                  : Padding(
+                      key: ValueKey('unlocked-${idea.id}'),
+                      padding: EdgeInsets.all(_isGrid ? 14 : 22),
+                      child: _isGrid
+                          ? _buildGridContent(context)
+                          : _buildListContent(context),
+                    ),
+            ),
           ),
         ),
       ),
@@ -206,6 +214,7 @@ class IdeaCard extends StatelessWidget {
   Widget _buildLockedCard(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return Stack(
+      key: ValueKey('locked-${idea.id}'),
       fit: StackFit.expand,
       children: [
         Padding(

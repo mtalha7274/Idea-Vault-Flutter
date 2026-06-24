@@ -72,3 +72,40 @@ Future<bool> authenticateForNoteLock(
   }
   return result == true;
 }
+
+Future<void> authenticateAndOpenNote(
+  BuildContext context,
+  NoteLockAuthService authService, {
+  required String ideaId,
+  required Widget Function() nextRoute,
+}) async {
+  if (authService.isIdeaUnlocked(ideaId)) {
+    await AppRouter.push(context, nextRoute());
+    authService.markIdeaLocked(ideaId);
+    return;
+  }
+
+  if (!await authService.hasPin()) {
+    if (!context.mounted) {
+      return;
+    }
+    final didCreatePin = await showCreateNoteLockPinDialog(context, authService);
+    if (!didCreatePin) {
+      return;
+    }
+  }
+
+  if (!context.mounted) {
+    return;
+  }
+
+  await AppRouter.push<void>(
+    context,
+    NoteLockPinScreen(
+      mode: NoteLockPinMode.unlock,
+      authService: authService,
+      ideaId: ideaId,
+      nextRoute: nextRoute,
+    ),
+  );
+}

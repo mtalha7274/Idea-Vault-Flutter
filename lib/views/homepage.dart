@@ -317,20 +317,21 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    if (!await _authenticateLockedIdeaIfNeeded(idea)) {
-      return;
-    }
     if (!mounted) {
       return;
     }
 
-    await AppRouter.push(
-      context,
-      IdeaEditorScreen(ideaId: idea.id),
-    );
-    if (idea.isLocked) {
-      _noteLockAuthService.markIdeaLocked(idea.id);
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      return;
     }
+
+    await authenticateAndOpenNote(
+      context,
+      _noteLockAuthService,
+      ideaId: idea.id,
+      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
+    );
   }
 
   Future<void> _checkFreshInstallBackup() async {
@@ -426,30 +427,20 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    if (!await _authenticateLockedIdeaIfNeeded(idea)) {
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
       return;
     }
+
     if (!mounted) {
       return;
     }
 
-    await AppRouter.push(
-      context,
-      IdeaEditorScreen(ideaId: idea.id),
-    );
-    if (idea.isLocked) {
-      _noteLockAuthService.markIdeaLocked(idea.id);
-    }
-  }
-
-  Future<bool> _authenticateLockedIdeaIfNeeded(Idea idea) async {
-    if (!idea.isLocked) {
-      return true;
-    }
-    return authenticateForNoteLock(
+    await authenticateAndOpenNote(
       context,
       _noteLockAuthService,
       ideaId: idea.id,
+      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
     );
   }
 

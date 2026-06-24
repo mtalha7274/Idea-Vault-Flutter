@@ -71,13 +71,10 @@ class NoteLockAuthService {
   }
 
   Future<bool> authenticateWithBiometrics(String localizedReason) async {
-    if (!await canUseBiometrics()) {
-      return false;
-    }
     try {
-      return _localAuthentication.authenticate(
+      return await _localAuthentication.authenticate(
         localizedReason: localizedReason,
-        biometricOnly: true,
+        biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
     } catch (_) {

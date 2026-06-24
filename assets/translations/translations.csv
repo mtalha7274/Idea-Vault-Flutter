@@ -109,6 +109,12 @@ noteLockEditorAction,Unlock Note
 noteLockEditorBackAction,Back to Ideas
 noteLockLockedSnackbar,Note locked.
 noteLockUnlockedSnackbar,Note unlocked.
+noteLockVerifyCurrentPinTitle,Verify PIN
+noteLockVerifyCurrentPinBody,Enter your current PIN to change it.
+noteLockNewPinTitle,New PIN
+noteLockNewPinBody,Enter a new 4-digit PIN.
+noteLockChangePinSuccess,PIN changed.
+settingsChangePin,Change PIN
 homepageSavedIdeasTooltipOne,1 saved idea
 homepageSavedIdeasTooltipMany,{count} saved ideas
 homepageTitle,Idea Vault
