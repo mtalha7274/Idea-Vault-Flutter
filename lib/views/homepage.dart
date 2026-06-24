@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -8,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../config/config.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/app_assets.dart';
+import '../core/services/note_lock_auth_service.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
@@ -22,6 +25,7 @@ import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
 import '../widgets/free_usage_progress_ring.dart';
 import '../widgets/ideas/ideas_layout.dart';
+import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/premium_crown_icon.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
@@ -53,6 +57,7 @@ class _HomepageState extends State<Homepage> {
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _quickAdditionController;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
+  late final NoteLockAuthService _noteLockAuthService;
 
   bool _didHandleResume = false;
   bool _didCheckFreeUsageIntro = false;
@@ -67,6 +72,9 @@ class _HomepageState extends State<Homepage> {
     super.initState();
     _sortPreferencesRepo =
         widget.sortPreferencesRepo ?? sl<IdeaListPreferencesRepo>();
+    _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
     _sortOption = _sortPreferencesRepo.getSortOption();
     _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _quickAdditionController = TextEditingController();
@@ -180,7 +188,8 @@ class _HomepageState extends State<Homepage> {
                                     ideas: visibleIdeas,
                                     layoutOption: _layoutOption,
                                     selectedIdeaIds: _selectedIdeaIds,
-                                    onTap: _handleIdeaTap,
+                                    onTap: (idea) =>
+                                        unawaited(_handleIdeaTap(idea)),
                                     onLongPress: _handleIdeaLongPress,
                                   ),
                                 ),
@@ -308,10 +317,20 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
+    if (!await _authenticateLockedIdeaIfNeeded(idea)) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
     await AppRouter.push(
       context,
       IdeaEditorScreen(ideaId: idea.id),
     );
+    if (idea.isLocked) {
+      _noteLockAuthService.markIdeaLocked(idea.id);
+    }
   }
 
   Future<void> _checkFreshInstallBackup() async {
@@ -401,15 +420,36 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  void _handleIdeaTap(Idea idea) {
+  Future<void> _handleIdeaTap(Idea idea) async {
     if (_isSelectionMode) {
       _toggleIdeaSelection(idea.id);
       return;
     }
 
-    AppRouter.push(
+    if (!await _authenticateLockedIdeaIfNeeded(idea)) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    await AppRouter.push(
       context,
       IdeaEditorScreen(ideaId: idea.id),
+    );
+    if (idea.isLocked) {
+      _noteLockAuthService.markIdeaLocked(idea.id);
+    }
+  }
+
+  Future<bool> _authenticateLockedIdeaIfNeeded(Idea idea) async {
+    if (!idea.isLocked) {
+      return true;
+    }
+    return authenticateForNoteLock(
+      context,
+      _noteLockAuthService,
+      ideaId: idea.id,
     );
   }
 
@@ -499,7 +539,29 @@ class _HomepageState extends State<Homepage> {
     }
 
     final selectedIds = _selectedIdeaIds.toList(growable: false);
-    await context.read<IdeasProvider>().deleteIdeas(selectedIds);
+    final ideasProvider = context.read<IdeasProvider>();
+    final selectedIdeas = ideasProvider.ideas
+        .where((idea) => selectedIds.contains(idea.id))
+        .toList(growable: false);
+    final lockedIdeas =
+        selectedIdeas.where((idea) => idea.isLocked).toList(growable: false);
+    if (lockedIdeas.isNotEmpty) {
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        _noteLockAuthService,
+        ideaId: lockedIdeas.first.id,
+      );
+      if (!didAuthenticate) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      for (final idea in lockedIdeas) {
+        _noteLockAuthService.markIdeaUnlocked(idea.id);
+      }
+    }
+    await ideasProvider.deleteIdeas(selectedIds);
     if (!mounted) {
       return;
     }

@@ -112,6 +112,31 @@ class ViewConstants {
       'ideaEditorOptionsSheetTitle';
   static const String ideaEditorOptionsDeleteIdea =
       'ideaEditorOptionsDeleteIdea';
+  static const String ideaEditorOptionsLockNote = 'ideaEditorOptionsLockNote';
+  static const String ideaEditorOptionsUnlockNote =
+      'ideaEditorOptionsUnlockNote';
+  static const String noteLockCreatePinTitle = 'noteLockCreatePinTitle';
+  static const String noteLockCreatePinBody = 'noteLockCreatePinBody';
+  static const String noteLockConfirmPinTitle = 'noteLockConfirmPinTitle';
+  static const String noteLockConfirmPinBody = 'noteLockConfirmPinBody';
+  static const String noteLockEnterPinTitle = 'noteLockEnterPinTitle';
+  static const String noteLockPinLabel = 'noteLockPinLabel';
+  static const String noteLockConfirmPinLabel = 'noteLockConfirmPinLabel';
+  static const String noteLockCreatePinAction = 'noteLockCreatePinAction';
+  static const String noteLockPinTooShort = 'noteLockPinTooShort';
+  static const String noteLockPinMismatch = 'noteLockPinMismatch';
+  static const String noteLockUnlockTitle = 'noteLockUnlockTitle';
+  static const String noteLockUnlockBody = 'noteLockUnlockBody';
+  static const String noteLockWrongPin = 'noteLockWrongPin';
+  static const String noteLockUnlockAction = 'noteLockUnlockAction';
+  static const String noteLockUseBiometric = 'noteLockUseBiometric';
+  static const String noteLockBiometricReason = 'noteLockBiometricReason';
+  static const String noteLockEditorTitle = 'noteLockEditorTitle';
+  static const String noteLockEditorBody = 'noteLockEditorBody';
+  static const String noteLockEditorAction = 'noteLockEditorAction';
+  static const String noteLockEditorBackAction = 'noteLockEditorBackAction';
+  static const String noteLockLockedSnackbar = 'noteLockLockedSnackbar';
+  static const String noteLockUnlockedSnackbar = 'noteLockUnlockedSnackbar';
 
   static const String homepageSavedIdeasTooltipOne =
       'homepageSavedIdeasTooltipOne';

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -183,10 +185,179 @@ class IdeaCard extends StatelessWidget {
                   : Colors.transparent,
             ),
           ),
-          padding: EdgeInsets.all(_isGrid ? 14 : 22),
-          child:
-              _isGrid ? _buildGridContent(context) : _buildListContent(context),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: idea.isLocked
+                ? _buildLockedCard(context)
+                : Padding(
+                    padding: EdgeInsets.all(_isGrid ? 14 : 22),
+                    child: _isGrid
+                        ? _buildGridContent(context)
+                        : _buildListContent(context),
+                  ),
+          ),
         ),
+      ),
+    );
+  }
+
+  double get _cardPadding => _isGrid ? 14 : 22;
+
+  Widget _buildLockedCard(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Padding(
+          padding: EdgeInsets.all(_cardPadding),
+          child: _isGrid
+              ? _buildGridLockedBlurBase(context)
+              : _buildListLockedBlurBase(context),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: ColoredBox(
+              color: theme.surface.withValues(alpha: 0.78),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  _cardPadding,
+                  _cardPadding,
+                  _cardPadding,
+                  0,
+                ),
+                child: _buildLockedTitle(context),
+              ),
+              Expanded(
+                child: Center(
+                  child: _buildLockedIcon(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListLockedBlurBase(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLockedBlurBar(context, widthFactor: 1, height: 28),
+        SizedBox(height: 6),
+        _buildLockedBlurBar(context, widthFactor: 0.55, height: 28),
+        SizedBox(height: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLockedBlurBar(context, widthFactor: 1, height: 12),
+                    _buildLockedBlurBar(context, widthFactor: 0.92, height: 12),
+                    _buildLockedBlurBar(context, widthFactor: 0.78, height: 12),
+                  ],
+                ),
+              ),
+              _buildLockedBlurBar(context, widthFactor: 0.34, height: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridLockedBlurBase(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLockedBlurBar(context, widthFactor: 1, height: 20),
+        SizedBox(height: 6),
+        _buildLockedBlurBar(context, widthFactor: 0.72, height: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              _buildLockedBlurBar(context, widthFactor: 0.42, height: 22),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLockedBlurBar(context, widthFactor: 1, height: 10),
+                    _buildLockedBlurBar(context, widthFactor: 0.88, height: 10),
+                    _buildLockedBlurBar(context, widthFactor: 0.7, height: 10),
+                  ],
+                ),
+              ),
+              _buildLockedBlurBar(context, widthFactor: 0.38, height: 10),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLockedBlurBar(
+    BuildContext context, {
+    required double widthFactor,
+    required double height,
+  }) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: theme.textMuted.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockedTitle(BuildContext context) {
+    return Text(
+      idea.title,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: ideaVaultHeadline(
+        context,
+        size: _isGrid ? 17 : 24,
+        weight: FontWeight.w800,
+        height: _isGrid ? 1.18 : 1.15,
+      ),
+    );
+  }
+
+  Widget _buildLockedIcon(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Container(
+      width: _isGrid ? 42 : 50,
+      height: _isGrid ? 42 : 50,
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.lock_outline_rounded,
+        size: _isGrid ? 22 : 26,
+        color: theme.primary,
       ),
     );
   }
@@ -215,24 +386,31 @@ class IdeaCard extends StatelessWidget {
             IdeaSectionCountPill(idea: idea),
           ],
         ),
-        const SizedBox(height: 14),
-        Text(
-          ideaPreviewText(idea),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: ideaVaultBody(
-            context,
-            size: 15,
-            weight: FontWeight.w500,
-            color: theme.textMuted,
-            height: 1.65,
+        SizedBox(height: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ideaPreviewText(idea),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: ideaVaultBody(
+                  context,
+                  size: 15,
+                  weight: FontWeight.w500,
+                  color: theme.textMuted,
+                  height: 1.65,
+                ),
+              ),
+              const Spacer(),
+              IdeaUpdatedAtLabel(
+                updatedAt: idea.updatedAt,
+                iconSize: 18,
+                textSize: 13,
+              ),
+            ],
           ),
-        ),
-        const Spacer(),
-        IdeaUpdatedAtLabel(
-          updatedAt: idea.updatedAt,
-          iconSize: 18,
-          textSize: 13,
         ),
       ],
     );
@@ -254,31 +432,38 @@ class IdeaCard extends StatelessWidget {
             height: 1.18,
           ),
         ),
-        const SizedBox(height: 10),
-        IdeaSectionCountPill(
-          idea: idea,
-          compact: true,
-        ),
-        const SizedBox(height: 10),
         Expanded(
-          child: Text(
-            ideaPreviewText(idea),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: ideaVaultBody(
-              context,
-              size: 13,
-              weight: FontWeight.w500,
-              color: theme.textMuted,
-              height: 1.45,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              IdeaSectionCountPill(
+                idea: idea,
+                compact: true,
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Text(
+                  ideaPreviewText(idea),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: ideaVaultBody(
+                    context,
+                    size: 13,
+                    weight: FontWeight.w500,
+                    color: theme.textMuted,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              IdeaUpdatedAtLabel(
+                updatedAt: idea.updatedAt,
+                iconSize: 16,
+                textSize: 11,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 10),
-        IdeaUpdatedAtLabel(
-          updatedAt: idea.updatedAt,
-          iconSize: 16,
-          textSize: 11,
         ),
       ],
     );

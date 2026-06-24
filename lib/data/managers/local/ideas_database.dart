@@ -7,7 +7,7 @@ class IdeasDatabaseManager {
   });
 
   static const String databaseName = 'idea_vault.db';
-  static const int databaseVersion = 3;
+  static const int databaseVersion = 4;
 
   static const String ideasTable = 'ideas';
   static const String sectionsTable = 'idea_sections';
@@ -40,7 +40,8 @@ class IdeasDatabaseManager {
             title TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            last_opened_section_id TEXT
+            last_opened_section_id TEXT,
+            is_locked INTEGER NOT NULL DEFAULT 0
           )
         ''');
 
@@ -74,6 +75,11 @@ class IdeasDatabaseManager {
         if (oldVersion < 3) {
           await db.execute(
             'ALTER TABLE $ideasTable ADD COLUMN last_opened_section_id TEXT',
+          );
+        }
+        if (oldVersion < 4) {
+          await db.execute(
+            'ALTER TABLE $ideasTable ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0',
           );
         }
       },

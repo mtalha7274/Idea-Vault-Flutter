@@ -1,16 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config/router/app_router.dart';
 import '../core/constants/view_constants.dart';
+import '../core/services/note_lock_auth_service.dart';
 import '../core/utils/idea_search.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
+import '../models/idea.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/ideas/ideas_layout.dart';
 import '../widgets/ideas_search_field.dart';
+import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/translated_text.dart';
 import 'idea_editor.dart';
 import 'ideas/idea_vault_theme.dart';
@@ -24,12 +29,16 @@ class SearchIdeasScreen extends StatefulWidget {
 
 class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
   late final TextEditingController _searchController;
+  late final NoteLockAuthService _noteLockAuthService;
 
   String get _searchQuery => _searchController.text.trim();
 
   @override
   void initState() {
     super.initState();
+    _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
     _searchController = TextEditingController()
       ..addListener(_handleSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -92,10 +101,7 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
                               child: IdeasLayout(
                                 ideas: results,
                                 layoutOption: layoutOption,
-                                onTap: (idea) => AppRouter.push(
-                                  context,
-                                  IdeaEditorScreen(ideaId: idea.id),
-                                ),
+                                onTap: (idea) => unawaited(_openIdea(idea)),
                               ),
                             ),
                 ),
@@ -105,6 +111,27 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openIdea(Idea idea) async {
+    if (idea.isLocked) {
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        _noteLockAuthService,
+        ideaId: idea.id,
+      );
+      if (!mounted || !didAuthenticate) {
+        return;
+      }
+    }
+
+    await AppRouter.push(
+      context,
+      IdeaEditorScreen(ideaId: idea.id),
+    );
+    if (idea.isLocked) {
+      _noteLockAuthService.markIdeaLocked(idea.id);
+    }
   }
 }
 

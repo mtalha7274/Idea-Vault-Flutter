@@ -85,6 +85,30 @@ exportForAiClipboardIdeaLine,Idea: {title}
 exportForAiSectionNoContentYet,No content yet
 ideaEditorOptionsSheetTitle,Idea options
 ideaEditorOptionsDeleteIdea,Delete Idea
+ideaEditorOptionsLockNote,Lock Note
+ideaEditorOptionsUnlockNote,Unlock Note
+noteLockCreatePinTitle,Create note PIN
+noteLockCreatePinBody,Set a 4-digit PIN before locking notes.
+noteLockConfirmPinTitle,Confirm PIN
+noteLockConfirmPinBody,Enter the same 4-digit PIN again.
+noteLockEnterPinTitle,Enter PIN
+noteLockPinLabel,PIN
+noteLockConfirmPinLabel,Confirm PIN
+noteLockCreatePinAction,Create PIN
+noteLockPinTooShort,Use exactly 4 digits.
+noteLockPinMismatch,PINs do not match.
+noteLockUnlockTitle,Unlock note
+noteLockUnlockBody,Enter your PIN to unlock this note.
+noteLockWrongPin,Wrong PIN. Try again.
+noteLockUnlockAction,Unlock
+noteLockUseBiometric,Use Face ID / Touch ID
+noteLockBiometricReason,Unlock your locked note
+noteLockEditorTitle,This note is locked
+noteLockEditorBody,Unlock it to view or edit its content.
+noteLockEditorAction,Unlock Note
+noteLockEditorBackAction,Back to Ideas
+noteLockLockedSnackbar,Note locked.
+noteLockUnlockedSnackbar,Note unlocked.
 homepageSavedIdeasTooltipOne,1 saved idea
 homepageSavedIdeasTooltipMany,{count} saved ideas
 homepageTitle,Idea Vault

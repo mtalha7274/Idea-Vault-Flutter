@@ -43,6 +43,7 @@ class IdeasRepo {
         createdAt: DateTime.parse(row['created_at'] as String),
         updatedAt: DateTime.parse(row['updated_at'] as String),
         lastOpenedSectionId: row['last_opened_section_id'] as String?,
+        isLocked: row['is_locked'] == 1,
         sections: sectionsByIdeaId[ideaId] ?? const [],
       );
     }).toList();
@@ -59,6 +60,7 @@ class IdeasRepo {
           'created_at': idea.createdAt.toIso8601String(),
           'updated_at': idea.updatedAt.toIso8601String(),
           'last_opened_section_id': idea.lastOpenedSectionId,
+          'is_locked': idea.isLocked ? 1 : 0,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -99,6 +101,19 @@ class IdeasRepo {
     );
   }
 
+  Future<void> updateIdeaLockState({
+    required String ideaId,
+    required bool isLocked,
+  }) async {
+    final db = await _databaseManager.database;
+    await db.update(
+      IdeasDatabaseManager.ideasTable,
+      {'is_locked': isLocked ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [ideaId],
+    );
+  }
+
   Future<void> deleteIdeas(Iterable<String> ideaIds) async {
     final ids = ideaIds.toSet().toList();
     if (ids.isEmpty) {
@@ -128,6 +143,7 @@ class IdeasRepo {
             'created_at': idea.createdAt.toIso8601String(),
             'updated_at': idea.updatedAt.toIso8601String(),
             'last_opened_section_id': idea.lastOpenedSectionId,
+            'is_locked': idea.isLocked ? 1 : 0,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );

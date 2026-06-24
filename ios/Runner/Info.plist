@@ -30,6 +30,8 @@
 	<string>Idea Vault uses your microphone to let you dictate ideas hands-free.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Idea Vault uses your camera to capture images and extract text into your ideas.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Idea Vault uses Face ID to unlock locked notes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Idea Vault uses your photo library to extract text from selected images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

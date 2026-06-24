@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config/router/app_router.dart';
 import '../core/services/image_text_recognition_service.dart';
+import '../core/services/note_lock_auth_service.dart';
 import '../core/utils/editor_text_insertion.dart';
 import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
@@ -29,6 +31,7 @@ import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
+import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/sheets/idea_editor_section_sheet.dart';
 import '../widgets/sheets/idea_options_sheet.dart';
@@ -74,6 +77,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late IdeasProvider _ideasProvider;
   late IdeaOrganizationRepository _organizationRepo;
   late ImageTextRecognitionService _imageTextRecognitionService;
+  late NoteLockAuthService _noteLockAuthService;
 
   Timer? _autosaveTimer;
   Future<void>? _saveInFlight;
@@ -102,6 +106,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final ideasProvider = context.read<IdeasProvider>();
     _ideasProvider = ideasProvider;
     _organizationRepo = sl<IdeaOrganizationRepository>();
+    _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
     _imageTextRecognitionService =
         sl.isRegistered<ImageTextRecognitionService>()
             ? sl<ImageTextRecognitionService>()
@@ -192,6 +199,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final currentIdea = _currentIdea(context.watch<IdeasProvider>());
+    final isEditorLocked = currentIdea != null &&
+        currentIdea.isLocked &&
+        !_noteLockAuthService.isIdeaUnlocked(currentIdea.id);
     return PopScope<Object?>(
       canPop: _allowPop || !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) async {
@@ -259,9 +270,137 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           if (_isOrganizing) _buildOrganizingOverlay(context),
           if (_isPreparingImageText) _buildPreparingImageOverlay(context),
           if (_isExtractingImageText) _buildImageTextOverlay(context),
+          if (isEditorLocked) _buildLockedEditorOverlay(context, currentIdea),
         ],
       ),
     );
+  }
+
+  Idea? _currentIdea(IdeasProvider ideasProvider) {
+    final ideaId = _savedIdeaId ?? widget.ideaId;
+    if (ideaId == null) {
+      return null;
+    }
+    return ideasProvider.findById(ideaId);
+  }
+
+  Widget _buildLockedEditorOverlay(BuildContext context, Idea idea) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Positioned.fill(
+      child: Material(
+        type: MaterialType.transparency,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: ColoredBox(
+              color: theme.background.withValues(alpha: 0.86),
+              child: SafeArea(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: IconButton(
+                        onPressed: _leaveLockedEditor,
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: theme.primaryText,
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 76,
+                              height: 76,
+                              decoration: BoxDecoration(
+                                color: theme.primary.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.lock_outline_rounded,
+                                size: 36,
+                                color: theme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            TranslatedText(
+                              ViewConstants.noteLockEditorTitle,
+                              textAlign: TextAlign.center,
+                              style: ideaVaultHeadline(
+                                context,
+                                size: 24,
+                                weight: FontWeight.w800,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TranslatedText(
+                              ViewConstants.noteLockEditorBody,
+                              textAlign: TextAlign.center,
+                              style: ideaVaultBody(
+                                context,
+                                size: 15,
+                                weight: FontWeight.w500,
+                                color: theme.textMuted,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  unawaited(_unlockEditorContent(idea)),
+                              icon: const Icon(Icons.lock_open_rounded),
+                              label:
+                                  Text(ViewConstants.noteLockEditorAction.tr()),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _leaveLockedEditor,
+                              child: Text(
+                                ViewConstants.noteLockEditorBackAction.tr(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _leaveLockedEditor() async {
+    await _ideasProvider.clearEditorState();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _allowPop = true;
+    });
+    AppRouter.pop(context);
+  }
+
+  Future<void> _unlockEditorContent(Idea idea) async {
+    final didAuthenticate = await authenticateForNoteLock(
+      context,
+      _noteLockAuthService,
+      ideaId: idea.id,
+    );
+    if (!mounted || !didAuthenticate) {
+      return;
+    }
+    setState(() {});
   }
 
   Widget _buildCollapsibleEditorHeader(BuildContext context) {
@@ -1431,7 +1570,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showMoreOptionsSheet() async {
-    final action = await showIdeaEditorOptionsSheet(context);
+    final currentIdea = _currentIdea(context.read<IdeasProvider>());
+    final action = await showIdeaEditorOptionsSheet(
+      context,
+      currentIdea?.isLocked == true,
+    );
 
     if (!mounted || action == null) {
       return;
@@ -1444,16 +1587,104 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       case IdeaEditorOptionsSheetAction.exportToPDF:
         await _openExportScreen(ExportMode.pdfExport);
         break;
+      case IdeaEditorOptionsSheetAction.lockNote:
+        await _lockCurrentIdea();
+        break;
+      case IdeaEditorOptionsSheetAction.unlockNote:
+        await _unlockCurrentIdea();
+        break;
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
         break;
     }
   }
 
+  Future<void> _lockCurrentIdea() async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+
+    final isReady = await ensureNoteLockReady(context, _noteLockAuthService);
+    if (!mounted || !isReady) {
+      return;
+    }
+
+    await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: true);
+    _noteLockAuthService.markIdeaLocked(ideaId);
+    if (!mounted) {
+      return;
+    }
+    _showNoteLockSnackBar(ViewConstants.noteLockLockedSnackbar);
+  }
+
+  Future<void> _unlockCurrentIdea() async {
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+
+    final didAuthenticate = await authenticateForNoteLock(
+      context,
+      _noteLockAuthService,
+      ideaId: ideaId,
+    );
+    if (!mounted || !didAuthenticate) {
+      return;
+    }
+
+    await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: false);
+    _noteLockAuthService.markIdeaLocked(ideaId);
+    if (!mounted) {
+      return;
+    }
+    _showNoteLockSnackBar(ViewConstants.noteLockUnlockedSnackbar);
+  }
+
+  void _showNoteLockSnackBar(String messageKey) {
+    final theme = context.read<ThemeProvider>().baseTheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: theme.surface,
+        content: Text(
+          messageKey.tr(),
+          style: ideaVaultBody(
+            context,
+            size: 14,
+            weight: FontWeight.w700,
+            color: theme.primaryText,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openExportScreen(ExportMode mode) async {
     await _flushAutosave();
     if (!mounted) {
       return;
+    }
+
+    final currentIdea = _currentIdea(context.read<IdeasProvider>());
+    if (currentIdea?.isLocked == true) {
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        _noteLockAuthService,
+        ideaId: currentIdea!.id,
+      );
+      if (!mounted || !didAuthenticate) {
+        return;
+      }
     }
 
     await AppRouter.push(
@@ -1483,6 +1714,18 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final ideaId = _savedIdeaId;
     if (ideaId == null) {
       return;
+    }
+
+    final currentIdea = _currentIdea(context.read<IdeasProvider>());
+    if (currentIdea?.isLocked == true) {
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        _noteLockAuthService,
+        ideaId: currentIdea!.id,
+      );
+      if (!mounted || !didAuthenticate) {
+        return;
+      }
     }
 
     final shouldDelete = await showDeleteIdeasConfirmationDialog(
