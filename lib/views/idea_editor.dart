@@ -39,6 +39,7 @@ import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/sheets/idea_editor_section_sheet.dart';
 import '../widgets/sheets/idea_options_sheet.dart';
 import '../widgets/sheets/organise_section_sheet.dart';
+import '../widgets/speech_to_text_mic_fab.dart';
 import '../core/constants/view_constants.dart';
 import '../widgets/translated_text.dart';
 import 'export_for_ai_screen.dart';
@@ -62,7 +63,7 @@ class IdeaEditorScreen extends StatefulWidget {
 }
 
 class _IdeaEditorScreenState extends State<IdeaEditorScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   static const _autosaveDelay = Duration(milliseconds: 700);
   final SpeechToText _speechToText = SpeechToText();
   final ImagePicker _imagePicker = ImagePicker();
@@ -70,9 +71,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late final TextEditingController _contentController;
   late final FocusNode _titleFocusNode;
   late final FocusNode _contentFocusNode;
-  late final AnimationController _micScaleController;
-  late final AnimationController _micGlowController;
-  late final Animation<double> _micScaleAnimation;
   late List<IdeaSection> _sections;
   late Map<String, String> _sectionContentById;
   late String _activeSectionId;
@@ -91,6 +89,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isAutosaving = false;
   bool _hasSaveFailed = false;
   bool _isListening = false;
+  bool _isSpeechActivating = false;
   bool _isMicPressHeld = false;
   final GlobalKey<TooltipState> _micTooltipKey = GlobalKey<TooltipState>();
   bool _isSpeechInitialized = false;
@@ -141,20 +140,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
     _titleFocusNode = FocusNode();
     _contentFocusNode = FocusNode();
-    _micScaleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _micGlowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _micScaleAnimation = Tween<double>(begin: 1, end: 1.65).animate(
-      CurvedAnimation(
-        parent: _micScaleController,
-        curve: Curves.easeOutBack,
-      ),
-    );
     _titleController.addListener(_handleDraftChanged);
     _contentController.addListener(_handleEditorContentChanged);
     _lastSavedSnapshot = _snapshot();
@@ -190,8 +175,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       ..dispose();
     _titleFocusNode.dispose();
     _contentFocusNode.dispose();
-    _micScaleController.dispose();
-    _micGlowController.dispose();
     super.dispose();
   }
 
@@ -227,7 +210,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           Scaffold(
             backgroundColor: theme.background,
             resizeToAvoidBottomInset: true,
-            floatingActionButton: _buildSpeechFab(context),
+            floatingActionButton: SpeechToTextMicFab(
+              isListening: _isListening,
+              isActivating: _isSpeechActivating,
+              tooltipKey: _micTooltipKey,
+              onTap: _handleMicSingleTap,
+              onLongPressStart: _handleMicLongPress,
+              onLongPressEnd: _handleMicLongPressEnd,
+            ),
             body: SafeArea(
               bottom: false,
               child: _wrapEditorBodyWithKeyboardActions(
@@ -529,126 +519,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSpeechFab(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    final primaryColor = theme.primary;
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardVisible = keyboardHeight > 0;
-
-    return AnimatedScale(
-      scale: isKeyboardVisible ? 0 : 1,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeInOutCubic,
-      child: AnimatedOpacity(
-        opacity: isKeyboardVisible ? 0 : 1,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInOut,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            AnimatedSlide(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              offset: _isListening ? Offset.zero : const Offset(0, 0.3),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 160),
-                opacity: _isListening ? 1 : 0,
-                child: IgnorePointer(
-                  ignoring: !_isListening,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: theme.surface,
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.15),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      ViewConstants.ideaEditorListening.tr(),
-                      style: ideaVaultLabel(
-                        context,
-                        size: 13,
-                        weight: FontWeight.w700,
-                        color: primaryColor,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Tooltip(
-              key: _micTooltipKey,
-              message: ViewConstants.ideaEditorMicLongPressToTalk.tr(),
-              triggerMode: TooltipTriggerMode.manual,
-              showDuration: const Duration(seconds: 3),
-              child: GestureDetector(
-                key: const Key('idea-editor-mic-fab'),
-                behavior: HitTestBehavior.opaque,
-                onTap: _handleMicSingleTap,
-                onLongPress: _handleMicLongPress,
-                onLongPressEnd: (_) => _handleMicLongPressEnd(),
-                child: ScaleTransition(
-                  scale: _micScaleAnimation,
-                  child: AnimatedBuilder(
-                    animation: _micGlowController,
-                    builder: (context, child) {
-                      final glowOpacity =
-                          0.16 + (_micGlowController.value * 0.22);
-                      final glowRadius =
-                          32.0 + (_micGlowController.value * 12.0);
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: _isListening
-                              ? [
-                                  BoxShadow(
-                                    color: primaryColor.withValues(
-                                        alpha: glowOpacity),
-                                    blurRadius: glowRadius,
-                                    spreadRadius: 3,
-                                  ),
-                                ]
-                              : const [],
-                        ),
-                        child: child,
-                      );
-                    },
-                    child: AbsorbPointer(
-                      child: FloatingActionButton(
-                        heroTag: 'idea-editor-mic-fab',
-                        onPressed: () {},
-                        elevation: _isListening ? 8 : 6,
-                        backgroundColor: primaryColor,
-                        foregroundColor: theme.onPrimary,
-                        shape: const CircleBorder(),
-                        child: Icon(
-                          _isListening ? Icons.mic_none : Icons.mic,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1138,27 +1008,25 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
+    _isMicPressHeld = true;
+    await _setSpeechActivating(true);
+
     final hasAccess = await _ensurePremiumAccess(PremiumFeature.speechToText);
     if (!hasAccess || !mounted) {
+      await _setSpeechActivating(false);
+      _isMicPressHeld = false;
       return;
     }
 
-    _isMicPressHeld = true;
-
-    HapticFeedback.mediumImpact();
-    SystemSound.play(SystemSoundType.click);
-
-    _micScaleController.forward();
-
     final hasPermission = await _ensureSpeechPermission();
     if (!hasPermission || !_isMicPressHeld || !mounted) {
-      await _setListeningState(false);
+      await _setSpeechActivating(false);
       return;
     }
 
     final isAvailable = await _ensureSpeechReady();
     if (!isAvailable || !_isMicPressHeld || !mounted) {
-      await _setListeningState(false);
+      await _setSpeechActivating(false);
       if (mounted) {
         _showSpeechUnavailableMessage();
       }
@@ -1178,7 +1046,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
 
     if (!mounted || !_speechToText.isListening) {
-      await _setListeningState(false);
+      await _setSpeechActivating(false);
       return;
     }
 
@@ -1191,6 +1059,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       HapticFeedback.lightImpact();
     }
     await _stopListening();
+    await _setSpeechActivating(false);
     _partialSpeechText = '';
     _lastInsertedSpeechOffset = 0;
   }
@@ -1223,34 +1092,42 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     return isAvailable;
   }
 
-  Future<void> _setListeningState(bool isListening) async {
-    if (_isListening == isListening) {
-      if (!isListening && _micScaleController.value != 0) {
-        await _micScaleController.reverse();
-      }
+  Future<void> _setSpeechActivating(bool isActivating) async {
+    if (_isSpeechActivating == isActivating) {
       return;
     }
 
     if (mounted) {
       setState(() {
-        _isListening = isListening;
+        _isSpeechActivating = isActivating;
       });
     } else {
-      _isListening = isListening;
+      _isSpeechActivating = isActivating;
     }
+  }
 
-    if (isListening) {
-      _micGlowController
-        ..stop()
-        ..reset()
-        ..repeat(reverse: true);
+  Future<void> _setListeningState(bool isListening) async {
+    if (_isListening == isListening) {
       return;
     }
 
-    _micGlowController
-      ..stop()
-      ..reset();
-    _micScaleController.reverse();
+    if (isListening) {
+      HapticFeedback.mediumImpact();
+    }
+
+    if (mounted) {
+      setState(() {
+        _isListening = isListening;
+        if (isListening) {
+          _isSpeechActivating = false;
+        }
+      });
+    } else {
+      _isListening = isListening;
+      if (isListening) {
+        _isSpeechActivating = false;
+      }
+    }
   }
 
   Future<void> _stopListening() async {
