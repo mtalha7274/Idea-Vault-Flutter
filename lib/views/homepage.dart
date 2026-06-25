@@ -108,6 +108,7 @@ class _HomepageState extends State<Homepage> {
       return child;
     }
     return KeyboardActions(
+      disableScroll: true,
       config: keyboardActionbuildConfig(
         context,
         [_quickAdditionFocusNode],
