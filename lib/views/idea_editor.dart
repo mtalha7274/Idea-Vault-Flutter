@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:keyboard_actions/keyboard_actions.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -20,7 +21,9 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../config/router/app_router.dart';
 import '../core/services/image_text_recognition_service.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/editor_text_insertion.dart';
+import '../core/utils/helpers.dart';
 import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
@@ -78,6 +81,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late IdeaOrganizationRepository _organizationRepo;
   late ImageTextRecognitionService _imageTextRecognitionService;
   late NoteLockAuthService _noteLockAuthService;
+  late NoteLockBiometricService _noteLockBiometricService;
 
   Timer? _autosaveTimer;
   Future<void>? _saveInFlight;
@@ -109,6 +113,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
         ? sl<NoteLockAuthService>()
         : NoteLockAuthService();
+    _noteLockBiometricService = sl.isRegistered<NoteLockBiometricService>()
+        ? sl<NoteLockBiometricService>()
+        : NoteLockBiometricService();
     _imageTextRecognitionService =
         sl.isRegistered<ImageTextRecognitionService>()
             ? sl<ImageTextRecognitionService>()
@@ -221,49 +228,50 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             floatingActionButton: _buildSpeechFab(context),
             body: SafeArea(
               bottom: false,
-              child: CustomScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                slivers: [
-                  _buildCollapsibleEditorHeader(context),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _PinnedHeaderDelegate(
-                      extent: _PinnedHeaderDelegate.sectionTabsExtent,
-                      child: _buildPinnedSectionTabsContent(context),
-                    ),
-                  ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _PinnedHeaderDelegate(
-                      extent: _PinnedHeaderDelegate.toolbarExtent,
-                      child: IdeaEditorToolbarContainer(
-                        controller: _contentController,
-                        focusNode: _contentFocusNode,
-                        isPreviewMode: _isPreviewMode,
-                        onPreviewToggle: _togglePreviewMode,
-                        onOrganize: () =>
-                            unawaited(_onOrganizeToolbarPressed()),
-                        onImageText: () =>
-                            unawaited(_onImageTextToolbarPressed()),
-                        organizeEnabled: !_isOrganizing,
-                        imageTextEnabled:
-                            !_isPreparingImageText && !_isExtractingImageText,
-                        exceedsAiCharacterLimit:
-                            _sectionExceedsAiWarningCharacterLimit,
+              child: _wrapEditorBodyWithKeyboardActions(
+                context,
+                CustomScrollView(
+                  slivers: [
+                    _buildCollapsibleEditorHeader(context),
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _PinnedHeaderDelegate(
+                        extent: _PinnedHeaderDelegate.sectionTabsExtent,
+                        child: _buildPinnedSectionTabsContent(context),
                       ),
                     ),
-                  ),
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: IdeaMarkdownEditor(
-                      controller: _contentController,
-                      focusNode: _contentFocusNode,
-                      placeholder: _sectionPlaceholder(),
-                      isPreviewMode: _isPreviewMode,
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _PinnedHeaderDelegate(
+                        extent: _PinnedHeaderDelegate.toolbarExtent,
+                        child: IdeaEditorToolbarContainer(
+                          controller: _contentController,
+                          focusNode: _contentFocusNode,
+                          isPreviewMode: _isPreviewMode,
+                          onPreviewToggle: _togglePreviewMode,
+                          onOrganize: () =>
+                              unawaited(_onOrganizeToolbarPressed()),
+                          onImageText: () =>
+                              unawaited(_onImageTextToolbarPressed()),
+                          organizeEnabled: !_isOrganizing,
+                          imageTextEnabled:
+                              !_isPreparingImageText && !_isExtractingImageText,
+                          exceedsAiCharacterLimit:
+                              _sectionExceedsAiWarningCharacterLimit,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: IdeaMarkdownEditor(
+                        controller: _contentController,
+                        focusNode: _contentFocusNode,
+                        placeholder: _sectionPlaceholder(),
+                        isPreviewMode: _isPreviewMode,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -395,12 +403,30 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final didAuthenticate = await authenticateForNoteLock(
       context,
       _noteLockAuthService,
+      _noteLockBiometricService,
       ideaId: idea.id,
     );
     if (!mounted || !didAuthenticate) {
       return;
     }
     setState(() {});
+  }
+
+  Widget _wrapEditorBodyWithKeyboardActions(
+    BuildContext context,
+    Widget child,
+  ) {
+    if (!Platform.isIOS) {
+      return child;
+    }
+    return KeyboardActions(
+      config: keyboardActionbuildConfig(
+        context,
+        [_titleFocusNode, _contentFocusNode],
+        keyboardActionsPlatform: KeyboardActionsPlatform.IOS,
+      ),
+      child: child,
+    );
   }
 
   Widget _buildCollapsibleEditorHeader(BuildContext context) {
@@ -464,6 +490,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           textCapitalization: TextCapitalization.sentences,
           minLines: 1,
           maxLines: 3,
+          scrollPadding: EdgeInsets.only(
+            bottom: Platform.isIOS ? 64 : 20,
+          ),
           decoration: InputDecoration(
             hintText: ViewConstants.ideaEditorTitleHint.tr(),
             hintStyle: ideaVaultHeadline(
@@ -1610,7 +1639,11 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
-    final isReady = await ensureNoteLockReady(context, _noteLockAuthService);
+    final isReady = await ensureNoteLockReady(
+      context,
+      _noteLockAuthService,
+      _noteLockBiometricService,
+    );
     if (!mounted || !isReady) {
       return;
     }
@@ -1637,6 +1670,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final didAuthenticate = await authenticateForNoteLock(
       context,
       _noteLockAuthService,
+      _noteLockBiometricService,
       ideaId: ideaId,
     );
     if (!mounted || !didAuthenticate) {
@@ -1680,6 +1714,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       final didAuthenticate = await authenticateForNoteLock(
         context,
         _noteLockAuthService,
+        _noteLockBiometricService,
         ideaId: currentIdea!.id,
       );
       if (!mounted || !didAuthenticate) {
@@ -1721,6 +1756,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       final didAuthenticate = await authenticateForNoteLock(
         context,
         _noteLockAuthService,
+        _noteLockBiometricService,
         ideaId: currentIdea!.id,
       );
       if (!mounted || !didAuthenticate) {

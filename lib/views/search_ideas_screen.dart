@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/view_constants.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/idea_search.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
@@ -30,6 +31,7 @@ class SearchIdeasScreen extends StatefulWidget {
 class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
   late final TextEditingController _searchController;
   late final NoteLockAuthService _noteLockAuthService;
+  late final NoteLockBiometricService _noteLockBiometricService;
 
   String get _searchQuery => _searchController.text.trim();
 
@@ -39,6 +41,9 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
     _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
         ? sl<NoteLockAuthService>()
         : NoteLockAuthService();
+    _noteLockBiometricService = sl.isRegistered<NoteLockBiometricService>()
+        ? sl<NoteLockBiometricService>()
+        : NoteLockBiometricService();
     _searchController = TextEditingController()
       ..addListener(_handleSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -126,6 +131,7 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
     await authenticateAndOpenNote(
       context,
       _noteLockAuthService,
+      _noteLockBiometricService,
       ideaId: idea.id,
       nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
     );

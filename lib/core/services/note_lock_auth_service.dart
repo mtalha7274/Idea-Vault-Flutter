@@ -3,17 +3,14 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:local_auth/local_auth.dart';
 
 class NoteLockAuthService {
   NoteLockAuthService({
     FlutterSecureStorage? secureStorage,
-    LocalAuthentication? localAuthentication,
     Random? random,
     Future<String?> Function(String key)? readValue,
     Future<void> Function(String key, String value)? writeValue,
-  })  : _localAuthentication = localAuthentication ?? LocalAuthentication(),
-        _random = random ?? Random.secure(),
+  })  : _random = random ?? Random.secure(),
         _readValue = readValue ??
             ((key) => (secureStorage ?? const FlutterSecureStorage()).read(
                   key: key,
@@ -28,7 +25,6 @@ class NoteLockAuthService {
   static const String _pinHashKey = 'note_lock_pin_hash';
   static const String _pinSaltKey = 'note_lock_pin_salt';
 
-  final LocalAuthentication _localAuthentication;
   final Random _random;
   final Set<String> _unlockedIdeaIds = {};
   final Future<String?> Function(String key) _readValue;
@@ -54,32 +50,6 @@ class NoteLockAuthService {
       return false;
     }
     return _hashPin(pin, storedSalt) == storedHash;
-  }
-
-  Future<bool> canUseBiometrics() async {
-    final hasStoredPin = await hasPin();
-    if (!hasStoredPin) {
-      return false;
-    }
-    try {
-      final isSupported = await _localAuthentication.isDeviceSupported();
-      final canCheck = await _localAuthentication.canCheckBiometrics;
-      return isSupported && canCheck;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<bool> authenticateWithBiometrics(String localizedReason) async {
-    try {
-      return await _localAuthentication.authenticate(
-        localizedReason: localizedReason,
-        biometricOnly: false,
-        persistAcrossBackgrounding: true,
-      );
-    } catch (_) {
-      return false;
-    }
   }
 
   bool isIdeaUnlocked(String ideaId) {

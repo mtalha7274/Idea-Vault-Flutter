@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/view_constants.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/helpers.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
@@ -26,12 +27,14 @@ class NoteLockPinScreen extends StatefulWidget {
     super.key,
     required this.mode,
     required this.authService,
+    required this.biometricService,
     this.ideaId,
     this.nextRoute,
   });
 
   final NoteLockPinMode mode;
   final NoteLockAuthService authService;
+  final NoteLockBiometricService biometricService;
   final String? ideaId;
   final Widget Function()? nextRoute;
 
@@ -46,17 +49,23 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   String _pin = '';
   String? _firstPin;
   String? _errorKey;
-  bool _canUseBiometrics = false;
+  bool _canUseBiometricUnlock = false;
+  bool _canOfferBiometricEnrollment = false;
   bool _isCheckingBiometrics = true;
   bool _didScheduleInitialKeyboard = false;
   bool _currentPinVerified = false;
   bool _isError = false;
+  bool _suppressKeyboard = false;
+  bool _showBiometricSuccessDots = false;
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
 
   bool get _isSetup => widget.mode == NoteLockPinMode.setup;
   bool get _isChangePin => widget.mode == NoteLockPinMode.changePin;
   bool get _isConfirming => _isSetup && _firstPin != null;
+
+  int get _pinDotsFilledCount =>
+      _showBiometricSuccessDots ? 4 : _pin.length;
 
   String get _titleKey {
     if (_isChangePin) {
@@ -128,7 +137,6 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     ]).animate(_shakeController);
     _pinController.addListener(_handlePinChanged);
     _loadBiometrics();
-    _scheduleInitialKeyboard();
   }
 
   void _scheduleInitialKeyboard() {
@@ -144,7 +152,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   void _openKeyboard() {
-    if (!mounted) {
+    if (!mounted || _suppressKeyboard) {
       return;
     }
     _pinFocusNode.requestFocus();
@@ -166,20 +174,35 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
 
   Future<void> _loadBiometrics() async {
     if (_isSetup || _isChangePin) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _isCheckingBiometrics = false;
       });
+      _scheduleInitialKeyboard();
       return;
     }
 
-    final canUseBiometrics = await widget.authService.canUseBiometrics();
+    final canUseBiometricUnlock =
+        await widget.biometricService.canUseBiometricUnlock();
+    final canOfferBiometricEnrollment =
+        await widget.biometricService.canOfferBiometricEnrollment();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canUseBiometrics = canUseBiometrics;
+      _canUseBiometricUnlock = canUseBiometricUnlock;
+      _canOfferBiometricEnrollment = canOfferBiometricEnrollment;
       _isCheckingBiometrics = false;
     });
+
+    if (canUseBiometricUnlock) {
+      await _authenticateWithBiometrics();
+      return;
+    }
+
+    _scheduleInitialKeyboard();
   }
 
   void _handlePinChanged() {
@@ -260,9 +283,57 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     }
 
     await widget.authService.createPin(pin);
+    if (!mounted) {
+      return;
+    }
+
+    if (_isSetup) {
+      _suppressKeyboard = true;
+      _dismissKeyboard();
+      _pinFocusNode.unfocus();
+      await _promptEnableBiometricAfterSetup();
+    }
+
     if (mounted) {
       AppRouter.pop(context, true);
     }
+  }
+
+  Future<void> _promptEnableBiometricAfterSetup() async {
+    final canOffer = await widget.biometricService.canOfferBiometricEnrollment();
+    if (!mounted || !canOffer) {
+      return;
+    }
+
+    _dismissKeyboard();
+    _pinFocusNode.unfocus();
+
+    final shouldEnable = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: TranslatedText(ViewConstants.noteLockEnableBiometricTitle),
+        content: TranslatedText(ViewConstants.noteLockEnableBiometricBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(ViewConstants.noteLockEnableBiometricSkip.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(ViewConstants.noteLockEnableBiometricAction.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldEnable != true || !mounted) {
+      return;
+    }
+
+    await _authenticateWithBiometrics(
+      enrollOnSuccess: true,
+      completeOnSuccess: false,
+    );
   }
 
   void _showError(String errorKey) {
@@ -281,27 +352,58 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     _clearPin();
   }
 
-  void _clearPin() {
+  void _clearPin({bool requestFocus = true}) {
     _pinController.clear();
     setState(() {
       _pin = '';
     });
-    _openKeyboard();
+    if (requestFocus && !_suppressKeyboard) {
+      _openKeyboard();
+    }
   }
 
-  Future<void> _authenticateWithBiometrics() async {
+  Future<void> _authenticateWithBiometrics({
+    bool enrollOnSuccess = false,
+    bool completeOnSuccess = true,
+  }) async {
     _dismissKeyboard();
+    _pinFocusNode.unfocus();
     await Future<void>.delayed(const Duration(milliseconds: 150));
     if (!mounted) {
       return;
     }
-    final didAuthenticate = await widget.authService.authenticateWithBiometrics(
-      ViewConstants.noteLockBiometricReason.tr(),
-    );
-    if (!mounted || !didAuthenticate) {
+
+    final localizedReason = enrollOnSuccess
+        ? ViewConstants.noteLockEnableBiometricReason.tr()
+        : ViewConstants.noteLockBiometricReason.tr();
+
+    final result = enrollOnSuccess
+        ? await widget.biometricService.enableBiometricUnlock(localizedReason)
+        : await widget.biometricService.authenticate(localizedReason);
+
+    if (!mounted) {
       return;
     }
-    await _onPinSuccess();
+
+    if (result == BiometricAuthResult.success) {
+      if (enrollOnSuccess) {
+        setState(() {
+          _canUseBiometricUnlock = true;
+          _canOfferBiometricEnrollment = true;
+        });
+      }
+      if (!completeOnSuccess) {
+        return;
+      }
+      setState(() {
+        _showBiometricSuccessDots = true;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) {
+        return;
+      }
+      await _onPinSuccess();
+    }
   }
 
   Future<void> _onPinSuccess() async {
@@ -396,7 +498,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                           child: child,
                         ),
                         child: _PinDots(
-                          filledCount: _pin.length,
+                          filledCount: _pinDotsFilledCount,
                           isError: _isError,
                           onTap: _openKeyboard,
                         ),
@@ -416,12 +518,26 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                       ],
                       if (widget.mode == NoteLockPinMode.unlock &&
                           !_isCheckingBiometrics &&
-                          _canUseBiometrics) ...[
+                          _canUseBiometricUnlock) ...[
                         Gap(28.h),
                         TextButton.icon(
                           onPressed: _authenticateWithBiometrics,
                           icon: const Icon(Icons.fingerprint_rounded),
                           label: Text(ViewConstants.noteLockUseBiometric.tr()),
+                        ),
+                      ],
+                      if (widget.mode == NoteLockPinMode.unlock &&
+                          !_isCheckingBiometrics &&
+                          !_canUseBiometricUnlock &&
+                          _canOfferBiometricEnrollment) ...[
+                        Gap(28.h),
+                        TextButton.icon(
+                          onPressed: () => _authenticateWithBiometrics(
+                            enrollOnSuccess: true,
+                          ),
+                          icon: const Icon(Icons.fingerprint_rounded),
+                          label: Text(
+                              ViewConstants.noteLockEnableBiometricUnlockAction.tr()),
                         ),
                       ],
                       SizedBox(
@@ -430,7 +546,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                         child: TextField(
                           controller: _pinController,
                           focusNode: _pinFocusNode,
-                          autofocus: true,
+                          autofocus: !_suppressKeyboard,
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,

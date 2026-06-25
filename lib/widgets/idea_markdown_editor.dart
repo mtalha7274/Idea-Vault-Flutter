@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -63,6 +65,9 @@ class IdeaMarkdownEditor extends StatelessWidget {
                 keyboardType: TextInputType.multiline,
                 textCapitalization: TextCapitalization.sentences,
                 scrollPhysics: const NeverScrollableScrollPhysics(),
+                scrollPadding: EdgeInsets.only(
+                  bottom: Platform.isIOS ? 64 : 20,
+                ),
                 inputFormatters: [_BulletListFormatter()],
                 style: ideaVaultBody(
                   context,

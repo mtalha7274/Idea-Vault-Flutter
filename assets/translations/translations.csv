@@ -103,6 +103,12 @@ noteLockWrongPin,Wrong PIN. Try again.
 noteLockUnlockAction,Unlock
 noteLockUseBiometric,Use Face ID / Touch ID
 noteLockBiometricReason,Unlock your locked note
+noteLockEnableBiometricTitle,Enable biometric unlock?
+noteLockEnableBiometricBody,Use fingerprint or face unlock next time instead of entering your PIN.
+noteLockEnableBiometricAction,Enable
+noteLockEnableBiometricUnlockAction,Enable Face ID / Touch ID
+noteLockEnableBiometricSkip,Not now
+noteLockEnableBiometricReason,Confirm to enable biometric unlock
 noteLockEditorTitle,This note is locked
 noteLockEditorBody,Unlock it to view or edit its content.
 noteLockEditorAction,Unlock Note

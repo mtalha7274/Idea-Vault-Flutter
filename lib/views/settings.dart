@@ -18,6 +18,7 @@ import '../core/constants/app_assets.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/view_constants.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/helpers.dart';
 import '../injection_container.dart';
 import '../main.dart';
@@ -36,6 +37,7 @@ class Settings extends StatefulWidget {
 class _SettingsState extends State<Settings> {
   final ValueNotifier<bool> inAsyncCall = ValueNotifier(false);
   late final NoteLockAuthService _authService;
+  late final NoteLockBiometricService _biometricService;
   bool _hasPinSetup = false;
 
   @override
@@ -44,6 +46,9 @@ class _SettingsState extends State<Settings> {
     _authService = sl.isRegistered<NoteLockAuthService>()
         ? sl<NoteLockAuthService>()
         : NoteLockAuthService();
+    _biometricService = sl.isRegistered<NoteLockBiometricService>()
+        ? sl<NoteLockBiometricService>()
+        : NoteLockBiometricService();
     _loadPinStatus();
   }
 
@@ -344,6 +349,7 @@ class _SettingsState extends State<Settings> {
       NoteLockPinScreen(
         mode: NoteLockPinMode.changePin,
         authService: _authService,
+        biometricService: _biometricService,
       ),
     );
     if (result == true && mounted) {

@@ -10,6 +10,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
     required this.controller,
     required this.hintText,
     this.fieldKey,
+    this.focusNode,
     this.leading,
     this.trailing,
     this.minLines = 1,
@@ -24,6 +25,7 @@ class IdeaVaultPillTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
   final Key? fieldKey;
+  final FocusNode? focusNode;
   final Widget? leading;
   final Widget? trailing;
   final int minLines;
@@ -39,14 +41,18 @@ class IdeaVaultPillTextField extends StatefulWidget {
 }
 
 class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
-  late final FocusNode _focusNode;
+  FocusNode? _ownedFocusNode;
   double? _textMaxWidth;
   bool _isMultiline = false;
+
+  FocusNode get _focusNode => widget.focusNode ?? _ownedFocusNode!;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    if (widget.focusNode == null) {
+      _ownedFocusNode = FocusNode();
+    }
     _focusNode.addListener(_onFocusChange);
     widget.controller.addListener(_scheduleMultilineCheck);
   }
@@ -124,9 +130,8 @@ class _IdeaVaultPillTextFieldState extends State<IdeaVaultPillTextField> {
   @override
   void dispose() {
     widget.controller.removeListener(_scheduleMultilineCheck);
-    _focusNode
-      ..removeListener(_onFocusChange)
-      ..dispose();
+    _focusNode.removeListener(_onFocusChange);
+    _ownedFocusNode?.dispose();
     super.dispose();
   }
 

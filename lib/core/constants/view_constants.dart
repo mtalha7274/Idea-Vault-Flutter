@@ -131,6 +131,13 @@ class ViewConstants {
   static const String noteLockUnlockAction = 'noteLockUnlockAction';
   static const String noteLockUseBiometric = 'noteLockUseBiometric';
   static const String noteLockBiometricReason = 'noteLockBiometricReason';
+  static const String noteLockEnableBiometricTitle = 'noteLockEnableBiometricTitle';
+  static const String noteLockEnableBiometricBody = 'noteLockEnableBiometricBody';
+  static const String noteLockEnableBiometricAction = 'noteLockEnableBiometricAction';
+  static const String noteLockEnableBiometricUnlockAction =
+      'noteLockEnableBiometricUnlockAction';
+  static const String noteLockEnableBiometricSkip = 'noteLockEnableBiometricSkip';
+  static const String noteLockEnableBiometricReason = 'noteLockEnableBiometricReason';
   static const String noteLockEditorTitle = 'noteLockEditorTitle';
   static const String noteLockEditorBody = 'noteLockEditorBody';
   static const String noteLockEditorAction = 'noteLockEditorAction';

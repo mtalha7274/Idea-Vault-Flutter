@@ -25,6 +25,7 @@ import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
 import 'core/services/image_text_recognition_service.dart';
 import 'core/services/note_lock_auth_service.dart';
+import 'core/services/note_lock_biometric_service.dart';
 import 'core/services/premium/bypass_paywall_subscription_service.dart';
 import 'core/services/premium/paywall_provider.dart';
 import 'core/services/premium/revenuecat_subscription_service.dart';
@@ -69,6 +70,7 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<ImageTextRecognitionService>(
       GoogleMlKitImageTextRecognitionService());
   sl.registerSingleton<NoteLockAuthService>(NoteLockAuthService());
+  sl.registerSingleton<NoteLockBiometricService>(NoteLockBiometricService());
   sl.registerSingleton<SubscriptionService>(_buildSubscriptionService());
   sl.registerSingleton<PaywallProvider>(_buildPaywallProvider());
 

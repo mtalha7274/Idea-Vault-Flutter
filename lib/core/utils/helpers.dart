@@ -12,10 +12,14 @@ import '../constants/view_constants.dart';
 import 'ui.dart';
 
 KeyboardActionsConfig keyboardActionbuildConfig(
-    BuildContext context, List<FocusNode> nodes) {
+  BuildContext context,
+  List<FocusNode> nodes, {
+  KeyboardActionsPlatform keyboardActionsPlatform =
+      KeyboardActionsPlatform.ALL,
+}) {
   final theme = context.read<ThemeProvider>().baseTheme;
   return KeyboardActionsConfig(
-      keyboardActionsPlatform: KeyboardActionsPlatform.ALL,
+      keyboardActionsPlatform: keyboardActionsPlatform,
       keyboardBarColor: theme.surfaceLow,
       nextFocus: true,
       actions: nodes

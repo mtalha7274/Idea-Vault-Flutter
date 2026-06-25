@@ -1,16 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
+import 'package:keyboard_actions/keyboard_actions.dart';
 import 'package:provider/provider.dart';
 
 import '../config/config.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/app_assets.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
+import '../core/utils/helpers.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
@@ -56,8 +60,10 @@ class _HomepageState extends State<Homepage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _quickAdditionController;
+  late final FocusNode _quickAdditionFocusNode;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
   late final NoteLockAuthService _noteLockAuthService;
+  late final NoteLockBiometricService _noteLockBiometricService;
 
   bool _didHandleResume = false;
   bool _didCheckFreeUsageIntro = false;
@@ -75,9 +81,13 @@ class _HomepageState extends State<Homepage> {
     _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
         ? sl<NoteLockAuthService>()
         : NoteLockAuthService();
+    _noteLockBiometricService = sl.isRegistered<NoteLockBiometricService>()
+        ? sl<NoteLockBiometricService>()
+        : NoteLockBiometricService();
     _sortOption = _sortPreferencesRepo.getSortOption();
     _layoutOption = _sortPreferencesRepo.getLayoutOption();
     _quickAdditionController = TextEditingController();
+    _quickAdditionFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleInitialHomeEffects();
     });
@@ -86,7 +96,25 @@ class _HomepageState extends State<Homepage> {
   @override
   void dispose() {
     _quickAdditionController.dispose();
+    _quickAdditionFocusNode.dispose();
     super.dispose();
+  }
+
+  Widget _wrapHomepageBodyWithKeyboardActions(
+    BuildContext context,
+    Widget child,
+  ) {
+    if (!Platform.isIOS) {
+      return child;
+    }
+    return KeyboardActions(
+      config: keyboardActionbuildConfig(
+        context,
+        [_quickAdditionFocusNode],
+        keyboardActionsPlatform: KeyboardActionsPlatform.IOS,
+      ),
+      child: child,
+    );
   }
 
   @override
@@ -103,10 +131,9 @@ class _HomepageState extends State<Homepage> {
         hostContext: context,
         onBackupPressed: _openBackupRestore,
       ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: Stack(
+      body: _wrapHomepageBodyWithKeyboardActions(
+        context,
+        Stack(
           children: [
             SafeArea(
               bottom: false,
@@ -164,6 +191,8 @@ class _HomepageState extends State<Homepage> {
                     body: Builder(
                       builder: (context) {
                         return CustomScrollView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           physics: const AlwaysScrollableScrollPhysics(),
                           slivers: [
                             SliverOverlapInjector(
@@ -261,6 +290,7 @@ class _HomepageState extends State<Homepage> {
                 constraints: const BoxConstraints(maxWidth: 860),
                 child: RandomAdditionComposer(
                   controller: _quickAdditionController,
+                  focusNode: _quickAdditionFocusNode,
                   fieldKey: const Key('homepage-random-addition-field'),
                   sendButtonKey: const Key('homepage-random-addition-send'),
                   onSubmit: _submitQuickAddition,
@@ -329,6 +359,7 @@ class _HomepageState extends State<Homepage> {
     await authenticateAndOpenNote(
       context,
       _noteLockAuthService,
+      _noteLockBiometricService,
       ideaId: idea.id,
       nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
     );
@@ -439,6 +470,7 @@ class _HomepageState extends State<Homepage> {
     await authenticateAndOpenNote(
       context,
       _noteLockAuthService,
+      _noteLockBiometricService,
       ideaId: idea.id,
       nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
     );
@@ -540,6 +572,7 @@ class _HomepageState extends State<Homepage> {
       final didAuthenticate = await authenticateForNoteLock(
         context,
         _noteLockAuthService,
+        _noteLockBiometricService,
         ideaId: lockedIdeas.first.id,
       );
       if (!didAuthenticate) {
