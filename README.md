@@ -2,6 +2,7 @@
 
 ## v1.0.5
 
+- **Free trial** information is now saved and restored with **cloud backup**
 - Fixed **auto backup** reliability issues
 - **Secret notes** with **PIN** and **biometric** lock support
 - **Text field** fixes on the **idea editor** and **homepage** for smoother typing
