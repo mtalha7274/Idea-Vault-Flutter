@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/backup/cloud_backup_scheduler.dart';
 import '../../../core/services/backup/cloud_backup_service.dart';
+import '../../../core/services/backup/cloud_usage_metadata_sync_service.dart';
 import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
 import '../../../models/backup/cloud_backup_state.dart';
@@ -12,12 +13,15 @@ class CloudBackupProvider with ChangeNotifier {
   CloudBackupProvider(
     this._settingsRepo,
     this._backupService,
-    this._scheduler,
-  ) : _state = _settingsRepo.getState();
+    this._scheduler, {
+    CloudUsageMetadataSyncService? usageMetadataSync,
+  })  : _usageMetadataSync = usageMetadataSync,
+        _state = _settingsRepo.getState();
 
   final CloudBackupSettingsRepo _settingsRepo;
   final CloudBackupService _backupService;
   final CloudBackupScheduler _scheduler;
+  final CloudUsageMetadataSyncService? _usageMetadataSync;
 
   CloudBackupState _state;
   CloudBackupState get state => _state;
@@ -35,6 +39,8 @@ class CloudBackupProvider with ChangeNotifier {
         email: account.email,
       );
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
+      await _usageMetadataSync?.syncToCloud(silentAuth: true);
       await _scheduler.scheduleDailyBackup();
     });
   }
@@ -67,6 +73,8 @@ class CloudBackupProvider with ChangeNotifier {
       }
       _state = _state.copyWith(email: account.email, enabled: true);
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
+      await _usageMetadataSync?.syncToCloud(silentAuth: true);
     });
   }
 
@@ -95,6 +103,7 @@ class CloudBackupProvider with ChangeNotifier {
         lastBackupSizeBytes: sizeBytes,
       );
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncToCloud();
     });
   }
 
@@ -122,6 +131,10 @@ class CloudBackupProvider with ChangeNotifier {
 
   Future<CloudBackupSnapshot?> fetchRestoreSnapshot() async {
     return _backupService.restoreSnapshot();
+  }
+
+  Future<void> syncUsageMetadataFromCloud({bool silentAuth = true}) async {
+    await _usageMetadataSync?.syncFromCloud(silentAuth: silentAuth);
   }
 
   Future<void> checkForFreshInstallBackup({required bool hasLocalIdeas}) async {

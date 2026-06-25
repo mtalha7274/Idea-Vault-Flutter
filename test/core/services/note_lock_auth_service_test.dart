@@ -25,6 +25,29 @@ void main() {
       expect(storage.values, isNot(contains('1234')));
     });
 
+    test('clearPin removes stored pin and unlocked ideas', () async {
+      final storage = <String, String>{};
+      final service = NoteLockAuthService(
+        random: Random(1),
+        readValue: (key) async => storage[key],
+        writeValue: (key, value) async {
+          storage[key] = value;
+        },
+        deleteValue: (key) async {
+          storage.remove(key);
+        },
+      );
+      await service.createPin('1234');
+      service.markIdeaUnlocked('idea-1');
+
+      await service.clearPin();
+
+      expect(await service.hasPin(), isFalse);
+      expect(await service.verifyPin('1234'), isFalse);
+      expect(service.isIdeaUnlocked('idea-1'), isFalse);
+      expect(storage, isEmpty);
+    });
+
     test('tracks unlocked ideas for the current session', () {
       final service = NoteLockAuthService(
         random: Random(1),

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 
+import '../core/constants/view_constants.dart';
 import '../core/extensions/int.dart';
+import '../core/utils/helpers.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../views/ideas/idea_vault_theme.dart';
+import 'translated_text.dart';
 
 class BackupRestorePromptBanner extends StatefulWidget {
   const BackupRestorePromptBanner({super.key});
@@ -48,8 +51,8 @@ class _BackupRestorePromptBannerState extends State<BackupRestorePromptBanner> {
               ),
               Gap(12.w),
               Expanded(
-                child: Text(
-                  'Cloud backup found',
+                child: TranslatedText(
+                  ViewConstants.backupRestorePromptFound,
                   style: ideaVaultBody(
                     context,
                     size: 15,
@@ -59,8 +62,10 @@ class _BackupRestorePromptBannerState extends State<BackupRestorePromptBanner> {
               ),
               TextButton(
                 onPressed: _isRestoring ? null : _restore,
-                child: Text(
-                  _isRestoring ? 'Restoring' : 'Restore',
+                child: TranslatedText(
+                  _isRestoring
+                      ? ViewConstants.backupRestoreRestoring
+                      : ViewConstants.backupRestoreConfirmRestoreButton,
                   style: ideaVaultLabel(
                     context,
                     size: 14,
@@ -84,22 +89,41 @@ class _BackupRestorePromptBannerState extends State<BackupRestorePromptBanner> {
     setState(() => _isRestoring = true);
     try {
       final snapshot = await backupProvider.fetchRestoreSnapshot();
-      if (snapshot == null || !mounted) {
+      if (!mounted) {
+        return;
+      }
+      if (snapshot == null) {
+        _showSnackBar(messenger, ViewConstants.backupRestoreNoBackupFound);
         return;
       }
       await ideasProvider.replaceIdeas(snapshot.ideas);
       await additionsProvider.replaceAdditions(snapshot.randomAdditions);
+      await backupProvider.syncUsageMetadataFromCloud(silentAuth: false);
+      backupProvider.dismissRestorePrompt();
       if (!mounted) {
         return;
       }
-      backupProvider.dismissRestorePrompt();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Backup restored.')),
-      );
+      _showSnackBar(messenger, ViewConstants.backupRestoreRestoredMessage);
+    } catch (error, stackTrace) {
+      printLog('Cloud backup prompt restore failed: $error\n$stackTrace');
+      if (mounted) {
+        _showSnackBar(
+          messenger,
+          ViewConstants.backupRestoreCloudUpdateFailed,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isRestoring = false);
       }
     }
+  }
+
+  void _showSnackBar(ScaffoldMessengerState messenger, String messageKey) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: TranslatedText(messageKey),
+      ),
+    );
   }
 }

@@ -20,6 +20,27 @@ void main() {
       expect(storage['note_lock_biometric_enabled'], 'true');
     });
 
+    test('clearBiometricUnlock removes stored biometric preference', () async {
+      final storage = <String, String>{};
+      final service = NoteLockBiometricService(
+        readValue: (key) async => storage[key],
+        writeValue: (key, value) async {
+          storage[key] = value;
+        },
+        deleteValue: (key) async {
+          storage.remove(key);
+        },
+      );
+
+      await service.setBiometricUnlockEnabled(true);
+      expect(await service.isBiometricUnlockEnabled(), isTrue);
+
+      await service.clearBiometricUnlock();
+
+      expect(await service.isBiometricUnlockEnabled(), isFalse);
+      expect(storage, isEmpty);
+    });
+
     test('canUseBiometricUnlock requires enabled preference and device support',
         () async {
       final storage = <String, String>{};
@@ -39,7 +60,8 @@ void main() {
       expect(await service.canUseBiometricUnlock(), isTrue);
     });
 
-    test('enableBiometricUnlock stores preference only after success', () async {
+    test('enableBiometricUnlock stores preference only after success',
+        () async {
       final storage = <String, String>{};
       var authenticateCalls = 0;
       final service = NoteLockBiometricService(
@@ -66,7 +88,8 @@ void main() {
       expect(authenticateCalls, 2);
     });
 
-    test('authenticate returns canceled when challenge fails without side effects',
+    test(
+        'authenticate returns canceled when challenge fails without side effects',
         () async {
       final service = NoteLockBiometricService(
         readValue: (_) async => null,

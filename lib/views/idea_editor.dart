@@ -176,6 +176,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   @override
   void dispose() {
+    _clearLockedEditorSessionUnlock();
     WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.primaryFocus?.unfocus();
     _speechToText.stop();
@@ -214,6 +215,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       canPop: _allowPop || !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) {
+          _clearLockedEditorSessionUnlock();
           await _ideasProvider.clearEditorState();
           return;
         }
@@ -1896,6 +1898,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     if (!mounted) {
       return;
     }
+    _clearLockedEditorSessionUnlock();
     await _ideasProvider.clearEditorState();
     if (!mounted) {
       return;
@@ -1909,6 +1912,17 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       }
       AppRouter.pop(context, _savedIdeaId);
     });
+  }
+
+  void _clearLockedEditorSessionUnlock() {
+    final ideaId = _savedIdeaId;
+    if (ideaId == null) {
+      return;
+    }
+    final currentIdea = _ideasProvider.findById(ideaId);
+    if (currentIdea?.isLocked == true) {
+      _noteLockAuthService.markIdeaLocked(ideaId);
+    }
   }
 
   Future<void> _handleOrganize() async {

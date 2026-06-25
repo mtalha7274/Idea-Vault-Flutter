@@ -101,7 +101,8 @@ void main() {
       await tester.enterText(find.byType(TextField), '1234');
       await tester.pumpAndSettle();
 
-      expect(find.text(ViewConstants.noteLockEnableBiometricTitle), findsOneWidget);
+      expect(find.text(ViewConstants.noteLockEnableBiometricTitle),
+          findsOneWidget);
       await tester.tap(find.text(ViewConstants.noteLockEnableBiometricSkip));
       await tester.pumpAndSettle();
 

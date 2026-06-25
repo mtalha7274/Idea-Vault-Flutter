@@ -14,6 +14,8 @@ abstract class CloudBackupStore {
   Future<CloudBackupAccount?> connect({required bool forceAccountPicker});
   Future<void> disconnect();
   Future<CloudBackupFile?> readBackup();
+  Future<CloudBackupFile?> readUsageMetadata({bool silentAuth = false});
   Future<int> writeBackup(String contents, {bool silentAuth = false});
+  Future<int> writeUsageMetadata(String contents, {bool silentAuth = false});
   Future<bool> backupExists();
 }

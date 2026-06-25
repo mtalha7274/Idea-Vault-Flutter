@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../config/config.dart';
 import '../../../config/router/app_router.dart';
+import '../../../core/services/backup/cloud_usage_metadata_sync_service.dart';
 import '../../../core/services/backup/cloud_backup_scheduler.dart';
 import '../../../core/services/backup/cloud_backup_service.dart';
 import '../../../core/services/premium/paywall_provider.dart';
@@ -28,8 +29,10 @@ class PaywallViewModel with ChangeNotifier {
     this._backupScheduler, {
     ShowPaywall? showPaywall,
     RequestRateAppReview? requestRateAppReview,
+    CloudUsageMetadataSyncService? usageMetadataSync,
   })  : _showPaywall = showPaywall ?? AppRouter.showPaywall,
         _requestRateAppReview = requestRateAppReview ?? rateApp,
+        _usageMetadataSync = usageMetadataSync,
         _subscriptionState = const SubscriptionState.initial() {
     _subscriptionService.addListener(_handleSubscriptionStateChanged);
   }
@@ -42,6 +45,7 @@ class PaywallViewModel with ChangeNotifier {
   final CloudBackupScheduler _backupScheduler;
   final ShowPaywall _showPaywall;
   final RequestRateAppReview _requestRateAppReview;
+  final CloudUsageMetadataSyncService? _usageMetadataSync;
 
   SubscriptionState _subscriptionState;
   PaywallOffering? _offering;
@@ -64,6 +68,7 @@ class PaywallViewModel with ChangeNotifier {
     await _subscriptionService.initialize();
     final state = await _subscriptionService.getSubscriptionState();
     _offering = await _paywallProvider.loadOffering();
+    await _usageMetadataSync?.syncFromCloud();
     await _setSubscriptionState(state);
   }
 
@@ -103,6 +108,7 @@ class PaywallViewModel with ChangeNotifier {
     if (!_paidFeatureUsageRepo.hasReachedFreeLimit) {
       final usageCount = await _paidFeatureUsageRepo.incrementUsage();
       await _maybeRequestHalfLimitReview(usageCount);
+      await _usageMetadataSync?.syncToCloud();
       if (usageCount >= Config.paidFeatureFreeUsageLimit) {
         if (!context.mounted) {
           await _disableCloudBackupIfNeeded();
@@ -119,6 +125,10 @@ class PaywallViewModel with ChangeNotifier {
     }
 
     return _showPaywallAndRefresh(context);
+  }
+
+  Future<void> syncUsageMetadataToCloud({bool silentAuth = true}) async {
+    await _usageMetadataSync?.syncToCloud(silentAuth: silentAuth);
   }
 
   Future<void> _maybeRequestHalfLimitReview(int usageCount) async {

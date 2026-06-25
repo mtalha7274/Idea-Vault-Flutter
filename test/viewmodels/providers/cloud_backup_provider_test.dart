@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
+import 'package:idea_vault/models/backup/cloud_backup_snapshot.dart';
 import 'package:idea_vault/models/backup/cloud_backup_state.dart';
 import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/models/random_addition.dart';
@@ -145,11 +146,53 @@ void main() {
 
       expect(backupService.backUpCount, 1);
     });
+
+    test('checkForFreshInstallBackup shows prompt when backup exists',
+        () async {
+      backupService.backupExistsResult = true;
+
+      await provider.checkForFreshInstallBackup(hasLocalIdeas: false);
+
+      expect(provider.state.restorePromptAvailable, isTrue);
+      expect(backupService.backupExistsCount, 1);
+    });
+
+    test('checkForFreshInstallBackup skips when local ideas exist', () async {
+      backupService.backupExistsResult = true;
+
+      await provider.checkForFreshInstallBackup(hasLocalIdeas: true);
+
+      expect(provider.state.restorePromptAvailable, isFalse);
+      expect(backupService.backupExistsCount, 0);
+    });
+
+    test('dismissRestorePrompt clears fresh install prompt', () async {
+      backupService.backupExistsResult = true;
+      await provider.checkForFreshInstallBackup(hasLocalIdeas: false);
+
+      provider.dismissRestorePrompt();
+
+      expect(provider.state.restorePromptAvailable, isFalse);
+    });
+
+    test('fetchRestoreSnapshot delegates to backup service', () async {
+      final snapshot = CloudBackupSnapshot.fromIdeas(sampleIdeas);
+      backupService.restoreSnapshotResult = snapshot;
+
+      final result = await provider.fetchRestoreSnapshot();
+
+      expect(result, same(snapshot));
+      expect(backupService.restoreSnapshotCount, 1);
+    });
   });
 }
 
 class _FakeCloudBackupService extends CloudBackupService {
   int backUpCount = 0;
+  int backupExistsCount = 0;
+  int restoreSnapshotCount = 0;
+  bool backupExistsResult = false;
+  CloudBackupSnapshot? restoreSnapshotResult;
 
   @override
   Future<int> backUpIdeas(
@@ -159,6 +202,18 @@ class _FakeCloudBackupService extends CloudBackupService {
   }) async {
     backUpCount += 1;
     return 128;
+  }
+
+  @override
+  Future<bool> backupExists() async {
+    backupExistsCount += 1;
+    return backupExistsResult;
+  }
+
+  @override
+  Future<CloudBackupSnapshot?> restoreSnapshot() async {
+    restoreSnapshotCount += 1;
+    return restoreSnapshotResult;
   }
 }
 

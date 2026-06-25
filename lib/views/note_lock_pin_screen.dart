@@ -64,8 +64,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   bool get _isChangePin => widget.mode == NoteLockPinMode.changePin;
   bool get _isConfirming => _isSetup && _firstPin != null;
 
-  int get _pinDotsFilledCount =>
-      _showBiometricSuccessDots ? 4 : _pin.length;
+  int get _pinDotsFilledCount => _showBiometricSuccessDots ? 4 : _pin.length;
 
   String get _titleKey {
     if (_isChangePin) {
@@ -110,8 +109,8 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     );
     _shakeAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween:
-            Tween<double>(begin: 0, end: 8).chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(begin: 0, end: 8)
+            .chain(CurveTween(curve: Curves.easeOut)),
         weight: 1,
       ),
       TweenSequenceItem(
@@ -130,8 +129,8 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
         weight: 2,
       ),
       TweenSequenceItem(
-        tween:
-            Tween<double>(begin: -6, end: 0).chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(begin: -6, end: 0)
+            .chain(CurveTween(curve: Curves.easeIn)),
         weight: 1,
       ),
     ]).animate(_shakeController);
@@ -300,7 +299,8 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   Future<void> _promptEnableBiometricAfterSetup() async {
-    final canOffer = await widget.biometricService.canOfferBiometricEnrollment();
+    final canOffer =
+        await widget.biometricService.canOfferBiometricEnrollment();
     if (!mounted || !canOffer) {
       return;
     }
@@ -536,8 +536,9 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                             enrollOnSuccess: true,
                           ),
                           icon: const Icon(Icons.fingerprint_rounded),
-                          label: Text(
-                              ViewConstants.noteLockEnableBiometricUnlockAction.tr()),
+                          label: Text(ViewConstants
+                              .noteLockEnableBiometricUnlockAction
+                              .tr()),
                         ),
                       ],
                       SizedBox(

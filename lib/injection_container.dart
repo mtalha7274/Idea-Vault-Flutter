@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/app_constants.dart';
+import 'core/services/app_install_bootstrap_service.dart';
 import 'data/managers/local/ideas_database.dart';
 import 'data/managers/local/local_storage.dart';
 import 'data/managers/local/shared_preference.dart';
@@ -15,6 +16,7 @@ import 'data/managers/remote/api_manager.dart';
 import 'data/managers/remote/dio_api_manager.dart';
 import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/idea_list_preferences.dart';
+import 'data/repositories/local/app_install_state.dart';
 import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/paid_feature_usage.dart';
 import 'data/repositories/local/random_additions.dart';
@@ -23,6 +25,7 @@ import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
+import 'core/services/backup/cloud_usage_metadata_sync_service.dart';
 import 'core/services/image_text_recognition_service.dart';
 import 'core/services/note_lock_auth_service.dart';
 import 'core/services/note_lock_biometric_service.dart';
@@ -83,10 +86,17 @@ Future<void> initializeDependencies() async {
   // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<AppInstallStateRepo>(
+      AppInstallStateRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CloudBackupSettingsRepo>(
       CloudBackupSettingsRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<PaidFeatureUsageRepo>(
       PaidFeatureUsageRepo(sl<LocalStorageManager>()));
+  sl.registerSingleton<CloudUsageMetadataSyncService>(
+      CloudUsageMetadataSyncService(
+    sl<PaidFeatureUsageRepo>(),
+    sl<CloudBackupService>(),
+  ));
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
@@ -108,6 +118,7 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupSettingsRepo>(),
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
+        usageMetadataSync: sl<CloudUsageMetadataSyncService>(),
       ));
   sl.registerFactory<PaywallViewModel>(() => PaywallViewModel(
         sl<SubscriptionService>(),
@@ -116,12 +127,36 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupSettingsRepo>(),
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
+        usageMetadataSync: sl<CloudUsageMetadataSyncService>(),
       ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
       () => LanguageProvider(sl<LanguageRepo>()));
   sl.registerFactory<InfoProvider>(
       () => InfoProvider(sl<CountryRepo>(), sl<LocalStorageManager>()));
+  sl.registerSingleton<AppInstallBootstrapService>(AppInstallBootstrapService(
+    sl<AppInstallStateRepo>(),
+    sl<NoteLockAuthService>(),
+    sl<NoteLockBiometricService>(),
+    hasLocalAppData: () async {
+      final ideas = await sl<IdeasRepo>().getIdeas();
+      if (ideas.isNotEmpty) {
+        return true;
+      }
+      final additions = await sl<RandomAdditionsRepo>().getAdditions();
+      if (additions.isNotEmpty) {
+        return true;
+      }
+      final usageRepo = sl<PaidFeatureUsageRepo>();
+      if (usageRepo.usageCount != 0 || usageRepo.hasFreeUsageIntroMetadata) {
+        return true;
+      }
+      final backupState = sl<CloudBackupSettingsRepo>().getState();
+      return backupState.enabled ||
+          backupState.email != null ||
+          backupState.lastBackupAt != null;
+    },
+  ));
 }
 
 SubscriptionService _buildSubscriptionService() {

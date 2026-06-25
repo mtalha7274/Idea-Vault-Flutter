@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'config/config.dart';
 import 'config/languages/language_config.dart';
+import 'core/services/app_install_bootstrap_service.dart';
 import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
@@ -49,6 +50,7 @@ void main() async {
   );
 
   await initializeDependencies();
+  await sl<AppInstallBootstrapService>().runFreshInstallTasks();
   await CloudBackupBackgroundTask.initialize();
   await switchToPortraitMode();
 

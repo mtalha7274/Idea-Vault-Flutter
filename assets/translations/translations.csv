@@ -223,6 +223,7 @@ backupRestoreConfirmRestoreBody,All current data will be replaced with the ideas
 backupRestoreConfirmRestoreButton,Restore
 backupRestoreNoBackupFound,No cloud backup was found.
 backupRestoreRestoredMessage,Backup restored.
+backupRestorePromptFound,Cloud backup found
 backupRestoreFormatBytesB,{bytes} B
 backupRestoreFormatBytesKb,{kb} KB
 backupRestoreFormatBytesMb,{mb} MB

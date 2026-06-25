@@ -10,6 +10,7 @@ class NoteLockAuthService {
     Random? random,
     Future<String?> Function(String key)? readValue,
     Future<void> Function(String key, String value)? writeValue,
+    Future<void> Function(String key)? deleteValue,
   })  : _random = random ?? Random.secure(),
         _readValue = readValue ??
             ((key) => (secureStorage ?? const FlutterSecureStorage()).read(
@@ -20,6 +21,10 @@ class NoteLockAuthService {
                 (secureStorage ?? const FlutterSecureStorage()).write(
                   key: key,
                   value: value,
+                )),
+        _deleteValue = deleteValue ??
+            ((key) => (secureStorage ?? const FlutterSecureStorage()).delete(
+                  key: key,
                 ));
 
   static const String _pinHashKey = 'note_lock_pin_hash';
@@ -29,6 +34,7 @@ class NoteLockAuthService {
   final Set<String> _unlockedIdeaIds = {};
   final Future<String?> Function(String key) _readValue;
   final Future<void> Function(String key, String value) _writeValue;
+  final Future<void> Function(String key) _deleteValue;
 
   Future<bool> hasPin() async {
     final storedHash = await _readValue(_pinHashKey);
@@ -41,6 +47,12 @@ class NoteLockAuthService {
     final hash = _hashPin(pin, salt);
     await _writeValue(_pinSaltKey, salt);
     await _writeValue(_pinHashKey, hash);
+  }
+
+  Future<void> clearPin() async {
+    await _deleteValue(_pinSaltKey);
+    await _deleteValue(_pinHashKey);
+    clearSessionUnlocks();
   }
 
   Future<bool> verifyPin(String pin) async {

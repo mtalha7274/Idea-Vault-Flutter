@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import '../../../config/config.dart';
+import '../../../models/backup/cloud_usage_metadata.dart';
 import '../../managers/local/local_storage.dart';
 
 class PaidFeatureUsageRepo {
@@ -73,6 +76,43 @@ class PaidFeatureUsageRepo {
       key: _freeUsageIntroSeenKey,
       value: 'true',
     );
+  }
+
+  CloudUsageMetadata toCloudUsageMetadata() {
+    return CloudUsageMetadata(
+      version: CloudUsageMetadata.currentVersion,
+      updatedAt: DateTime.now().toUtc(),
+      usageCount: usageCount,
+      freeUsageGrantLimit: freeUsageGrantLimit,
+      introSeen: hasSeenFreeUsageIntro,
+      halfLimitReviewRequested: hasRequestedHalfLimitReview,
+    );
+  }
+
+  Future<void> mergeCloudUsageMetadata(CloudUsageMetadata metadata) async {
+    final nextUsageCount = max(usageCount, metadata.usageCount);
+    await _localStorage.setString(
+      key: _key,
+      value: nextUsageCount.toString(),
+    );
+
+    final remoteGrantLimit = metadata.freeUsageGrantLimit;
+    final localGrantLimit = freeUsageGrantLimit;
+    final nextGrantLimit = max(
+      localGrantLimit ?? Config.paidFeatureFreeUsageLimit,
+      remoteGrantLimit ?? Config.paidFeatureFreeUsageLimit,
+    );
+    await _localStorage.setString(
+      key: _freeUsageGrantLimitKey,
+      value: nextGrantLimit.toString(),
+    );
+
+    if (metadata.introSeen || hasSeenFreeUsageIntro) {
+      await markFreeUsageIntroSeen();
+    }
+    if (metadata.halfLimitReviewRequested || hasRequestedHalfLimitReview) {
+      await markHalfLimitReviewRequested();
+    }
   }
 
   Future<void> clear() async {

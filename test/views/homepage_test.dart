@@ -10,6 +10,7 @@ import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
 import 'package:idea_vault/core/services/note_lock_auth_service.dart';
+import 'package:idea_vault/core/services/note_lock_biometric_service.dart';
 import 'package:idea_vault/core/services/premium/paywall_provider.dart';
 import 'package:idea_vault/core/services/premium/subscription_service.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
@@ -141,10 +142,12 @@ void main() {
       await settleUi(tester);
     }
 
-    CloudBackupProvider buildCloudBackupProvider() {
+    CloudBackupProvider buildCloudBackupProvider({
+      _FakeCloudBackupService? backupService,
+    }) {
       return CloudBackupProvider(
         CloudBackupSettingsRepo(storage),
-        _FakeCloudBackupService(),
+        backupService ?? _FakeCloudBackupService(),
         _FakeCloudBackupScheduler(),
       );
     }
@@ -163,6 +166,53 @@ void main() {
         showPaywall: (_) async => false,
         requestRateAppReview: () async => false,
       );
+    }
+
+    Future<NoteLockAuthService> registerNoteLockServices({
+      bool withPin = false,
+    }) async {
+      final pinStorage = <String, String>{};
+      final authService = NoteLockAuthService(
+        random: Random(1),
+        readValue: (key) async => pinStorage[key],
+        writeValue: (key, value) async {
+          pinStorage[key] = value;
+        },
+      );
+      if (withPin) {
+        await authService.createPin('1234');
+      }
+      final biometricService = NoteLockBiometricService(
+        readValue: (key) async => pinStorage[key],
+        writeValue: (key, value) async {
+          pinStorage[key] = value;
+        },
+        isDeviceSupported: () async => true,
+        canCheckBiometrics: () async => true,
+        authenticate: ({
+          required String localizedReason,
+          bool biometricOnly = false,
+          bool persistAcrossBackgrounding = false,
+        }) async =>
+            false,
+      );
+      if (sl.isRegistered<NoteLockAuthService>()) {
+        await sl.unregister<NoteLockAuthService>();
+      }
+      if (sl.isRegistered<NoteLockBiometricService>()) {
+        await sl.unregister<NoteLockBiometricService>();
+      }
+      sl.registerSingleton<NoteLockAuthService>(authService);
+      sl.registerSingleton<NoteLockBiometricService>(biometricService);
+      addTearDown(() async {
+        if (sl.isRegistered<NoteLockAuthService>()) {
+          await sl.unregister<NoteLockAuthService>();
+        }
+        if (sl.isRegistered<NoteLockBiometricService>()) {
+          await sl.unregister<NoteLockBiometricService>();
+        }
+      });
+      return authService;
     }
 
     Finder sectionTab(IdeaSection section) {
@@ -205,6 +255,35 @@ void main() {
       expect(find.text('homepageBackupOffAction'), findsOneWidget);
     });
 
+    testWidgets('hides restore prompt when no backup is available',
+        (tester) async {
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(find.text(ViewConstants.backupRestorePromptFound), findsNothing);
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'shows restore prompt with backup-off indicator when backup exists',
+        (tester) async {
+      final backupService = _FakeCloudBackupService()
+        ..backupExistsResult = true;
+
+      await pumpIdeasApp(
+        tester,
+        backupProvider: buildCloudBackupProvider(backupService: backupService),
+      );
+
+      expect(find.text(ViewConstants.backupRestorePromptFound), findsOneWidget);
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('hides backup-off indicator when backup is enabled',
         (tester) async {
       await CloudBackupSettingsRepo(storage).saveState(
@@ -228,6 +307,7 @@ void main() {
         tester,
         paywallViewModel: buildPaywallViewModel(),
       );
+      await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('free-usage-screen')), findsOneWidget);
       expect(paidFeatureUsageRepo.hasSeenFreeUsageIntro, isTrue);
@@ -789,7 +869,6 @@ void main() {
       await settleUi(tester);
 
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
-      expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsNothing);
       expect(find.text('ideaEditorTitleEdit'), findsOneWidget);
 
@@ -800,8 +879,9 @@ void main() {
       await settleUi(tester);
     });
 
-    testWidgets('restores locked editor with in-editor overlay on relaunch',
+    testWidgets('restores locked editor through PIN setup on relaunch',
         (tester) async {
+      await registerNoteLockServices();
       late final String ideaId;
       late final String sectionId;
       await tester.runAsync(() async {
@@ -823,30 +903,35 @@ void main() {
       await pumpIdeasApp(tester);
       await settleUi(tester);
 
-      expect(find.text(ViewConstants.noteLockEditorTitle), findsOneWidget);
-      expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
-      expect(find.byKey(const Key('idea-editor-lock-toggle')), findsOneWidget);
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
+      expect(find.text(ViewConstants.noteLockCreatePinTitle), findsWidgets);
+      expect(find.byKey(const Key('idea-editor-lock-toggle')), findsNothing);
+    });
+
+    testWidgets(
+        'opens restored locked note through PIN setup when no PIN exists',
+        (tester) async {
+      await registerNoteLockServices();
+      late final String ideaId;
+      await tester.runAsync(() async {
+        final savedIdea = await provider.saveIdea(
+          title: 'Restored locked note',
+          sections: provider.createDefaultSections(),
+        );
+        ideaId = savedIdea!.id;
+        await provider.setIdeaLocked(ideaId: ideaId, isLocked: true);
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.tap(find.byKey(Key('idea-card-$ideaId')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
+      expect(find.text(ViewConstants.noteLockCreatePinTitle), findsWidgets);
     });
 
     testWidgets('locks note in editor without showing overlay', (tester) async {
-      final pinStorage = <String, String>{};
-      final authService = NoteLockAuthService(
-        random: Random(1),
-        readValue: (key) async => pinStorage[key],
-        writeValue: (key, value) async {
-          pinStorage[key] = value;
-        },
-      );
-      await authService.createPin('1234');
-      if (sl.isRegistered<NoteLockAuthService>()) {
-        await sl.unregister<NoteLockAuthService>();
-      }
-      sl.registerSingleton<NoteLockAuthService>(authService);
-      addTearDown(() async {
-        if (sl.isRegistered<NoteLockAuthService>()) {
-          await sl.unregister<NoteLockAuthService>();
-        }
-      });
+      final authService = await registerNoteLockServices(withPin: true);
 
       await pumpIdeasApp(tester);
       await tester.tap(find.byKey(const Key('ideas-fab')));
@@ -879,6 +964,26 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      final ideaId = provider.ideas.single.id;
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+
+      expect(authService.isIdeaUnlocked(ideaId), isFalse);
+
+      await tester.tap(find.byKey(Key('idea-card-$ideaId')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
+      expect(find.text(ViewConstants.noteLockEnterPinTitle), findsWidgets);
+
+      Navigator.of(
+        tester.element(find.byKey(const Key('note-lock-pin-screen'))),
+      ).pop();
+      await settleUi(tester);
     });
 
     testWidgets('supports selecting and deleting ideas from the list',
@@ -1505,8 +1610,10 @@ void main() {
 }
 
 class _FakeCloudBackupService extends CloudBackupService {
+  bool backupExistsResult = false;
+
   @override
-  Future<bool> backupExists() async => false;
+  Future<bool> backupExists() async => backupExistsResult;
 
   @override
   Future<CloudBackupAccount?> connect({bool forceAccountPicker = false}) async {

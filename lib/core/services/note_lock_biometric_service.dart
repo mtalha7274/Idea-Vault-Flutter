@@ -14,6 +14,7 @@ class NoteLockBiometricService {
     LocalAuthentication? localAuthentication,
     Future<String?> Function(String key)? readValue,
     Future<void> Function(String key, String value)? writeValue,
+    Future<void> Function(String key)? deleteValue,
     Future<bool> Function({
       required String localizedReason,
       bool biometricOnly,
@@ -32,6 +33,10 @@ class NoteLockBiometricService {
                   key: key,
                   value: value,
                 )),
+        _deleteValue = deleteValue ??
+            ((key) => (secureStorage ?? const FlutterSecureStorage()).delete(
+                  key: key,
+                )),
         _authenticate = authenticate,
         _isDeviceSupported = isDeviceSupported,
         _canCheckBiometrics = canCheckBiometrics;
@@ -41,6 +46,7 @@ class NoteLockBiometricService {
   final LocalAuthentication _localAuthentication;
   final Future<String?> Function(String key) _readValue;
   final Future<void> Function(String key, String value) _writeValue;
+  final Future<void> Function(String key) _deleteValue;
   final Future<bool> Function({
     required String localizedReason,
     bool biometricOnly,
@@ -56,6 +62,10 @@ class NoteLockBiometricService {
 
   Future<void> setBiometricUnlockEnabled(bool enabled) async {
     await _writeValue(_biometricEnabledKey, enabled.toString());
+  }
+
+  Future<void> clearBiometricUnlock() async {
+    await _deleteValue(_biometricEnabledKey);
   }
 
   Future<bool> isDeviceSupported() async {

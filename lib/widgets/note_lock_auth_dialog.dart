@@ -47,10 +47,6 @@ Future<bool> authenticateForNoteLock(
   NoteLockBiometricService biometricService, {
   String? ideaId,
 }) async {
-  if (ideaId != null && authService.isIdeaUnlocked(ideaId)) {
-    return true;
-  }
-
   if (!await authService.hasPin()) {
     if (!context.mounted) {
       return false;
@@ -63,6 +59,14 @@ Future<bool> authenticateForNoteLock(
     if (!didCreatePin) {
       return false;
     }
+    if (ideaId != null) {
+      authService.markIdeaUnlocked(ideaId);
+    }
+    return true;
+  }
+
+  if (ideaId != null && authService.isIdeaUnlocked(ideaId)) {
+    return true;
   }
 
   if (!context.mounted) {
@@ -91,12 +95,6 @@ Future<void> authenticateAndOpenNote(
   required String ideaId,
   required Widget Function() nextRoute,
 }) async {
-  if (authService.isIdeaUnlocked(ideaId)) {
-    await AppRouter.push(context, nextRoute());
-    authService.markIdeaLocked(ideaId);
-    return;
-  }
-
   if (!await authService.hasPin()) {
     if (!context.mounted) {
       return;
@@ -109,6 +107,14 @@ Future<void> authenticateAndOpenNote(
     if (!didCreatePin) {
       return;
     }
+    authService.markIdeaUnlocked(ideaId);
+    if (!context.mounted) {
+      authService.markIdeaLocked(ideaId);
+      return;
+    }
+    await AppRouter.push(context, nextRoute());
+    authService.markIdeaLocked(ideaId);
+    return;
   }
 
   if (!context.mounted) {

@@ -384,7 +384,18 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      return;
+    }
+
+    await authenticateAndOpenNote(
+      context,
+      _noteLockAuthService,
+      _noteLockBiometricService,
+      ideaId: idea.id,
+      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
+    );
   }
 
   Future<void> _checkFreshInstallBackup() async {
@@ -461,6 +472,7 @@ class _HomepageState extends State<Homepage> {
 
     await usageRepo.initializeFreeUsageGrantIfNeeded();
     await usageRepo.markFreeUsageIntroSeen();
+    await paywall.syncUsageMetadataToCloud();
     if (!mounted) {
       return;
     }
