@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
-import 'package:keyboard_actions/keyboard_actions.dart';
 import 'package:provider/provider.dart';
 
 import '../config/config.dart';
@@ -14,7 +12,6 @@ import '../config/router/app_router.dart';
 import '../core/constants/app_assets.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
-import '../core/utils/helpers.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
@@ -54,8 +51,8 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  static const double _fabBaseBottomPadding = 60;
-  static const double _composerExtraLineHeight = 15 * 1.35;
+  static const double _dockScrollPaddingBase = 236;
+  static const double _dockMultilineExtraPadding = 15 * 1.35;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
@@ -100,24 +97,6 @@ class _HomepageState extends State<Homepage> {
     super.dispose();
   }
 
-  Widget _wrapHomepageBodyWithKeyboardActions(
-    BuildContext context,
-    Widget child,
-  ) {
-    if (!Platform.isIOS) {
-      return child;
-    }
-    return KeyboardActions(
-      disableScroll: true,
-      config: keyboardActionbuildConfig(
-        context,
-        [_quickAdditionFocusNode],
-        keyboardActionsPlatform: KeyboardActionsPlatform.IOS,
-      ),
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
@@ -132,127 +111,114 @@ class _HomepageState extends State<Homepage> {
         hostContext: context,
         onBackupPressed: _openBackupRestore,
       ),
-      body: _wrapHomepageBodyWithKeyboardActions(
-        context,
-        Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 860),
-                  child: NestedScrollView(
-                    floatHeaderSlivers: true,
-                    headerSliverBuilder: (context, innerBoxIsScrolled) {
-                      final handle =
-                          NestedScrollView.sliverOverlapAbsorberHandleFor(
-                        context,
-                      );
-                      return [
-                        SliverOverlapAbsorber(
-                          handle: handle,
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Gap(8.h),
-                                _Header(
-                                  ideaCount: ideas.length,
-                                  selectedCount: _selectedIdeaIds.length,
-                                  onMenuPressed: () =>
-                                      _scaffoldKey.currentState?.openDrawer(),
-                                  onDeletePressed: _isSelectionMode
-                                      ? _confirmDeleteSelection
-                                      : null,
-                                  onSearchPressed: _isSelectionMode
-                                      ? null
-                                      : _openSearchScreen,
-                                  onSortPressed:
-                                      _isSelectionMode ? null : _showSortSheet,
-                                  layoutOption: _layoutOption,
-                                  onLayoutPressed: _isSelectionMode
-                                      ? null
-                                      : _toggleLayoutOption,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: NestedScrollView(
+                  floatHeaderSlivers: true,
+                  headerSliverBuilder: (context, innerBoxIsScrolled) {
+                    final handle =
+                        NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      context,
+                    );
+                    return [
+                      SliverOverlapAbsorber(
+                        handle: handle,
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Gap(8.h),
+                              _Header(
+                                ideaCount: ideas.length,
+                                selectedCount: _selectedIdeaIds.length,
+                                onMenuPressed: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
+                                onDeletePressed: _isSelectionMode
+                                    ? _confirmDeleteSelection
+                                    : null,
+                                onSearchPressed:
+                                    _isSelectionMode ? null : _openSearchScreen,
+                                onSortPressed:
+                                    _isSelectionMode ? null : _showSortSheet,
+                                layoutOption: _layoutOption,
+                                onLayoutPressed: _isSelectionMode
+                                    ? null
+                                    : _toggleLayoutOption,
+                              ),
+                              SizedBox(height: 18.h),
+                              if (_hasCloudBackupProvider(context)) ...[
+                                _BackupOffIndicator(
+                                  onTap: _openBackupRestore,
                                 ),
-                                SizedBox(height: 18.h),
-                                if (_hasCloudBackupProvider(context)) ...[
-                                  _BackupOffIndicator(
-                                    onTap: _openBackupRestore,
-                                  ),
-                                  const BackupRestorePromptBanner(),
-                                ],
+                                const BackupRestorePromptBanner(),
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                      ];
-                    },
-                    body: Builder(
-                      builder: (context) {
-                        return CustomScrollView(
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            SliverOverlapInjector(
-                              handle: NestedScrollView
-                                  .sliverOverlapAbsorberHandleFor(context),
-                            ),
-                            if (ideas.isEmpty)
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 24),
-                                sliver: SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: const _EmptyIdeasState(),
-                                ),
-                              )
-                            else
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 0, 16, 200),
-                                sliver: SliverToBoxAdapter(
-                                  child: IdeasLayout(
-                                    ideas: visibleIdeas,
-                                    layoutOption: _layoutOption,
-                                    selectedIdeaIds: _selectedIdeaIds,
-                                    onTap: (idea) =>
-                                        unawaited(_handleIdeaTap(idea)),
-                                    onLongPress: _handleIdeaLongPress,
-                                  ),
+                      ),
+                    ];
+                  },
+                  body: Builder(
+                    builder: (context) {
+                      return CustomScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverOverlapInjector(
+                            handle:
+                                NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                    context),
+                          ),
+                          if (ideas.isEmpty)
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              sliver: SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: const _EmptyIdeasState(),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                16,
+                                0,
+                                16,
+                                _dockScrollPaddingBase +
+                                    (_isQuickAdditionMultiline
+                                        ? _dockMultilineExtraPadding
+                                        : 0),
+                              ),
+                              sliver: SliverToBoxAdapter(
+                                child: IdeasLayout(
+                                  ideas: visibleIdeas,
+                                  layoutOption: _layoutOption,
+                                  selectedIdeaIds: _selectedIdeaIds,
+                                  onTap: (idea) =>
+                                      unawaited(_handleIdeaTap(idea)),
+                                  onLongPress: _handleIdeaLongPress,
                                 ),
                               ),
-                          ],
-                        );
-                      },
-                    ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
             ),
-            if (!_isSelectionMode) _buildQuickAdditionDock(context),
-          ],
-        ),
+          ),
+          if (!_isSelectionMode) _buildQuickAdditionDock(context),
+        ],
       ),
-      floatingActionButton: _isSelectionMode
-          ? null
-          : AnimatedPadding(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(
-                bottom: _fabBaseBottomPadding +
-                    (_isQuickAdditionMultiline ? _composerExtraLineHeight : 0),
-              ),
-              child: _HomepageFab(
-                isExtended: _layoutOption == IdeaLayoutOption.list,
-                onPressed: () => AppRouter.push(
-                  context,
-                  const IdeaEditorScreen(),
-                ),
-              ),
-            ),
     );
   }
 
@@ -263,49 +229,76 @@ class _HomepageState extends State<Homepage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IgnorePointer(
-            child: Container(
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.background.withValues(alpha: 0),
-                    theme.background,
-                  ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _HomepageFab(
+                  isExtended: _layoutOption == IdeaLayoutOption.list,
+                  onPressed: () => AppRouter.push(
+                    context,
+                    const IdeaEditorScreen(),
+                  ),
                 ),
               ),
             ),
           ),
-          ColoredBox(
-            color: theme.background,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                MediaQuery.of(context).padding.bottom + 8,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: RandomAdditionComposer(
-                  controller: _quickAdditionController,
-                  focusNode: _quickAdditionFocusNode,
-                  fieldKey: const Key('homepage-random-addition-field'),
-                  sendButtonKey: const Key('homepage-random-addition-send'),
-                  onSubmit: _submitQuickAddition,
-                  onMultilineChanged: (isMultiline) {
-                    if (_isQuickAdditionMultiline == isMultiline) {
-                      return;
-                    }
-                    setState(() {
-                      _isQuickAdditionMultiline = isMultiline;
-                    });
-                  },
+          const Gap(24),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ColoredBox(
+                color: theme.background,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 860),
+                    child: RandomAdditionComposer(
+                      controller: _quickAdditionController,
+                      focusNode: _quickAdditionFocusNode,
+                      fieldKey: const Key('homepage-random-addition-field'),
+                      sendButtonKey: const Key('homepage-random-addition-send'),
+                      onSubmit: _submitQuickAddition,
+                      onMultilineChanged: (isMultiline) {
+                        if (_isQuickAdditionMultiline == isMultiline) {
+                          return;
+                        }
+                        setState(() {
+                          _isQuickAdditionMultiline = isMultiline;
+                        });
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                height: 32,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          theme.background.withValues(alpha: 0),
+                          theme.background,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
