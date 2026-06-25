@@ -232,7 +232,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 context,
                 CustomScrollView(
                   slivers: [
-                    _buildCollapsibleEditorHeader(context),
+                    _buildCollapsibleEditorHeader(context, currentIdea),
                     SliverPersistentHeader(
                       pinned: true,
                       delegate: _PinnedHeaderDelegate(
@@ -429,7 +429,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
-  Widget _buildCollapsibleEditorHeader(BuildContext context) {
+  Widget _buildCollapsibleEditorHeader(
+    BuildContext context,
+    Idea? currentIdea,
+  ) {
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -440,6 +443,15 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             isAutosaving: _isAutosaving,
             hasSaveFailed: _hasSaveFailed,
             isEditingExisting: widget.ideaId != null,
+            showLockButton: _savedIdeaId != null,
+            isNoteLocked: currentIdea?.isLocked ?? false,
+            onLockPressed: () {
+              if (currentIdea?.isLocked == true) {
+                unawaited(_unlockCurrentIdea());
+              } else {
+                unawaited(_lockCurrentIdea());
+              }
+            },
           ),
           Align(
             alignment: Alignment.topCenter,
@@ -1599,11 +1611,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showMoreOptionsSheet() async {
-    final currentIdea = _currentIdea(context.read<IdeasProvider>());
-    final action = await showIdeaEditorOptionsSheet(
-      context,
-      currentIdea?.isLocked == true,
-    );
+    final action = await showIdeaEditorOptionsSheet(context);
 
     if (!mounted || action == null) {
       return;
@@ -1615,12 +1623,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         break;
       case IdeaEditorOptionsSheetAction.exportToPDF:
         await _openExportScreen(ExportMode.pdfExport);
-        break;
-      case IdeaEditorOptionsSheetAction.lockNote:
-        await _lockCurrentIdea();
-        break;
-      case IdeaEditorOptionsSheetAction.unlockNote:
-        await _unlockCurrentIdea();
         break;
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
@@ -1649,7 +1651,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
 
     await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: true);
-    _noteLockAuthService.markIdeaLocked(ideaId);
+    _noteLockAuthService.markIdeaUnlocked(ideaId);
     if (!mounted) {
       return;
     }
@@ -1692,10 +1694,9 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         backgroundColor: theme.surface,
         content: Text(
           messageKey.tr(),
-          style: ideaVaultBody(
-            context,
-            size: 14,
-            weight: FontWeight.w700,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
             color: theme.primaryText,
           ),
         ),
@@ -2012,6 +2013,9 @@ class _Header extends StatelessWidget {
     required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
+    required this.showLockButton,
+    required this.isNoteLocked,
+    required this.onLockPressed,
   });
 
   final VoidCallback onClose;
@@ -2019,9 +2023,13 @@ class _Header extends StatelessWidget {
   final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
+  final bool showLockButton;
+  final bool isNoteLocked;
+  final VoidCallback onLockPressed;
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
     return Row(
       children: [
         Gap(10.w),
@@ -2052,6 +2060,27 @@ class _Header extends StatelessWidget {
             size: 20,
           ),
           Gap(8.w),
+        ],
+        if (showLockButton) ...[
+          Tooltip(
+            message: (isNoteLocked
+                    ? ViewConstants.ideaEditorOptionsUnlockNote
+                    : ViewConstants.ideaEditorOptionsLockNote)
+                .tr(),
+            child: IconButton(
+              key: const Key('idea-editor-lock-toggle'),
+              onPressed: onLockPressed,
+              style: isNoteLocked
+                  ? IconButton.styleFrom(foregroundColor: theme.primary)
+                  : null,
+              icon: Icon(
+                isNoteLocked
+                    ? Icons.lock_outline_rounded
+                    : Icons.lock_open_rounded,
+              ),
+              padding: EdgeInsets.all(10.d),
+            ),
+          ),
         ],
         IconButton(
           key: const Key('idea-editor-menu'),

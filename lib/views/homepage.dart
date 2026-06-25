@@ -320,7 +320,39 @@ class _HomepageState extends State<Homepage> {
     if (!mounted) {
       return;
     }
+    await _runAutoBackupCatchUp();
+    if (!mounted) {
+      return;
+    }
     await _showFreeUsageIntroIfNeeded();
+  }
+
+  Future<void> _runAutoBackupCatchUp() async {
+    if (!mounted) {
+      return;
+    }
+    final backupProvider = _maybeCloudBackupProvider(context);
+    if (backupProvider == null) {
+      return;
+    }
+    final ideasProvider = context.read<IdeasProvider>();
+    await ideasProvider.ensureLoaded();
+    if (!mounted) {
+      return;
+    }
+    final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+    await randomAdditionsProvider.ensureLoaded();
+    if (!mounted) {
+      return;
+    }
+    await backupProvider.initializeAutoBackup();
+    if (!mounted) {
+      return;
+    }
+    await backupProvider.runAutoBackupIfDue(
+      ideasProvider.ideas,
+      randomAdditions: randomAdditionsProvider.additions,
+    );
   }
 
   Future<void> _resumeEditorIfNeeded() async {
@@ -351,18 +383,7 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    if (!idea.isLocked) {
-      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
-      return;
-    }
-
-    await authenticateAndOpenNote(
-      context,
-      _noteLockAuthService,
-      _noteLockBiometricService,
-      ideaId: idea.id,
-      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
-    );
+    await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
   }
 
   Future<void> _checkFreshInstallBackup() async {

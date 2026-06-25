@@ -108,8 +108,8 @@ class GoogleDriveBackupStore implements CloudBackupStore {
   }
 
   @override
-  Future<int> writeBackup(String contents) async {
-    final api = await _driveApi(promptIfNecessary: true);
+  Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
+    final api = await _driveApi(promptIfNecessary: !silentAuth);
     if (api == null) {
       throw StateError('Google Drive is not connected.');
     }

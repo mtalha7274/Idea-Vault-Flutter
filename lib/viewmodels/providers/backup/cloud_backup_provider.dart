@@ -98,6 +98,28 @@ class CloudBackupProvider with ChangeNotifier {
     });
   }
 
+  Future<void> initializeAutoBackup() async {
+    if (!_state.enabled || !_state.autoBackupEnabled) {
+      return;
+    }
+    await _scheduler.scheduleDailyBackup();
+  }
+
+  Future<void> runAutoBackupIfDue(
+    List<Idea> ideas, {
+    List<RandomAddition> randomAdditions = const [],
+  }) async {
+    if (!_state.enabled || !_state.autoBackupEnabled || _state.isBusy) {
+      return;
+    }
+    if (_state.lastBackupAt != null &&
+        DateTime.now().difference(_state.lastBackupAt!) <
+            CloudBackupScheduler.backupInterval) {
+      return;
+    }
+    await backUpNow(ideas, randomAdditions: randomAdditions);
+  }
+
   Future<CloudBackupSnapshot?> fetchRestoreSnapshot() async {
     return _backupService.restoreSnapshot();
   }

@@ -106,6 +106,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     this.organizeEnabled = true,
     this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
+    this.showPreviewToggle = false,
   });
 
   final TextEditingController controller;
@@ -117,6 +118,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
   final bool organizeEnabled;
   final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
+  final bool showPreviewToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +139,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
           organizeEnabled: organizeEnabled,
           imageTextEnabled: imageTextEnabled,
           exceedsAiCharacterLimit: exceedsAiCharacterLimit,
+          showPreviewToggle: showPreviewToggle,
         ),
       ),
     );
@@ -155,6 +158,7 @@ class IdeaEditorToolbar extends StatelessWidget {
     this.organizeEnabled = true,
     this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
+    this.showPreviewToggle = false,
   });
 
   final TextEditingController controller;
@@ -166,6 +170,7 @@ class IdeaEditorToolbar extends StatelessWidget {
   final bool organizeEnabled;
   final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
+  final bool showPreviewToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -266,14 +271,16 @@ class IdeaEditorToolbar extends StatelessWidget {
           enabled: organizeEnabled,
           exceedsCharacterLimit: exceedsAiCharacterLimit,
         ),
-        const SizedBox(width: 8),
-        _ToolbarIconButton(
-          key: const Key('idea-markdown-preview-toggle'),
-          icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
-          tooltip: isPreviewMode ? 'Edit' : 'Preview',
-          onPressed: onPreviewToggle,
-          rightPadding: 2,
-        ),
+        if (showPreviewToggle) ...[
+          const SizedBox(width: 8),
+          _ToolbarIconButton(
+            key: const Key('idea-markdown-preview-toggle'),
+            icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
+            tooltip: isPreviewMode ? 'Edit' : 'Preview',
+            onPressed: onPreviewToggle,
+            rightPadding: 2,
+          ),
+        ],
       ],
     );
   }

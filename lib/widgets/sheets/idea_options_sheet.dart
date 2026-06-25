@@ -10,7 +10,6 @@ import '../translated_text.dart';
 
 Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
   BuildContext context,
-  bool isLocked,
 ) {
   return showModalBottomSheet<IdeaEditorOptionsSheetAction>(
     context: context,
@@ -100,25 +99,6 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
                         ),
                         Divider(height: 1, thickness: 1, color: dividerColor),
                         _SheetOptionRow(
-                          key: const Key('idea-editor-option-lock-note'),
-                          icon: isLocked
-                              ? Icons.lock_open_rounded
-                              : Icons.lock_outline_rounded,
-                          labelKey: isLocked
-                              ? ViewConstants.ideaEditorOptionsUnlockNote
-                              : ViewConstants.ideaEditorOptionsLockNote,
-                          iconBackgroundColor:
-                              sheetTheme.primary.withValues(alpha: 0.12),
-                          iconColor: sheetTheme.primary,
-                          labelColor: sheetTheme.primaryText,
-                          onTap: () => Navigator.of(sheetContext).pop(
-                            isLocked
-                                ? IdeaEditorOptionsSheetAction.unlockNote
-                                : IdeaEditorOptionsSheetAction.lockNote,
-                          ),
-                        ),
-                        Divider(height: 1, thickness: 1, color: dividerColor),
-                        _SheetOptionRow(
                           key: const Key('idea-editor-option-delete-idea'),
                           icon: Icons.delete_outline_rounded,
                           labelKey: ViewConstants.ideaEditorOptionsDeleteIdea,
@@ -146,8 +126,6 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
 enum IdeaEditorOptionsSheetAction {
   exportForAI,
   exportToPDF,
-  lockNote,
-  unlockNote,
   deleteIdea,
 }
 

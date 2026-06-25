@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.5
+
+- Fixed **auto backup** reliability issues
+- **Secret notes** with **PIN** and **biometric** lock support
+- **Text field** fixes on the **idea editor** and **homepage** for smoother typing
+- Removed **preview** button from the editor toolbar
+
 ## v1.0.4
 
 - **Search** and **quick-capture** hints are easier to read

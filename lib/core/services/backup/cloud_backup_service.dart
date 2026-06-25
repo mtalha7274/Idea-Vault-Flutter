@@ -36,13 +36,14 @@ class CloudBackupService {
   Future<int> backUpIdeas(
     List<Idea> ideas, {
     List<RandomAddition> randomAdditions = const [],
+    bool silentAuth = false,
   }) async {
     final snapshot = CloudBackupSnapshot.fromContent(
       ideas: ideas,
       randomAdditions: randomAdditions,
     );
     final encoded = const JsonEncoder.withIndent('  ').convert(snapshot);
-    return _store.writeBackup(encoded);
+    return _store.writeBackup(encoded, silentAuth: silentAuth);
   }
 
   Future<CloudBackupSnapshot?> restoreSnapshot() async {

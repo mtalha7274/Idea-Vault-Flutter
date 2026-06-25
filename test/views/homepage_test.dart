@@ -1,11 +1,15 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:idea_vault/config/config.dart';
+import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
+import 'package:idea_vault/core/services/note_lock_auth_service.dart';
 import 'package:idea_vault/core/services/premium/paywall_provider.dart';
 import 'package:idea_vault/core/services/premium/subscription_service.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
@@ -27,7 +31,6 @@ import 'package:idea_vault/viewmodels/providers/premium/paywall_view_model.dart'
 import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
-import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -644,10 +647,6 @@ void main() {
       );
       expect(editor.controller?.text, contains('Vision'));
 
-      await tester.tap(find.byKey(const Key('idea-markdown-preview-toggle')));
-      await settleUi(tester);
-      expect(find.byType(MarkdownBlock), findsOneWidget);
-
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
       );
@@ -799,6 +798,87 @@ void main() {
       );
       closeButton.onPressed!.call();
       await settleUi(tester);
+    });
+
+    testWidgets('restores locked editor with in-editor overlay on relaunch',
+        (tester) async {
+      late final String ideaId;
+      late final String sectionId;
+      await tester.runAsync(() async {
+        final savedIdea = await provider.saveIdea(
+          title: 'Locked resume',
+          sections: provider.createDefaultSections(),
+        );
+        ideaId = savedIdea!.id;
+        sectionId = savedIdea.sections.first.id;
+
+        await provider.setIdeaLocked(ideaId: ideaId, isLocked: true);
+        await provider.saveEditorState(
+          ideaId: ideaId,
+          activeSectionId: sectionId,
+          isPreviewMode: false,
+        );
+      });
+
+      await pumpIdeasApp(tester);
+      await settleUi(tester);
+
+      expect(find.text(ViewConstants.noteLockEditorTitle), findsOneWidget);
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
+      expect(find.byKey(const Key('idea-editor-lock-toggle')), findsOneWidget);
+    });
+
+    testWidgets('locks note in editor without showing overlay', (tester) async {
+      final pinStorage = <String, String>{};
+      final authService = NoteLockAuthService(
+        random: Random(1),
+        readValue: (key) async => pinStorage[key],
+        writeValue: (key, value) async {
+          pinStorage[key] = value;
+        },
+      );
+      await authService.createPin('1234');
+      if (sl.isRegistered<NoteLockAuthService>()) {
+        await sl.unregister<NoteLockAuthService>();
+      }
+      sl.registerSingleton<NoteLockAuthService>(authService);
+      addTearDown(() async {
+        if (sl.isRegistered<NoteLockAuthService>()) {
+          await sl.unregister<NoteLockAuthService>();
+        }
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await settleUi(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        'Secret draft',
+      );
+      await settlePersistenceAction(tester);
+
+      await tester.tap(find.byKey(const Key('idea-editor-lock-toggle')));
+      await settlePersistenceAction(tester);
+
+      expect(find.text(ViewConstants.noteLockEditorTitle), findsNothing);
+      expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
+      expect(provider.ideas.single.isLocked, isTrue);
+
+      final lockButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-lock-toggle')),
+      );
+      expect(
+        lockButton.style?.foregroundColor?.resolve({}),
+        themeProvider.baseTheme.primary,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('idea-editor-lock-toggle')),
+          matching: find.byIcon(Icons.lock_outline_rounded),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('supports selecting and deleting ideas from the list',

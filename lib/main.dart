@@ -111,6 +111,24 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(context.read<PaywallViewModel>().refreshSubscription());
+      unawaited(_runAutoBackupCatchUp(context));
+    }
+  }
+
+  Future<void> _runAutoBackupCatchUp(BuildContext context) async {
+    try {
+      final backupProvider = context.read<CloudBackupProvider>();
+      final ideasProvider = context.read<IdeasProvider>();
+      await ideasProvider.ensureLoaded();
+      final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+      await randomAdditionsProvider.ensureLoaded();
+      await backupProvider.initializeAutoBackup();
+      await backupProvider.runAutoBackupIfDue(
+        ideasProvider.ideas,
+        randomAdditions: randomAdditionsProvider.additions,
+      );
+    } on ProviderNotFoundException {
+      return;
     }
   }
 

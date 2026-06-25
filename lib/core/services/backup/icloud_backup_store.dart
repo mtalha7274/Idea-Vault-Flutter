@@ -52,7 +52,7 @@ class ICloudBackupStore implements CloudBackupStore {
   }
 
   @override
-  Future<int> writeBackup(String contents) async {
+  Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
     final tempFile = await _tempBackupFile();
     final bytes = utf8.encode(contents);
     await tempFile.writeAsBytes(bytes, flush: true);
