@@ -6,23 +6,14 @@ import 'dart:ui';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
 import 'package:keyboard_actions/keyboard_actions.dart';
-import 'package:image_cropper/image_cropper.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_recognition_error.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
 import '../config/router/app_router.dart';
-import '../core/services/image_text_recognition_service.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
-import '../core/utils/editor_text_insertion.dart';
 import '../core/utils/helpers.dart';
 import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
@@ -39,7 +30,6 @@ import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/sheets/idea_editor_section_sheet.dart';
 import '../widgets/sheets/idea_options_sheet.dart';
 import '../widgets/sheets/organise_section_sheet.dart';
-import '../widgets/speech_to_text_mic_fab.dart';
 import '../core/constants/view_constants.dart';
 import '../widgets/translated_text.dart';
 import 'export_for_ai_screen.dart';
@@ -65,8 +55,6 @@ class IdeaEditorScreen extends StatefulWidget {
 class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     with WidgetsBindingObserver {
   static const _autosaveDelay = Duration(milliseconds: 700);
-  final SpeechToText _speechToText = SpeechToText();
-  final ImagePicker _imagePicker = ImagePicker();
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
   late final FocusNode _titleFocusNode;
@@ -77,7 +65,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late String _lastSavedSnapshot;
   late IdeasProvider _ideasProvider;
   late IdeaOrganizationRepository _organizationRepo;
-  late ImageTextRecognitionService _imageTextRecognitionService;
   late NoteLockAuthService _noteLockAuthService;
   late NoteLockBiometricService _noteLockBiometricService;
 
@@ -88,18 +75,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isPreviewMode = false;
   bool _isAutosaving = false;
   bool _hasSaveFailed = false;
-  bool _isListening = false;
-  bool _isSpeechActivating = false;
-  bool _isMicPressHeld = false;
-  final GlobalKey<TooltipState> _micTooltipKey = GlobalKey<TooltipState>();
-  bool _isSpeechInitialized = false;
-  bool _didShowPermissionDialog = false;
   bool _isOrganizing = false;
-  bool _isPreparingImageText = false;
-  bool _isExtractingImageText = false;
-  bool _didShowImagePermissionDialog = false;
-  String _partialSpeechText = '';
-  int _lastInsertedSpeechOffset = 0;
 
   @override
   void initState() {
@@ -115,10 +91,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _noteLockBiometricService = sl.isRegistered<NoteLockBiometricService>()
         ? sl<NoteLockBiometricService>()
         : NoteLockBiometricService();
-    _imageTextRecognitionService =
-        sl.isRegistered<ImageTextRecognitionService>()
-            ? sl<ImageTextRecognitionService>()
-            : GoogleMlKitImageTextRecognitionService();
     final existingIdea =
         widget.ideaId == null ? null : ideasProvider.findById(widget.ideaId!);
     final resumeState =
@@ -156,14 +128,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       } else {
         _persistEditorState();
       }
-      unawaited(_prewarmSpeechToText());
     });
-  }
-
-  Future<void> _prewarmSpeechToText() async {
-    try {
-      await _ensureSpeechReady();
-    } catch (_) {}
   }
 
   @override
@@ -171,7 +136,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _clearLockedEditorSessionUnlock();
     WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.primaryFocus?.unfocus();
-    _speechToText.stop();
     _autosaveTimer?.cancel();
     unawaited(_flushAutosave(updateUi: false));
     _titleController
@@ -217,17 +181,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           Scaffold(
             backgroundColor: theme.background,
             resizeToAvoidBottomInset: true,
-            floatingActionButton: Padding(
-              padding: const EdgeInsets.only(right: 8, bottom: 4),
-              child: SpeechToTextMicFab(
-                isListening: _isListening,
-                isActivating: _isSpeechActivating,
-                tooltipKey: _micTooltipKey,
-                onTap: _handleMicSingleTap,
-                onLongPressStart: _handleMicLongPress,
-                onLongPressEnd: _handleMicLongPressEnd,
-              ),
-            ),
             body: SafeArea(
               bottom: false,
               child: _wrapEditorBodyWithKeyboardActions(
@@ -256,11 +209,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                           onPreviewToggle: _togglePreviewMode,
                           onOrganize: () =>
                               unawaited(_onOrganizeToolbarPressed()),
-                          onImageText: () =>
-                              unawaited(_onImageTextToolbarPressed()),
                           organizeEnabled: !_isOrganizing,
-                          imageTextEnabled:
-                              !_isPreparingImageText && !_isExtractingImageText,
                           exceedsAiCharacterLimit:
                               _sectionExceedsAiWarningCharacterLimit,
                         ),
@@ -281,8 +230,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             ),
           ),
           if (_isOrganizing) _buildOrganizingOverlay(context),
-          if (_isPreparingImageText) _buildPreparingImageOverlay(context),
-          if (_isExtractingImageText) _buildImageTextOverlay(context),
           if (isEditorLocked) _buildLockedEditorOverlay(context, currentIdea),
         ],
       ),
@@ -543,26 +490,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
-  Widget _buildImageTextOverlay(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: AiLoadingOverlay(
-        icon: Icons.document_scanner_rounded,
-        statusMessages: [ViewConstants.ideaEditorImageTextReading.tr()],
-      ),
-    );
-  }
-
-  Widget _buildPreparingImageOverlay(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: AiLoadingOverlay(
-        icon: Icons.crop_rounded,
-        statusMessages: [ViewConstants.ideaEditorImageTextPreparing.tr()],
-      ),
-    );
-  }
-
   Widget _buildAddSectionTab() {
     return Tooltip(
       message: ViewConstants.ideaEditorAddSectionTooltip.tr(),
@@ -751,216 +678,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
   }
 
-  Future<void> _onImageTextToolbarPressed() async {
-    if (_isPreviewMode || _isPreparingImageText || _isExtractingImageText) {
-      return;
-    }
-
-    final hasAccess =
-        await _ensurePremiumAccess(PremiumFeature.imageTextExtraction);
-    if (!hasAccess || !mounted) {
-      return;
-    }
-
-    final source = await _showImageTextSourceSheet();
-    if (!mounted || source == null) {
-      return;
-    }
-
-    await _pickAndReadImageText(source);
-  }
-
-  Future<ImageSource?> _showImageTextSourceSheet() {
-    final theme = context.read<ThemeProvider>().baseTheme;
-    return showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: theme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading:
-                      Icon(Icons.photo_camera_rounded, color: theme.primary),
-                  title: TranslatedText(
-                    ViewConstants.ideaEditorImageTextTakePhoto,
-                    style: ideaVaultBody(
-                      context,
-                      weight: FontWeight.w700,
-                      color: theme.primaryText,
-                    ),
-                  ),
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(ImageSource.camera),
-                ),
-                ListTile(
-                  leading:
-                      Icon(Icons.photo_library_rounded, color: theme.primary),
-                  title: TranslatedText(
-                    ViewConstants.ideaEditorImageTextChoosePhoto,
-                    style: ideaVaultBody(
-                      context,
-                      weight: FontWeight.w700,
-                      color: theme.primaryText,
-                    ),
-                  ),
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(ImageSource.gallery),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _pickAndReadImageText(ImageSource source) async {
-    final hasPermission = await _ensureImagePermission(source);
-    if (!hasPermission || !mounted) {
-      return;
-    }
-
-    XFile? image;
-    try {
-      _setPreparingImageText(true);
-      image = await _imagePicker.pickImage(source: source);
-    } on PlatformException catch (error) {
-      _setPreparingImageText(false);
-      if (_isImagePermissionError(error)) {
-        await _showImagePermissionDialog();
-        return;
-      }
-      _showImageTextFailedMessage();
-      return;
-    } catch (_) {
-      _setPreparingImageText(false);
-      _showImageTextFailedMessage();
-      return;
-    }
-
-    if (!mounted || image == null) {
-      _setPreparingImageText(false);
-      return;
-    }
-
-    final croppedImage = await _cropImageForText(image);
-    _setPreparingImageText(false);
-    if (!mounted || croppedImage == null) {
-      return;
-    }
-
-    setState(() {
-      _isExtractingImageText = true;
-    });
-
-    try {
-      final extractedText =
-          await _imageTextRecognitionService.recognizeText(croppedImage.path);
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isExtractingImageText = false;
-      });
-
-      if (extractedText.trim().isEmpty) {
-        _showNoImageTextMessage();
-        return;
-      }
-
-      _insertTextOnOwnLine(extractedText);
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _isExtractingImageText = false;
-      });
-      _showImageTextFailedMessage();
-    }
-  }
-
-  Future<CroppedFile?> _cropImageForText(XFile image) async {
-    final theme = context.read<ThemeProvider>().baseTheme;
-    try {
-      return await ImageCropper().cropImage(
-        sourcePath: image.path,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: ViewConstants.cropImage.tr(),
-            toolbarColor: theme.primary,
-            toolbarWidgetColor: theme.onPrimary,
-            activeControlsWidgetColor: theme.primary,
-            initAspectRatio: CropAspectRatioPreset.original,
-            lockAspectRatio: false,
-            cropStyle: CropStyle.rectangle,
-          ),
-          IOSUiSettings(
-            title: ViewConstants.cropImage.tr(),
-            aspectRatioLockEnabled: false,
-            cropStyle: CropStyle.rectangle,
-            resetButtonHidden: true,
-          ),
-        ],
-      );
-    } on PlatformException catch (error) {
-      if (_isImagePermissionError(error)) {
-        await _showImagePermissionDialog();
-        return null;
-      }
-      _showImageTextFailedMessage();
-      return null;
-    } catch (_) {
-      _showImageTextFailedMessage();
-      return null;
-    }
-  }
-
-  void _setPreparingImageText(bool isPreparing) {
-    if (_isPreparingImageText == isPreparing) {
-      return;
-    }
-    if (!mounted) {
-      _isPreparingImageText = isPreparing;
-      return;
-    }
-    setState(() {
-      _isPreparingImageText = isPreparing;
-    });
-  }
-
-  Future<bool> _ensureImagePermission(ImageSource source) async {
-    PermissionStatus status = PermissionStatus.granted;
-    if (source == ImageSource.camera) {
-      status = await Permission.camera.request();
-    } else if (Platform.isIOS) {
-      status = await Permission.photos.request();
-    }
-
-    final hasPermission = status.isGranted || status.isLimited;
-    if (!hasPermission && mounted) {
-      await _showImagePermissionDialog();
-    }
-    return hasPermission;
-  }
-
-  bool _isImagePermissionError(PlatformException error) {
-    final code = error.code.toLowerCase();
-    final message = error.message?.toLowerCase() ?? '';
-    return code.contains('denied') ||
-        code.contains('permission') ||
-        message.contains('denied') ||
-        message.contains('permission');
-  }
-
   void _replaceEditorContent(String content) {
     final selection = _contentController.selection;
     final cursorOffset = math.min(
@@ -974,373 +691,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
         selection: TextSelection.collapsed(offset: cursorOffset),
       )
       ..addListener(_handleEditorContentChanged);
-  }
-
-  void _insertTextOnOwnLine(String insertedText) {
-    final normalizedText = insertedText.trim();
-    if (normalizedText.isEmpty || _isPreviewMode) {
-      return;
-    }
-
-    final value = _contentController.value;
-    final currentText = value.text;
-    final selection = value.selection;
-    final canInsertAtCursor = _contentFocusNode.hasFocus &&
-        selection.isValid &&
-        selection.start >= 0 &&
-        selection.end >= 0;
-
-    final start = canInsertAtCursor
-        ? math.min(selection.start, selection.end)
-        : currentText.length;
-    final end = canInsertAtCursor
-        ? math.max(selection.start, selection.end)
-        : currentText.length;
-    final before = currentText.substring(0, start);
-    final after = currentText.substring(end);
-    final middle = textOnOwnLine(before, after, normalizedText);
-    final updatedText = before + middle + after;
-    final nextOffset = before.length + middle.length;
-
-    _contentController.value = TextEditingValue(
-      text: updatedText,
-      selection: TextSelection.collapsed(offset: nextOffset),
-    );
-    _contentFocusNode.requestFocus();
-  }
-
-  Future<void> _handleMicSingleTap() async {
-    if (_isListening) {
-      return;
-    }
-
-    _micTooltipKey.currentState?.ensureTooltipVisible();
-  }
-
-  Future<void> _handleMicLongPress() async {
-    if (_isListening) {
-      return;
-    }
-
-    _isMicPressHeld = true;
-    await _setSpeechActivating(true);
-
-    final hasAccess = await _ensurePremiumAccess(PremiumFeature.speechToText);
-    if (!hasAccess || !mounted) {
-      await _setSpeechActivating(false);
-      _isMicPressHeld = false;
-      return;
-    }
-
-    final hasPermission = await _ensureSpeechPermission();
-    if (!hasPermission || !_isMicPressHeld || !mounted) {
-      await _setSpeechActivating(false);
-      return;
-    }
-
-    final isAvailable = await _ensureSpeechReady();
-    if (!isAvailable || !_isMicPressHeld || !mounted) {
-      await _setSpeechActivating(false);
-      if (mounted) {
-        _showSpeechUnavailableMessage();
-      }
-      return;
-    }
-
-    _partialSpeechText = '';
-    _lastInsertedSpeechOffset = _contentController.selection.start;
-
-    await _setListeningState(true);
-
-    await _speechToText.listen(
-      onResult: _handleSpeechResult,
-      listenOptions: SpeechListenOptions(
-        partialResults: true,
-        cancelOnError: true,
-        listenMode: ListenMode.dictation,
-      ),
-    );
-
-    if (!mounted || !_speechToText.isListening) {
-      await _setListeningState(false);
-      await _setSpeechActivating(false);
-      return;
-    }
-  }
-
-  Future<void> _handleMicLongPressEnd() async {
-    _isMicPressHeld = false;
-    if (_isListening) {
-      HapticFeedback.lightImpact();
-    }
-    await _stopListening();
-    await _setSpeechActivating(false);
-    _partialSpeechText = '';
-    _lastInsertedSpeechOffset = 0;
-  }
-
-  Future<bool> _ensureSpeechPermission() async {
-    final microphoneStatus = await Permission.microphone.request();
-    PermissionStatus speechStatus = PermissionStatus.granted;
-
-    if (Platform.isIOS) {
-      speechStatus = await Permission.speech.request();
-    }
-
-    final hasPermission = microphoneStatus.isGranted && speechStatus.isGranted;
-    if (!hasPermission && mounted) {
-      await _showMicrophonePermissionDialog();
-    }
-    return hasPermission;
-  }
-
-  Future<bool> _ensureSpeechReady() async {
-    if (_isSpeechInitialized) {
-      return _speechToText.isAvailable;
-    }
-
-    final isAvailable = await _speechToText.initialize(
-      onStatus: _handleSpeechStatus,
-      onError: _handleSpeechError,
-    );
-    _isSpeechInitialized = true;
-    return isAvailable;
-  }
-
-  Future<void> _setSpeechActivating(bool isActivating) async {
-    if (_isSpeechActivating == isActivating) {
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isSpeechActivating = isActivating;
-      });
-    } else {
-      _isSpeechActivating = isActivating;
-    }
-  }
-
-  Future<void> _setListeningState(bool isListening) async {
-    if (_isListening == isListening) {
-      return;
-    }
-
-    if (isListening) {
-      HapticFeedback.mediumImpact();
-    }
-
-    if (mounted) {
-      setState(() {
-        _isListening = isListening;
-        if (isListening) {
-          _isSpeechActivating = false;
-        }
-      });
-    } else {
-      _isListening = isListening;
-      if (isListening) {
-        _isSpeechActivating = false;
-      }
-    }
-  }
-
-  Future<void> _stopListening() async {
-    if (_speechToText.isListening) {
-      await _speechToText.stop();
-    }
-    await _setListeningState(false);
-  }
-
-  void _handleSpeechStatus(String status) {
-    if (!mounted) {
-      return;
-    }
-
-    if (status == 'done' || status == 'notListening') {
-      _stopListening();
-    }
-  }
-
-  void _handleSpeechError(SpeechRecognitionError error) {
-    if (!mounted) {
-      return;
-    }
-
-    _stopListening();
-
-    final errorMessage = error.errorMsg.toLowerCase();
-    final isPermissionIssue =
-        errorMessage.contains('permission') || errorMessage.contains('denied');
-    if (isPermissionIssue) {
-      _showMicrophonePermissionDialog();
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TranslatedText(ViewConstants.ideaEditorSnackbarSpeechStopped),
-      ),
-    );
-  }
-
-  void _handleSpeechResult(SpeechRecognitionResult result) {
-    final recognizedWords = result.recognizedWords.trim();
-    if (recognizedWords.isEmpty) {
-      return;
-    }
-
-    if (result.finalResult) {
-      _insertRecognizedText(recognizedWords, isFinal: true);
-      _partialSpeechText = '';
-    } else {
-      _insertRecognizedText(recognizedWords, isFinal: false);
-    }
-  }
-
-  void _insertRecognizedText(String dictatedText, {required bool isFinal}) {
-    final normalizedText = dictatedText.trim();
-    if (normalizedText.isEmpty) {
-      return;
-    }
-
-    final selection = _contentController.selection;
-    final currentText = _contentController.text;
-    final canInsertAtCursor = !_isPreviewMode &&
-        _contentFocusNode.hasFocus &&
-        selection.isValid &&
-        selection.start >= 0 &&
-        selection.end >= 0;
-
-    if (!canInsertAtCursor) {
-      if (isFinal) {
-        final middle = textOnOwnLine(currentText, '', normalizedText);
-        final updatedText = currentText + middle;
-        _contentController.value = TextEditingValue(
-          text: updatedText,
-          selection: TextSelection.collapsed(offset: updatedText.length),
-        );
-        _lastInsertedSpeechOffset = updatedText.length;
-      }
-      return;
-    }
-
-    final before = currentText.substring(0, _lastInsertedSpeechOffset);
-    final after = currentText.substring(
-      _lastInsertedSpeechOffset + _partialSpeechText.length,
-    );
-
-    final middle = textOnOwnLine(
-      before,
-      after,
-      normalizedText,
-    );
-
-    final updatedText = before + middle + after;
-    final nextOffset = before.length + middle.length;
-
-    _contentController.value = TextEditingValue(
-      text: updatedText,
-      selection: TextSelection.collapsed(offset: nextOffset),
-    );
-
-    if (isFinal) {
-      _lastInsertedSpeechOffset = nextOffset;
-      _partialSpeechText = '';
-    } else {
-      _partialSpeechText = middle;
-    }
-  }
-
-  void _showSpeechUnavailableMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TranslatedText(
-          ViewConstants.ideaEditorSnackbarSpeechUnavailable,
-        ),
-      ),
-    );
-  }
-
-  void _showNoImageTextMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TranslatedText(ViewConstants.ideaEditorImageTextNoText),
-      ),
-    );
-  }
-
-  void _showImageTextFailedMessage() {
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TranslatedText(ViewConstants.ideaEditorImageTextFailed),
-      ),
-    );
-  }
-
-  Future<void> _showImagePermissionDialog() async {
-    if (_didShowImagePermissionDialog || !mounted) {
-      return;
-    }
-
-    _didShowImagePermissionDialog = true;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: TranslatedText(ViewConstants.ideaEditorImagePermissionTitle),
-          content: TranslatedText(ViewConstants.ideaEditorImagePermissionBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: TranslatedText(ViewConstants.cancel),
-            ),
-            FilledButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                await openAppSettings();
-              },
-              child: TranslatedText(ViewConstants.ideaEditorOpenSettings),
-            ),
-          ],
-        );
-      },
-    );
-    _didShowImagePermissionDialog = false;
-  }
-
-  Future<void> _showMicrophonePermissionDialog() async {
-    if (_didShowPermissionDialog || !mounted) {
-      return;
-    }
-
-    _didShowPermissionDialog = true;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: TranslatedText(ViewConstants.ideaEditorMicPermissionTitle),
-          content: TranslatedText(ViewConstants.ideaEditorMicPermissionBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: TranslatedText(ViewConstants.cancel),
-            ),
-            FilledButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                await openAppSettings();
-              },
-              child: TranslatedText(ViewConstants.ideaEditorOpenSettings),
-            ),
-          ],
-        );
-      },
-    );
-    _didShowPermissionDialog = false;
   }
 
   void _handlePreviewModeChanged(bool isPreviewMode) {
@@ -1878,7 +1228,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     });
   }
 }
-
 
 class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
   const _PinnedHeaderDelegate({

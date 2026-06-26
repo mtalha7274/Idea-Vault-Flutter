@@ -33,7 +33,6 @@ class ViewConstants {
   static const String home = "home";
   static const String search = "search";
   static const String more = "more";
-  static const String cropImage = "cropImage";
   static const String requestTimeout = "requestTimeout";
 
   /// `{limit}` = formatted warning character count (keep in sync with [ideaSectionAiWarningCharacterLimit]).
@@ -61,8 +60,6 @@ class ViewConstants {
   static const String paywallProUnlocks = 'paywallProUnlocks';
   static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
   static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
-  static const String paywallFeatureSpeechToText = 'paywallFeatureSpeechToText';
-  static const String paywallFeatureImageToText = 'paywallFeatureImageToText';
   static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
   static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
   static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';
@@ -251,7 +248,6 @@ class ViewConstants {
 
   static const String ideaEditorUntitledIdea = 'ideaEditorUntitledIdea';
   static const String ideaEditorTitleHint = 'ideaEditorTitleHint';
-  static const String ideaEditorListening = 'ideaEditorListening';
   static const String ideaEditorAddSectionTooltip =
       'ideaEditorAddSectionTooltip';
   static const String ideaEditorPlaceholderDefaultSection =
@@ -262,33 +258,8 @@ class ViewConstants {
       'ideaEditorSnackbarNothingToOrganize';
   static const String ideaEditorSnackbarOrganizeFailed =
       'ideaEditorSnackbarOrganizeFailed';
-  static const String ideaEditorSnackbarSpeechStopped =
-      'ideaEditorSnackbarSpeechStopped';
-  static const String ideaEditorSnackbarSpeechUnavailable =
-      'ideaEditorSnackbarSpeechUnavailable';
-  static const String ideaEditorImageTextTakePhoto =
-      'ideaEditorImageTextTakePhoto';
-  static const String ideaEditorImageTextChoosePhoto =
-      'ideaEditorImageTextChoosePhoto';
-  static const String ideaEditorImageTextReading = 'ideaEditorImageTextReading';
-  static const String ideaEditorImageTextPreparing =
-      'ideaEditorImageTextPreparing';
-  static const String ideaEditorImageTextTooltip = 'ideaEditorImageTextTooltip';
-  static const String ideaEditorImageTextNoText = 'ideaEditorImageTextNoText';
-  static const String ideaEditorImageTextFailed = 'ideaEditorImageTextFailed';
-  static const String ideaEditorImagePermissionTitle =
-      'ideaEditorImagePermissionTitle';
-  static const String ideaEditorImagePermissionBody =
-      'ideaEditorImagePermissionBody';
   static const String ideaEditorSnackbarDuplicateSection =
       'ideaEditorSnackbarDuplicateSection';
-  static const String ideaEditorMicPermissionTitle =
-      'ideaEditorMicPermissionTitle';
-  static const String ideaEditorMicPermissionBody =
-      'ideaEditorMicPermissionBody';
-  static const String ideaEditorOpenSettings = 'ideaEditorOpenSettings';
-  static const String ideaEditorMicLongPressToTalk =
-      'ideaEditorMicLongPressToTalk';
 
   static const String paywallPurchaseUnavailable = 'paywallPurchaseUnavailable';
 

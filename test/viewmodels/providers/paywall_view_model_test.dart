@@ -264,7 +264,7 @@ void main() {
 
       final hasAccess = await viewModel.ensureAccess(
         context,
-        PremiumFeature.imageTextExtraction,
+        PremiumFeature.aiOrganize,
       );
 
       expect(hasAccess, isTrue);

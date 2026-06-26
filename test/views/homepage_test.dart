@@ -445,7 +445,6 @@ void main() {
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-save')), findsNothing);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
-      expect(find.byKey(const Key('idea-editor-mic-fab')), findsOneWidget);
       expect(find.byKey(const Key('idea-editor-add-section')), findsOneWidget);
 
       final titleField = tester.widget<TextField>(

@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'dart:io';
 
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -109,9 +108,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
-    required this.onImageText,
     this.organizeEnabled = true,
-    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
     this.showPreviewToggle = false,
   });
@@ -121,9 +118,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
-  final VoidCallback onImageText;
   final bool organizeEnabled;
-  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
   final bool showPreviewToggle;
 
@@ -142,9 +137,7 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
           isPreviewMode: isPreviewMode,
           onPreviewToggle: onPreviewToggle,
           onOrganize: onOrganize,
-          onImageText: onImageText,
           organizeEnabled: organizeEnabled,
-          imageTextEnabled: imageTextEnabled,
           exceedsAiCharacterLimit: exceedsAiCharacterLimit,
           showPreviewToggle: showPreviewToggle,
         ),
@@ -161,9 +154,7 @@ class IdeaEditorToolbar extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
-    required this.onImageText,
     this.organizeEnabled = true,
-    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
     this.showPreviewToggle = false,
   });
@@ -173,9 +164,7 @@ class IdeaEditorToolbar extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
-  final VoidCallback onImageText;
   final bool organizeEnabled;
-  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
   final bool showPreviewToggle;
 
@@ -219,14 +208,6 @@ class IdeaEditorToolbar extends StatelessWidget {
                           enabled: !isPreviewMode,
                           onPressed: () =>
                               _wrapSelection(controller, '_', '_', false),
-                        ),
-                        _ToolbarIconButton(
-                          key: const Key('idea-editor-image-text'),
-                          icon: Icons.camera_alt_rounded,
-                          tooltip:
-                              ViewConstants.ideaEditorImageTextTooltip.tr(),
-                          enabled: imageTextEnabled && !isPreviewMode,
-                          onPressed: onImageText,
                         ),
                         _ToolbarIconButton(
                           icon: Icons.format_list_bulleted,
