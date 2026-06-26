@@ -140,7 +140,8 @@ class _SheetOptionRow extends StatelessWidget {
     required this.labelColor,
     required this.onTap,
   }) : assert(
-          (icon != null && leading == null) || (icon == null && leading != null),
+          (icon != null && leading == null) ||
+              (icon == null && leading != null),
           'Exactly one of icon or leading must be set',
         );
 
@@ -166,8 +167,7 @@ class _SheetOptionRow extends StatelessWidget {
                 width: 38.d,
                 height: 38.d,
                 child: Center(
-                  child: leading ??
-                      Icon(icon, size: 20.d, color: iconColor),
+                  child: leading ?? Icon(icon, size: 20.d, color: iconColor),
                 ),
               ),
               Gap(2.d),

@@ -91,6 +91,7 @@ class IdeasProvider with ChangeNotifier {
       updatedAt: now,
       lastOpenedSectionId:
           lastOpenedSectionId ?? existingIdea?.lastOpenedSectionId,
+      isLocked: existingIdea?.isLocked ?? false,
       sections: normalizedSections,
     );
 
@@ -134,6 +135,33 @@ class IdeasProvider with ChangeNotifier {
 
     final nextIdeas = [..._ideas];
     nextIdeas[existingIndex] = idea.copyWith(lastOpenedSectionId: sectionId);
+    _ideas = nextIdeas;
+    notifyListeners();
+  }
+
+  Future<void> setIdeaLocked({
+    required String ideaId,
+    required bool isLocked,
+  }) async {
+    await ensureLoaded();
+
+    final existingIndex = _ideas.indexWhere((idea) => idea.id == ideaId);
+    if (existingIndex == -1) {
+      return;
+    }
+
+    final idea = _ideas[existingIndex];
+    if (idea.isLocked == isLocked) {
+      return;
+    }
+
+    await _ideasRepo.updateIdeaLockState(
+      ideaId: ideaId,
+      isLocked: isLocked,
+    );
+
+    final nextIdeas = [..._ideas];
+    nextIdeas[existingIndex] = idea.copyWith(isLocked: isLocked);
     _ideas = nextIdeas;
     notifyListeners();
   }

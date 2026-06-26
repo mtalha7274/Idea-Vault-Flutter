@@ -96,6 +96,7 @@ class Idea extends Equatable {
     required this.updatedAt,
     required List<IdeaSection> sections,
     this.lastOpenedSectionId,
+    this.isLocked = false,
   }) : sections = List.unmodifiable(
           sections.map((section) => section.copyWith()).toList(),
         );
@@ -110,6 +111,7 @@ class Idea extends Equatable {
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),
       lastOpenedSectionId: json['lastOpenedSectionId'] as String?,
+      isLocked: json['isLocked'] as bool? ?? false,
       sections: rawSections
           .whereType<Map<String, dynamic>>()
           .map(IdeaSection.fromJson)
@@ -122,6 +124,7 @@ class Idea extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? lastOpenedSectionId;
+  final bool isLocked;
   final List<IdeaSection> sections;
 
   Idea copyWith({
@@ -130,6 +133,7 @@ class Idea extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? lastOpenedSectionId,
+    bool? isLocked,
     List<IdeaSection>? sections,
   }) {
     return Idea(
@@ -138,6 +142,7 @@ class Idea extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastOpenedSectionId: lastOpenedSectionId ?? this.lastOpenedSectionId,
+      isLocked: isLocked ?? this.isLocked,
       sections: sections ?? this.sections,
     );
   }
@@ -149,6 +154,7 @@ class Idea extends Equatable {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'lastOpenedSectionId': lastOpenedSectionId,
+      'isLocked': isLocked,
       'sections': sections.map((section) => section.toJson()).toList(),
     };
   }
@@ -160,6 +166,7 @@ class Idea extends Equatable {
         createdAt,
         updatedAt,
         lastOpenedSectionId,
+        isLocked,
         sections,
       ];
 }

@@ -41,7 +41,7 @@ class IdeaListPreferencesRepo {
         return option;
       }
     }
-    return IdeaLayoutOption.list;
+    return IdeaLayoutOption.grid;
   }
 
   Future<void> saveLayoutOption(IdeaLayoutOption layoutOption) async {

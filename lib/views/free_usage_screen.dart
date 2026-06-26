@@ -177,7 +177,7 @@ class _FreeUsageScreenState extends State<FreeUsageScreen>
                                   color: theme.onPrimary,
                                 ),
                               ),
-                              onPressed: () => Navigator.of(context).pop(),
+                              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
                               child: TranslatedText(actionKey),
                             ),
                           ),

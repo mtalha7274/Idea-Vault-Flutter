@@ -33,7 +33,6 @@ class ViewConstants {
   static const String home = "home";
   static const String search = "search";
   static const String more = "more";
-  static const String cropImage = "cropImage";
   static const String requestTimeout = "requestTimeout";
 
   /// `{limit}` = formatted warning character count (keep in sync with [ideaSectionAiWarningCharacterLimit]).
@@ -61,8 +60,6 @@ class ViewConstants {
   static const String paywallProUnlocks = 'paywallProUnlocks';
   static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
   static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
-  static const String paywallFeatureSpeechToText = 'paywallFeatureSpeechToText';
-  static const String paywallFeatureImageToText = 'paywallFeatureImageToText';
   static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
   static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
   static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';
@@ -112,6 +109,51 @@ class ViewConstants {
       'ideaEditorOptionsSheetTitle';
   static const String ideaEditorOptionsDeleteIdea =
       'ideaEditorOptionsDeleteIdea';
+  static const String ideaEditorOptionsLockNote = 'ideaEditorOptionsLockNote';
+  static const String ideaEditorOptionsUnlockNote =
+      'ideaEditorOptionsUnlockNote';
+  static const String noteLockCreatePinTitle = 'noteLockCreatePinTitle';
+  static const String noteLockCreatePinBody = 'noteLockCreatePinBody';
+  static const String noteLockConfirmPinTitle = 'noteLockConfirmPinTitle';
+  static const String noteLockConfirmPinBody = 'noteLockConfirmPinBody';
+  static const String noteLockEnterPinTitle = 'noteLockEnterPinTitle';
+  static const String noteLockPinLabel = 'noteLockPinLabel';
+  static const String noteLockConfirmPinLabel = 'noteLockConfirmPinLabel';
+  static const String noteLockCreatePinAction = 'noteLockCreatePinAction';
+  static const String noteLockPinTooShort = 'noteLockPinTooShort';
+  static const String noteLockPinMismatch = 'noteLockPinMismatch';
+  static const String noteLockUnlockTitle = 'noteLockUnlockTitle';
+  static const String noteLockUnlockBody = 'noteLockUnlockBody';
+  static const String noteLockWrongPin = 'noteLockWrongPin';
+  static const String noteLockUnlockAction = 'noteLockUnlockAction';
+  static const String noteLockUseBiometric = 'noteLockUseBiometric';
+  static const String noteLockBiometricReason = 'noteLockBiometricReason';
+  static const String noteLockEnableBiometricTitle =
+      'noteLockEnableBiometricTitle';
+  static const String noteLockEnableBiometricBody =
+      'noteLockEnableBiometricBody';
+  static const String noteLockEnableBiometricAction =
+      'noteLockEnableBiometricAction';
+  static const String noteLockEnableBiometricUnlockAction =
+      'noteLockEnableBiometricUnlockAction';
+  static const String noteLockEnableBiometricSkip =
+      'noteLockEnableBiometricSkip';
+  static const String noteLockEnableBiometricReason =
+      'noteLockEnableBiometricReason';
+  static const String noteLockEditorTitle = 'noteLockEditorTitle';
+  static const String noteLockEditorBody = 'noteLockEditorBody';
+  static const String noteLockEditorAction = 'noteLockEditorAction';
+  static const String noteLockEditorBackAction = 'noteLockEditorBackAction';
+  static const String noteLockLockedSnackbar = 'noteLockLockedSnackbar';
+  static const String noteLockUnlockedSnackbar = 'noteLockUnlockedSnackbar';
+  static const String noteLockVerifyCurrentPinTitle =
+      'noteLockVerifyCurrentPinTitle';
+  static const String noteLockVerifyCurrentPinBody =
+      'noteLockVerifyCurrentPinBody';
+  static const String noteLockNewPinTitle = 'noteLockNewPinTitle';
+  static const String noteLockNewPinBody = 'noteLockNewPinBody';
+  static const String noteLockChangePinSuccess = 'noteLockChangePinSuccess';
+  static const String settingsChangePin = 'settingsChangePin';
 
   static const String homepageSavedIdeasTooltipOne =
       'homepageSavedIdeasTooltipOne';
@@ -206,7 +248,6 @@ class ViewConstants {
 
   static const String ideaEditorUntitledIdea = 'ideaEditorUntitledIdea';
   static const String ideaEditorTitleHint = 'ideaEditorTitleHint';
-  static const String ideaEditorListening = 'ideaEditorListening';
   static const String ideaEditorAddSectionTooltip =
       'ideaEditorAddSectionTooltip';
   static const String ideaEditorPlaceholderDefaultSection =
@@ -217,33 +258,8 @@ class ViewConstants {
       'ideaEditorSnackbarNothingToOrganize';
   static const String ideaEditorSnackbarOrganizeFailed =
       'ideaEditorSnackbarOrganizeFailed';
-  static const String ideaEditorSnackbarSpeechStopped =
-      'ideaEditorSnackbarSpeechStopped';
-  static const String ideaEditorSnackbarSpeechUnavailable =
-      'ideaEditorSnackbarSpeechUnavailable';
-  static const String ideaEditorImageTextTakePhoto =
-      'ideaEditorImageTextTakePhoto';
-  static const String ideaEditorImageTextChoosePhoto =
-      'ideaEditorImageTextChoosePhoto';
-  static const String ideaEditorImageTextReading = 'ideaEditorImageTextReading';
-  static const String ideaEditorImageTextPreparing =
-      'ideaEditorImageTextPreparing';
-  static const String ideaEditorImageTextTooltip = 'ideaEditorImageTextTooltip';
-  static const String ideaEditorImageTextNoText = 'ideaEditorImageTextNoText';
-  static const String ideaEditorImageTextFailed = 'ideaEditorImageTextFailed';
-  static const String ideaEditorImagePermissionTitle =
-      'ideaEditorImagePermissionTitle';
-  static const String ideaEditorImagePermissionBody =
-      'ideaEditorImagePermissionBody';
   static const String ideaEditorSnackbarDuplicateSection =
       'ideaEditorSnackbarDuplicateSection';
-  static const String ideaEditorMicPermissionTitle =
-      'ideaEditorMicPermissionTitle';
-  static const String ideaEditorMicPermissionBody =
-      'ideaEditorMicPermissionBody';
-  static const String ideaEditorOpenSettings = 'ideaEditorOpenSettings';
-  static const String ideaEditorMicLongPressToTalk =
-      'ideaEditorMicLongPressToTalk';
 
   static const String paywallPurchaseUnavailable = 'paywallPurchaseUnavailable';
 
@@ -269,6 +285,7 @@ class ViewConstants {
   static const String backupRestoreNoBackupFound = 'backupRestoreNoBackupFound';
   static const String backupRestoreRestoredMessage =
       'backupRestoreRestoredMessage';
+  static const String backupRestorePromptFound = 'backupRestorePromptFound';
   static const String backupRestoreFormatBytesB = 'backupRestoreFormatBytesB';
   static const String backupRestoreFormatBytesKb = 'backupRestoreFormatBytesKb';
   static const String backupRestoreFormatBytesMb = 'backupRestoreFormatBytesMb';

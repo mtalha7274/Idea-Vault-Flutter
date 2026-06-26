@@ -7,6 +7,7 @@ class CloudBackupState {
     required this.lastBackupSizeBytes,
     required this.isBusy,
     required this.restorePromptAvailable,
+    required this.freshInstallRestoreCheckCompleted,
   });
 
   const CloudBackupState.initial()
@@ -16,7 +17,8 @@ class CloudBackupState {
         lastBackupAt = null,
         lastBackupSizeBytes = null,
         isBusy = false,
-        restorePromptAvailable = false;
+        restorePromptAvailable = false,
+        freshInstallRestoreCheckCompleted = false;
 
   final bool enabled;
   final bool autoBackupEnabled;
@@ -25,6 +27,7 @@ class CloudBackupState {
   final int? lastBackupSizeBytes;
   final bool isBusy;
   final bool restorePromptAvailable;
+  final bool freshInstallRestoreCheckCompleted;
 
   CloudBackupState copyWith({
     bool? enabled,
@@ -37,6 +40,7 @@ class CloudBackupState {
     bool clearLastBackupSizeBytes = false,
     bool? isBusy,
     bool? restorePromptAvailable,
+    bool? freshInstallRestoreCheckCompleted,
   }) {
     return CloudBackupState(
       enabled: enabled ?? this.enabled,
@@ -50,6 +54,8 @@ class CloudBackupState {
       isBusy: isBusy ?? this.isBusy,
       restorePromptAvailable:
           restorePromptAvailable ?? this.restorePromptAvailable,
+      freshInstallRestoreCheckCompleted: freshInstallRestoreCheckCompleted ??
+          this.freshInstallRestoreCheckCompleted,
     );
   }
 }

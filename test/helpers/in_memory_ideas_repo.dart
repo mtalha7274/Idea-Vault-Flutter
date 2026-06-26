@@ -48,6 +48,20 @@ class InMemoryIdeasRepo extends IdeasRepo {
   }
 
   @override
+  Future<void> updateIdeaLockState({
+    required String ideaId,
+    required bool isLocked,
+  }) async {
+    _ideas = [
+      for (final idea in _ideas)
+        if (idea.id == ideaId)
+          _cloneIdea(idea.copyWith(isLocked: isLocked))
+        else
+          _cloneIdea(idea),
+    ];
+  }
+
+  @override
   Future<void> saveIdeas(List<Idea> ideas) async {
     _ideas = ideas.map(_cloneIdea).toList();
   }

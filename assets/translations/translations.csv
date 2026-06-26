@@ -26,7 +26,6 @@ home,Home
 search,Search
 more,More
 noEmailAppAvailable,No email app available
-cropImage,Crop Image
 errorOpeningCamera,Error opening camera
 cameraAccessDenied,Camera access denied
 requestTimeout,Request timeout
@@ -44,8 +43,6 @@ paywallSubtitle,Unlock the full power of Idea Vault.
 paywallProUnlocks,Pro unlocks
 paywallFeatureAiOrganize,Extended AI Organize
 paywallFeatureAiBrainstorm,Idea Export for any AI
-paywallFeatureSpeechToText,AI speech to text dictation
-paywallFeatureImageToText,AI image to text extraction
 paywallFeatureCloudBackup,Cloud backup
 paywallFeatureExportPdf,Export to PDF
 paywallFeatureEarlyAccess,Early access to new features
@@ -85,6 +82,42 @@ exportForAiClipboardIdeaLine,Idea: {title}
 exportForAiSectionNoContentYet,No content yet
 ideaEditorOptionsSheetTitle,Idea options
 ideaEditorOptionsDeleteIdea,Delete Idea
+ideaEditorOptionsLockNote,Lock Note
+ideaEditorOptionsUnlockNote,Unlock Note
+noteLockCreatePinTitle,Create note PIN
+noteLockCreatePinBody,Set a 4-digit PIN before locking notes.
+noteLockConfirmPinTitle,Confirm PIN
+noteLockConfirmPinBody,Enter the same 4-digit PIN again.
+noteLockEnterPinTitle,Enter PIN
+noteLockPinLabel,PIN
+noteLockConfirmPinLabel,Confirm PIN
+noteLockCreatePinAction,Create PIN
+noteLockPinTooShort,Use exactly 4 digits.
+noteLockPinMismatch,PINs do not match.
+noteLockUnlockTitle,Unlock note
+noteLockUnlockBody,Enter your PIN to unlock this note.
+noteLockWrongPin,Wrong PIN. Try again.
+noteLockUnlockAction,Unlock
+noteLockUseBiometric,Use Face ID / Touch ID
+noteLockBiometricReason,Unlock your locked note
+noteLockEnableBiometricTitle,Enable biometric unlock?
+noteLockEnableBiometricBody,Use fingerprint or face unlock next time instead of entering your PIN.
+noteLockEnableBiometricAction,Enable
+noteLockEnableBiometricUnlockAction,Enable Face ID / Touch ID
+noteLockEnableBiometricSkip,Not now
+noteLockEnableBiometricReason,Confirm to enable biometric unlock
+noteLockEditorTitle,This note is locked
+noteLockEditorBody,Unlock it to view or edit its content.
+noteLockEditorAction,Unlock Note
+noteLockEditorBackAction,Back to Ideas
+noteLockLockedSnackbar,Note locked.
+noteLockUnlockedSnackbar,Note unlocked.
+noteLockVerifyCurrentPinTitle,Verify PIN
+noteLockVerifyCurrentPinBody,Enter your current PIN to change it.
+noteLockNewPinTitle,New PIN
+noteLockNewPinBody,Enter a new 4-digit PIN.
+noteLockChangePinSuccess,PIN changed.
+settingsChangePin,Change PIN
 homepageSavedIdeasTooltipOne,1 saved idea
 homepageSavedIdeasTooltipMany,{count} saved ideas
 homepageTitle,Idea Vault
@@ -151,28 +184,12 @@ randomAdditionsNoIdeasSubtitle,"Create an idea first, then you can file this add
 randomAdditionsFiledSnackbar,Added to {idea} / {section}
 ideaEditorUntitledIdea,Untitled Idea
 ideaEditorTitleHint,Enter idea title...
-ideaEditorListening,Listening...
 ideaEditorAddSectionTooltip,Add section
 ideaEditorPlaceholderDefaultSection,Start articulating your vision here.
 ideaEditorPlaceholderNamedSection,Capture {section} here.
 ideaEditorSnackbarNothingToOrganize,Nothing to organize
 ideaEditorSnackbarOrganizeFailed,Failed to organize. Please try again.
-ideaEditorSnackbarSpeechStopped,Speech recognition stopped. Please try again.
-ideaEditorSnackbarSpeechUnavailable,Speech recognition is unavailable on this device.
-ideaEditorImageTextTakePhoto,Take photo
-ideaEditorImageTextChoosePhoto,Choose from gallery
-ideaEditorImageTextReading,Reading text...
-ideaEditorImageTextPreparing,Preparing image...
-ideaEditorImageTextTooltip,Extract text from image
-ideaEditorImageTextNoText,No readable text found in that image.
-ideaEditorImageTextFailed,Could not read text from that image. Please try again.
-ideaEditorImagePermissionTitle,Image Access Needed
-ideaEditorImagePermissionBody,To extract text from images, please enable camera and photo access in your device settings.
 ideaEditorSnackbarDuplicateSection,That section already exists.
-ideaEditorMicPermissionTitle,Microphone Access Needed
-ideaEditorMicPermissionBody,To use speech to text, please enable microphone access in your device settings.
-ideaEditorOpenSettings,Open Settings
-ideaEditorMicLongPressToTalk,Long press and hold the mic button to dictate
 paywallPurchaseUnavailable,Purchase is unavailable. Please try again.
 backupRestoreCloudUpdateFailed,Cloud backup could not be updated. Please try again.
 backupRestoreLastBackupNever,Never
@@ -187,6 +204,7 @@ backupRestoreConfirmRestoreBody,All current data will be replaced with the ideas
 backupRestoreConfirmRestoreButton,Restore
 backupRestoreNoBackupFound,No cloud backup was found.
 backupRestoreRestoredMessage,Backup restored.
+backupRestorePromptFound,Cloud backup found
 backupRestoreFormatBytesB,{bytes} B
 backupRestoreFormatBytesKb,{kb} KB
 backupRestoreFormatBytesMb,{mb} MB

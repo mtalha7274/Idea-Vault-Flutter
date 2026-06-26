@@ -138,8 +138,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   static const List<String> _proFeatureKeys = [
     ViewConstants.paywallFeatureAiOrganize,
     ViewConstants.paywallFeatureAiBrainstorm,
-    ViewConstants.paywallFeatureSpeechToText,
-    ViewConstants.paywallFeatureImageToText,
     ViewConstants.paywallFeatureCloudBackup,
     ViewConstants.paywallFeatureExportPdf,
     ViewConstants.paywallFeatureEarlyAccess,

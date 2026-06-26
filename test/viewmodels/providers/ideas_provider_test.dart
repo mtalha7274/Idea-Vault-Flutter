@@ -201,5 +201,23 @@ void main() {
         'section-2',
       );
     });
+
+    test('sets idea lock state in memory and sqlite', () async {
+      final provider = IdeasProvider(repo, editorStateRepo);
+      await provider.ensureLoaded();
+
+      final savedIdea = await provider.saveIdea(
+        title: 'Private note',
+        sections: provider.createDefaultSections(),
+      );
+
+      await provider.setIdeaLocked(
+        ideaId: savedIdea!.id,
+        isLocked: true,
+      );
+
+      expect(provider.ideas.single.isLocked, isTrue);
+      expect((await repo.getIdeas()).single.isLocked, isTrue);
+    });
   });
 }

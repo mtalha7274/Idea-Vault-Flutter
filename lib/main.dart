@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'config/config.dart';
 import 'config/languages/language_config.dart';
+import 'core/services/app_install_bootstrap_service.dart';
 import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
@@ -49,6 +50,7 @@ void main() async {
   );
 
   await initializeDependencies();
+  await sl<AppInstallBootstrapService>().runFreshInstallTasks();
   await CloudBackupBackgroundTask.initialize();
   await switchToPortraitMode();
 
@@ -111,6 +113,24 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(context.read<PaywallViewModel>().refreshSubscription());
+      unawaited(_runAutoBackupCatchUp(context));
+    }
+  }
+
+  Future<void> _runAutoBackupCatchUp(BuildContext context) async {
+    try {
+      final backupProvider = context.read<CloudBackupProvider>();
+      final ideasProvider = context.read<IdeasProvider>();
+      await ideasProvider.ensureLoaded();
+      final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+      await randomAdditionsProvider.ensureLoaded();
+      await backupProvider.initializeAutoBackup();
+      await backupProvider.runAutoBackupIfDue(
+        ideasProvider.ideas,
+        randomAdditions: randomAdditionsProvider.additions,
+      );
+    } on ProviderNotFoundException {
+      return;
     }
   }
 

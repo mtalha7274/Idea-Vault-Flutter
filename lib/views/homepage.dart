@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -8,6 +10,8 @@ import 'package:provider/provider.dart';
 import '../config/config.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/app_assets.dart';
+import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../data/repositories/local/paid_feature_usage.dart';
 import '../injection_container.dart';
@@ -22,6 +26,7 @@ import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
 import '../widgets/free_usage_progress_ring.dart';
 import '../widgets/ideas/ideas_layout.dart';
+import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/premium_crown_icon.dart';
 import '../widgets/random_addition_composer.dart';
 import '../widgets/translated_text.dart';
@@ -46,13 +51,16 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  static const double _fabBaseBottomPadding = 60;
-  static const double _composerExtraLineHeight = 15 * 1.35;
+  static const double _dockScrollPaddingBase = 236;
+  static const double _dockMultilineExtraPadding = 15 * 1.35;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _selectedIdeaIds = <String>{};
   late final TextEditingController _quickAdditionController;
+  late final FocusNode _quickAdditionFocusNode;
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
+  late final NoteLockAuthService _noteLockAuthService;
+  late final NoteLockBiometricService _noteLockBiometricService;
 
   bool _didHandleResume = false;
   bool _didCheckFreeUsageIntro = false;
@@ -67,9 +75,17 @@ class _HomepageState extends State<Homepage> {
     super.initState();
     _sortPreferencesRepo =
         widget.sortPreferencesRepo ?? sl<IdeaListPreferencesRepo>();
+    _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
+    _noteLockBiometricService = sl.isRegistered<NoteLockBiometricService>()
+        ? sl<NoteLockBiometricService>()
+        : NoteLockBiometricService();
     _sortOption = _sortPreferencesRepo.getSortOption();
-    _layoutOption = _sortPreferencesRepo.getLayoutOption();
+    _layoutOption = IdeaLayoutOption.grid;
+    unawaited(_sortPreferencesRepo.saveLayoutOption(IdeaLayoutOption.grid));
     _quickAdditionController = TextEditingController();
+    _quickAdditionFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleInitialHomeEffects();
     });
@@ -78,6 +94,7 @@ class _HomepageState extends State<Homepage> {
   @override
   void dispose() {
     _quickAdditionController.dispose();
+    _quickAdditionFocusNode.dispose();
     super.dispose();
   }
 
@@ -95,125 +112,110 @@ class _HomepageState extends State<Homepage> {
         hostContext: context,
         onBackupPressed: _openBackupRestore,
       ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 860),
-                  child: NestedScrollView(
-                    floatHeaderSlivers: true,
-                    headerSliverBuilder: (context, innerBoxIsScrolled) {
-                      final handle =
-                          NestedScrollView.sliverOverlapAbsorberHandleFor(
-                        context,
-                      );
-                      return [
-                        SliverOverlapAbsorber(
-                          handle: handle,
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Gap(8.h),
-                                _Header(
-                                  ideaCount: ideas.length,
-                                  selectedCount: _selectedIdeaIds.length,
-                                  onMenuPressed: () =>
-                                      _scaffoldKey.currentState?.openDrawer(),
-                                  onDeletePressed: _isSelectionMode
-                                      ? _confirmDeleteSelection
-                                      : null,
-                                  onSearchPressed: _isSelectionMode
-                                      ? null
-                                      : _openSearchScreen,
-                                  onSortPressed:
-                                      _isSelectionMode ? null : _showSortSheet,
-                                  layoutOption: _layoutOption,
-                                  onLayoutPressed: _isSelectionMode
-                                      ? null
-                                      : _toggleLayoutOption,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: NestedScrollView(
+                  floatHeaderSlivers: true,
+                  headerSliverBuilder: (context, innerBoxIsScrolled) {
+                    final handle =
+                        NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      context,
+                    );
+                    return [
+                      SliverOverlapAbsorber(
+                        handle: handle,
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Gap(8.h),
+                              _Header(
+                                ideaCount: ideas.length,
+                                selectedCount: _selectedIdeaIds.length,
+                                onMenuPressed: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
+                                onDeletePressed: _isSelectionMode
+                                    ? _confirmDeleteSelection
+                                    : null,
+                                onSearchPressed:
+                                    _isSelectionMode ? null : _openSearchScreen,
+                                onSortPressed:
+                                    _isSelectionMode ? null : _showSortSheet,
+                              ),
+                              SizedBox(height: 18.h),
+                              if (_hasCloudBackupProvider(context)) ...[
+                                _BackupOffIndicator(
+                                  onTap: _openBackupRestore,
                                 ),
-                                SizedBox(height: 18.h),
-                                if (_hasCloudBackupProvider(context)) ...[
-                                  _BackupOffIndicator(
-                                    onTap: _openBackupRestore,
-                                  ),
-                                  const BackupRestorePromptBanner(),
-                                ],
+                                const BackupRestorePromptBanner(),
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                      ];
-                    },
-                    body: Builder(
-                      builder: (context) {
-                        return CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            SliverOverlapInjector(
-                              handle: NestedScrollView
-                                  .sliverOverlapAbsorberHandleFor(context),
-                            ),
-                            if (ideas.isEmpty)
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 24),
-                                sliver: SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: const _EmptyIdeasState(),
-                                ),
-                              )
-                            else
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 0, 16, 200),
-                                sliver: SliverToBoxAdapter(
-                                  child: IdeasLayout(
-                                    ideas: visibleIdeas,
-                                    layoutOption: _layoutOption,
-                                    selectedIdeaIds: _selectedIdeaIds,
-                                    onTap: _handleIdeaTap,
-                                    onLongPress: _handleIdeaLongPress,
-                                  ),
+                      ),
+                    ];
+                  },
+                  body: Builder(
+                    builder: (context) {
+                      return CustomScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverOverlapInjector(
+                            handle:
+                                NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                    context),
+                          ),
+                          if (ideas.isEmpty)
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              sliver: SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: const _EmptyIdeasState(),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                16,
+                                0,
+                                16,
+                                _dockScrollPaddingBase +
+                                    (_isQuickAdditionMultiline
+                                        ? _dockMultilineExtraPadding
+                                        : 0),
+                              ),
+                              sliver: SliverToBoxAdapter(
+                                child: IdeasLayout(
+                                  ideas: visibleIdeas,
+                                  layoutOption: _layoutOption,
+                                  selectedIdeaIds: _selectedIdeaIds,
+                                  onTap: (idea) =>
+                                      unawaited(_handleIdeaTap(idea)),
+                                  onLongPress: _handleIdeaLongPress,
                                 ),
                               ),
-                          ],
-                        );
-                      },
-                    ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
             ),
-            if (!_isSelectionMode) _buildQuickAdditionDock(context),
-          ],
-        ),
+          ),
+          if (!_isSelectionMode) _buildQuickAdditionDock(context),
+        ],
       ),
-      floatingActionButton: _isSelectionMode
-          ? null
-          : AnimatedPadding(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(
-                bottom: _fabBaseBottomPadding +
-                    (_isQuickAdditionMultiline ? _composerExtraLineHeight : 0),
-              ),
-              child: _HomepageFab(
-                isExtended: _layoutOption == IdeaLayoutOption.list,
-                onPressed: () => AppRouter.push(
-                  context,
-                  const IdeaEditorScreen(),
-                ),
-              ),
-            ),
     );
   }
 
@@ -224,48 +226,76 @@ class _HomepageState extends State<Homepage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IgnorePointer(
-            child: Container(
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.background.withValues(alpha: 0),
-                    theme.background,
-                  ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _HomepageFab(
+                  isExtended: _layoutOption == IdeaLayoutOption.list,
+                  onPressed: () => AppRouter.push(
+                    context,
+                    const IdeaEditorScreen(),
+                  ),
                 ),
               ),
             ),
           ),
-          ColoredBox(
-            color: theme.background,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                MediaQuery.of(context).padding.bottom + 8,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: RandomAdditionComposer(
-                  controller: _quickAdditionController,
-                  fieldKey: const Key('homepage-random-addition-field'),
-                  sendButtonKey: const Key('homepage-random-addition-send'),
-                  onSubmit: _submitQuickAddition,
-                  onMultilineChanged: (isMultiline) {
-                    if (_isQuickAdditionMultiline == isMultiline) {
-                      return;
-                    }
-                    setState(() {
-                      _isQuickAdditionMultiline = isMultiline;
-                    });
-                  },
+          const Gap(24),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ColoredBox(
+                color: theme.background,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 860),
+                    child: RandomAdditionComposer(
+                      controller: _quickAdditionController,
+                      focusNode: _quickAdditionFocusNode,
+                      fieldKey: const Key('homepage-random-addition-field'),
+                      sendButtonKey: const Key('homepage-random-addition-send'),
+                      onSubmit: _submitQuickAddition,
+                      onMultilineChanged: (isMultiline) {
+                        if (_isQuickAdditionMultiline == isMultiline) {
+                          return;
+                        }
+                        setState(() {
+                          _isQuickAdditionMultiline = isMultiline;
+                        });
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                height: 32,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          theme.background.withValues(alpha: 0),
+                          theme.background,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -281,7 +311,39 @@ class _HomepageState extends State<Homepage> {
     if (!mounted) {
       return;
     }
+    await _runAutoBackupCatchUp();
+    if (!mounted) {
+      return;
+    }
     await _showFreeUsageIntroIfNeeded();
+  }
+
+  Future<void> _runAutoBackupCatchUp() async {
+    if (!mounted) {
+      return;
+    }
+    final backupProvider = _maybeCloudBackupProvider(context);
+    if (backupProvider == null) {
+      return;
+    }
+    final ideasProvider = context.read<IdeasProvider>();
+    await ideasProvider.ensureLoaded();
+    if (!mounted) {
+      return;
+    }
+    final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+    await randomAdditionsProvider.ensureLoaded();
+    if (!mounted) {
+      return;
+    }
+    await backupProvider.initializeAutoBackup();
+    if (!mounted) {
+      return;
+    }
+    await backupProvider.runAutoBackupIfDue(
+      ideasProvider.ideas,
+      randomAdditions: randomAdditionsProvider.additions,
+    );
   }
 
   Future<void> _resumeEditorIfNeeded() async {
@@ -308,10 +370,18 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    await AppRouter.push(
-      context,
-      IdeaEditorScreen(ideaId: idea.id),
-    );
+    if (!mounted) {
+      return;
+    }
+
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      return;
+    }
+
+    // Don't auto-resume locked notes on cold start — auth on every open is
+    // disruptive on Android where the process is frequently killed.
+    await ideasProvider.clearEditorState();
   }
 
   Future<void> _checkFreshInstallBackup() async {
@@ -401,15 +471,27 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  void _handleIdeaTap(Idea idea) {
+  Future<void> _handleIdeaTap(Idea idea) async {
     if (_isSelectionMode) {
       _toggleIdeaSelection(idea.id);
       return;
     }
 
-    AppRouter.push(
+    if (!idea.isLocked) {
+      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await authenticateAndOpenNote(
       context,
-      IdeaEditorScreen(ideaId: idea.id),
+      _noteLockAuthService,
+      _noteLockBiometricService,
+      ideaId: idea.id,
+      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
     );
   }
 
@@ -499,7 +581,30 @@ class _HomepageState extends State<Homepage> {
     }
 
     final selectedIds = _selectedIdeaIds.toList(growable: false);
-    await context.read<IdeasProvider>().deleteIdeas(selectedIds);
+    final ideasProvider = context.read<IdeasProvider>();
+    final selectedIdeas = ideasProvider.ideas
+        .where((idea) => selectedIds.contains(idea.id))
+        .toList(growable: false);
+    final lockedIdeas =
+        selectedIdeas.where((idea) => idea.isLocked).toList(growable: false);
+    if (lockedIdeas.isNotEmpty) {
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        _noteLockAuthService,
+        _noteLockBiometricService,
+        ideaId: lockedIdeas.first.id,
+      );
+      if (!didAuthenticate) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      for (final idea in lockedIdeas) {
+        _noteLockAuthService.markIdeaUnlocked(idea.id);
+      }
+    }
+    await ideasProvider.deleteIdeas(selectedIds);
     if (!mounted) {
       return;
     }
@@ -602,17 +707,6 @@ class _HomepageState extends State<Homepage> {
       _sortOption = selectedSortOption;
     });
     await _sortPreferencesRepo.saveSortOption(selectedSortOption);
-  }
-
-  Future<void> _toggleLayoutOption() async {
-    final nextLayoutOption = _layoutOption == IdeaLayoutOption.list
-        ? IdeaLayoutOption.grid
-        : IdeaLayoutOption.list;
-
-    setState(() {
-      _layoutOption = nextLayoutOption;
-    });
-    await _sortPreferencesRepo.saveLayoutOption(nextLayoutOption);
   }
 }
 
@@ -1033,8 +1127,6 @@ class _Header extends StatelessWidget {
     required this.onDeletePressed,
     required this.onSearchPressed,
     required this.onSortPressed,
-    required this.layoutOption,
-    required this.onLayoutPressed,
   });
 
   final int ideaCount;
@@ -1043,8 +1135,6 @@ class _Header extends StatelessWidget {
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSearchPressed;
   final VoidCallback? onSortPressed;
-  final IdeaLayoutOption layoutOption;
-  final VoidCallback? onLayoutPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -1141,41 +1231,10 @@ class _Header extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                 ),
                 onSelected: (action) {
-                  switch (action) {
-                    case _HomepageMenuAction.layout:
-                      onLayoutPressed?.call();
-                      break;
-                    case _HomepageMenuAction.filter:
-                      onSortPressed?.call();
-                      break;
-                  }
+                  onSortPressed?.call();
                 },
                 itemBuilder: (menuContext) {
                   return [
-                    PopupMenuItem<_HomepageMenuAction>(
-                      key: const Key('ideas-menu-layout'),
-                      value: _HomepageMenuAction.layout,
-                      child: Row(
-                        children: [
-                          Icon(
-                            layoutOption == IdeaLayoutOption.list
-                                ? Icons.grid_view_rounded
-                                : Icons.view_agenda_rounded,
-                            color: theme.primary,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TranslatedText(
-                              ViewConstants.homepageMenuChangeLayout,
-                              style: menuItemBodyStyle,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     PopupMenuItem<_HomepageMenuAction>(
                       key: const Key('ideas-menu-filter'),
                       value: _HomepageMenuAction.filter,
@@ -1211,7 +1270,6 @@ class _Header extends StatelessWidget {
 }
 
 enum _HomepageMenuAction {
-  layout,
   filter,
 }
 

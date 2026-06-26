@@ -6,15 +6,21 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/config.dart';
 import '../../main.dart';
 import '../../viewmodels/providers/info_provider.dart';
+import '../../viewmodels/providers/theme_provider.dart';
 import '../constants/app_constants.dart';
 import '../constants/view_constants.dart';
 import 'ui.dart';
 
 KeyboardActionsConfig keyboardActionbuildConfig(
-    BuildContext context, List<FocusNode> nodes) {
+  BuildContext context,
+  List<FocusNode> nodes, {
+  KeyboardActionsPlatform keyboardActionsPlatform =
+      KeyboardActionsPlatform.ALL,
+}) {
+  final theme = context.read<ThemeProvider>().baseTheme;
   return KeyboardActionsConfig(
-      keyboardActionsPlatform: KeyboardActionsPlatform.ALL,
-      keyboardBarColor: Colors.grey[200],
+      keyboardActionsPlatform: keyboardActionsPlatform,
+      keyboardBarColor: theme.surfaceLow,
       nextFocus: true,
       actions: nodes
           .map((node) => KeyboardActionsItem(

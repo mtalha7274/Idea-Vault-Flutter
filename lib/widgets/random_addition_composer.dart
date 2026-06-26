@@ -12,6 +12,7 @@ class RandomAdditionComposer extends StatelessWidget {
     required this.controller,
     required this.onSubmit,
     this.fieldKey,
+    this.focusNode,
     this.sendButtonKey,
     this.onMultilineChanged,
   });
@@ -19,6 +20,7 @@ class RandomAdditionComposer extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSubmit;
   final Key? fieldKey;
+  final FocusNode? focusNode;
   final Key? sendButtonKey;
   final ValueChanged<bool>? onMultilineChanged;
 
@@ -27,6 +29,7 @@ class RandomAdditionComposer extends StatelessWidget {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return IdeaVaultPillTextField(
       fieldKey: fieldKey,
+      focusNode: focusNode,
       controller: controller,
       hintText: ViewConstants.randomAdditionsComposerHint.tr(),
       minLines: 1,

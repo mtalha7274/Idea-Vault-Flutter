@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/backup/cloud_backup_scheduler.dart';
 import '../../../core/services/backup/cloud_backup_service.dart';
+import '../../../core/services/backup/cloud_usage_metadata_sync_service.dart';
+import '../../../core/services/backup/initial_cloud_auth_coordinator.dart';
 import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
 import '../../../models/backup/cloud_backup_state.dart';
@@ -13,11 +15,16 @@ class CloudBackupProvider with ChangeNotifier {
     this._settingsRepo,
     this._backupService,
     this._scheduler,
-  ) : _state = _settingsRepo.getState();
+    this._initialCloudAuthCoordinator, {
+    CloudUsageMetadataSyncService? usageMetadataSync,
+  })  : _usageMetadataSync = usageMetadataSync,
+        _state = _settingsRepo.getState();
 
   final CloudBackupSettingsRepo _settingsRepo;
   final CloudBackupService _backupService;
   final CloudBackupScheduler _scheduler;
+  final InitialCloudAuthCoordinator _initialCloudAuthCoordinator;
+  final CloudUsageMetadataSyncService? _usageMetadataSync;
 
   CloudBackupState _state;
   CloudBackupState get state => _state;
@@ -35,6 +42,8 @@ class CloudBackupProvider with ChangeNotifier {
         email: account.email,
       );
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
+      await _usageMetadataSync?.syncToCloud(silentAuth: true);
       await _scheduler.scheduleDailyBackup();
     });
   }
@@ -67,6 +76,8 @@ class CloudBackupProvider with ChangeNotifier {
       }
       _state = _state.copyWith(email: account.email, enabled: true);
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
+      await _usageMetadataSync?.syncToCloud(silentAuth: true);
     });
   }
 
@@ -95,35 +106,76 @@ class CloudBackupProvider with ChangeNotifier {
         lastBackupSizeBytes: sizeBytes,
       );
       await _settingsRepo.saveState(_state);
+      await _usageMetadataSync?.syncToCloud();
     });
+  }
+
+  Future<void> initializeAutoBackup() async {
+    if (!_state.enabled || !_state.autoBackupEnabled) {
+      return;
+    }
+    await _scheduler.scheduleDailyBackup();
+  }
+
+  Future<void> runAutoBackupIfDue(
+    List<Idea> ideas, {
+    List<RandomAddition> randomAdditions = const [],
+  }) async {
+    if (!_state.enabled || !_state.autoBackupEnabled || _state.isBusy) {
+      return;
+    }
+    if (_state.lastBackupAt != null &&
+        DateTime.now().difference(_state.lastBackupAt!) <
+            CloudBackupScheduler.backupInterval) {
+      return;
+    }
+    await backUpNow(ideas, randomAdditions: randomAdditions);
   }
 
   Future<CloudBackupSnapshot?> fetchRestoreSnapshot() async {
     return _backupService.restoreSnapshot();
   }
 
+  Future<void> syncUsageMetadataFromCloud({
+    bool silentAuth = true,
+    bool overrideLocal = false,
+  }) async {
+    await _usageMetadataSync?.syncFromCloud(
+      silentAuth: silentAuth,
+      overrideLocal: overrideLocal,
+    );
+  }
+
   Future<void> checkForFreshInstallBackup({required bool hasLocalIdeas}) async {
-    if (hasLocalIdeas || _state.restorePromptAvailable) {
+    if (hasLocalIdeas ||
+        _state.freshInstallRestoreCheckCompleted ||
+        _initialCloudAuthCoordinator.isCompleted) {
       return;
     }
 
-    try {
-      final exists = await _backupService.backupExists();
-      if (exists) {
-        _state = _state.copyWith(restorePromptAvailable: true);
+    await _initialCloudAuthCoordinator.runOncePerInstall(() async {
+      try {
+        final exists = await _backupService.backupExists();
+        await _usageMetadataSync?.syncFromCloud(silentAuth: true);
+        _state = _state.copyWith(
+          freshInstallRestoreCheckCompleted: true,
+          restorePromptAvailable: exists,
+        );
+        await _settingsRepo.saveState(_state);
         notifyListeners();
+      } catch (_) {
+        _state = _state.copyWith(freshInstallRestoreCheckCompleted: true);
+        await _settingsRepo.saveState(_state);
       }
-    } catch (_) {
-      // The prompt is opportunistic; a failed cloud check should not block app
-      // launch or local idea access.
-    }
+    });
   }
 
-  void dismissRestorePrompt() {
+  Future<void> dismissRestorePrompt() async {
     if (!_state.restorePromptAvailable) {
       return;
     }
     _state = _state.copyWith(restorePromptAvailable: false);
+    await _settingsRepo.saveState(_state);
     notifyListeners();
   }
 

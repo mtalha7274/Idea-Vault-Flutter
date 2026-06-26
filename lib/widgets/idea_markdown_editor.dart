@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:easy_localization/easy_localization.dart';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -38,52 +39,62 @@ class IdeaMarkdownEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.surface,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-        child: isPreviewMode
-            ? ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) {
-                  return _PreviewPane(
-                    markdown: value.text,
-                    placeholder: placeholder,
-                  );
-                },
-              )
-            : TextField(
-                key: const Key('idea-markdown-text-field'),
-                controller: controller,
-                focusNode: focusNode,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
-                scrollPhysics: const NeverScrollableScrollPhysics(),
-                inputFormatters: [_BulletListFormatter()],
-                style: ideaVaultBody(
-                  context,
-                  size: _editorBodyTextSize,
-                  weight: FontWeight.w500,
-                  color: theme.primaryText,
-                  height: 1.72,
-                ),
-                decoration: InputDecoration(
-                  hintText: placeholder,
-                  hintStyle: ideaVaultBody(
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.surface,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+          child: isPreviewMode
+              ? ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    return SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: _PreviewPane(
+                        markdown: value.text,
+                        placeholder: placeholder,
+                      ),
+                    );
+                  },
+                )
+              : TextField(
+                  key: const Key('idea-markdown-text-field'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.sentences,
+                  scrollPadding: EdgeInsets.only(
+                    bottom: Platform.isIOS ? 52 : 12,
+                  ),
+                  inputFormatters: [_BulletListFormatter()],
+                  style: ideaVaultBody(
                     context,
                     size: _editorBodyTextSize,
                     weight: FontWeight.w500,
-                    color: theme.outline,
+                    color: theme.primaryText,
                     height: 1.72,
                   ),
-                  border: InputBorder.none,
-                  isCollapsed: true,
+                  decoration: InputDecoration(
+                    hintText: placeholder,
+                    hintStyle: ideaVaultBody(
+                      context,
+                      size: _editorBodyTextSize,
+                      weight: FontWeight.w500,
+                      color: theme.outline,
+                      height: 1.72,
+                    ),
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
@@ -97,10 +108,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
-    required this.onImageText,
     this.organizeEnabled = true,
-    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
+    this.showPreviewToggle = false,
   });
 
   final TextEditingController controller;
@@ -108,10 +118,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
-  final VoidCallback onImageText;
   final bool organizeEnabled;
-  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
+  final bool showPreviewToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +137,9 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
           isPreviewMode: isPreviewMode,
           onPreviewToggle: onPreviewToggle,
           onOrganize: onOrganize,
-          onImageText: onImageText,
           organizeEnabled: organizeEnabled,
-          imageTextEnabled: imageTextEnabled,
           exceedsAiCharacterLimit: exceedsAiCharacterLimit,
+          showPreviewToggle: showPreviewToggle,
         ),
       ),
     );
@@ -146,10 +154,9 @@ class IdeaEditorToolbar extends StatelessWidget {
     required this.isPreviewMode,
     required this.onPreviewToggle,
     required this.onOrganize,
-    required this.onImageText,
     this.organizeEnabled = true,
-    this.imageTextEnabled = true,
     this.exceedsAiCharacterLimit = false,
+    this.showPreviewToggle = false,
   });
 
   final TextEditingController controller;
@@ -157,10 +164,9 @@ class IdeaEditorToolbar extends StatelessWidget {
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
   final VoidCallback onOrganize;
-  final VoidCallback onImageText;
   final bool organizeEnabled;
-  final bool imageTextEnabled;
   final bool exceedsAiCharacterLimit;
+  final bool showPreviewToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -202,14 +208,6 @@ class IdeaEditorToolbar extends StatelessWidget {
                           enabled: !isPreviewMode,
                           onPressed: () =>
                               _wrapSelection(controller, '_', '_', false),
-                        ),
-                        _ToolbarIconButton(
-                          key: const Key('idea-editor-image-text'),
-                          icon: Icons.camera_alt_rounded,
-                          tooltip:
-                              ViewConstants.ideaEditorImageTextTooltip.tr(),
-                          enabled: imageTextEnabled && !isPreviewMode,
-                          onPressed: onImageText,
                         ),
                         _ToolbarIconButton(
                           icon: Icons.format_list_bulleted,
@@ -261,14 +259,16 @@ class IdeaEditorToolbar extends StatelessWidget {
           enabled: organizeEnabled,
           exceedsCharacterLimit: exceedsAiCharacterLimit,
         ),
-        const SizedBox(width: 8),
-        _ToolbarIconButton(
-          key: const Key('idea-markdown-preview-toggle'),
-          icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
-          tooltip: isPreviewMode ? 'Edit' : 'Preview',
-          onPressed: onPreviewToggle,
-          rightPadding: 2,
-        ),
+        if (showPreviewToggle) ...[
+          const SizedBox(width: 8),
+          _ToolbarIconButton(
+            key: const Key('idea-markdown-preview-toggle'),
+            icon: isPreviewMode ? Icons.edit_rounded : Icons.remove_red_eye,
+            tooltip: isPreviewMode ? 'Edit' : 'Preview',
+            onPressed: onPreviewToggle,
+            rightPadding: 2,
+          ),
+        ],
       ],
     );
   }

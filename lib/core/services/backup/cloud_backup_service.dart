@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../../../models/backup/cloud_backup_account.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
+import '../../../models/backup/cloud_usage_metadata.dart';
 import '../../../models/idea.dart';
 import '../../../models/random_addition.dart';
 import 'cloud_backup_store.dart';
@@ -14,7 +15,7 @@ class CloudBackupService {
     CloudBackupStore? androidStore,
     CloudBackupStore? iosStore,
   })  : _androidStore = androidStore ?? GoogleDriveBackupStore(),
-        _iosStore = iosStore ?? const ICloudBackupStore();
+        _iosStore = iosStore ?? ICloudBackupStore();
 
   final CloudBackupStore _androidStore;
   final CloudBackupStore _iosStore;
@@ -36,13 +37,14 @@ class CloudBackupService {
   Future<int> backUpIdeas(
     List<Idea> ideas, {
     List<RandomAddition> randomAdditions = const [],
+    bool silentAuth = false,
   }) async {
     final snapshot = CloudBackupSnapshot.fromContent(
       ideas: ideas,
       randomAdditions: randomAdditions,
     );
     final encoded = const JsonEncoder.withIndent('  ').convert(snapshot);
-    return _store.writeBackup(encoded);
+    return _store.writeBackup(encoded, silentAuth: silentAuth);
   }
 
   Future<CloudBackupSnapshot?> restoreSnapshot() async {
@@ -52,5 +54,24 @@ class CloudBackupService {
     }
     final decoded = jsonDecode(file.contents) as Map<String, dynamic>;
     return CloudBackupSnapshot.fromJson(decoded);
+  }
+
+  Future<int> backUpUsageMetadata(
+    CloudUsageMetadata metadata, {
+    bool silentAuth = false,
+  }) async {
+    final encoded = const JsonEncoder.withIndent('  ').convert(metadata);
+    return _store.writeUsageMetadata(encoded, silentAuth: silentAuth);
+  }
+
+  Future<CloudUsageMetadata?> restoreUsageMetadata({
+    bool silentAuth = false,
+  }) async {
+    final file = await _store.readUsageMetadata(silentAuth: silentAuth);
+    if (file == null) {
+      return null;
+    }
+    final decoded = jsonDecode(file.contents) as Map<String, dynamic>;
+    return CloudUsageMetadata.fromJson(decoded);
   }
 }

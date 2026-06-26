@@ -18,6 +18,7 @@ class GoogleDriveBackupStore implements CloudBackupStore {
   final String? _serverClientId;
 
   static const String backupFileName = 'idea_vault_backup.json';
+  static const String usageMetadataFileName = 'idea_vault_usage_metadata.json';
   static const List<String> scopes = [
     drive.DriveApi.driveAppdataScope,
   ];
@@ -40,7 +41,8 @@ class GoogleDriveBackupStore implements CloudBackupStore {
     if (fromCtor != null && fromCtor.isNotEmpty) {
       return fromCtor;
     }
-    final String? fromEnv = dotenv.env['GOOGLE_SIGN_IN_SERVER_CLIENT_ID']?.trim();
+    final String? fromEnv =
+        dotenv.env['GOOGLE_SIGN_IN_SERVER_CLIENT_ID']?.trim();
     if (fromEnv != null && fromEnv.isNotEmpty) {
       return fromEnv;
     }
@@ -76,18 +78,54 @@ class GoogleDriveBackupStore implements CloudBackupStore {
     if (api == null) {
       return false;
     }
-    final file = await _findBackupFile(api);
+    final file = await _findFile(api, backupFileName);
     return file?.id != null;
   }
 
   @override
   Future<CloudBackupFile?> readBackup() async {
-    final api = await _driveApi(promptIfNecessary: true);
+    return _readFile(backupFileName, promptIfNecessary: true);
+  }
+
+  @override
+  Future<CloudBackupFile?> readUsageMetadata({bool silentAuth = false}) {
+    return _readFile(
+      usageMetadataFileName,
+      promptIfNecessary: !silentAuth,
+    );
+  }
+
+  @override
+  Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
+    return _writeFile(
+      backupFileName,
+      contents,
+      promptIfNecessary: !silentAuth,
+    );
+  }
+
+  @override
+  Future<int> writeUsageMetadata(
+    String contents, {
+    bool silentAuth = false,
+  }) {
+    return _writeFile(
+      usageMetadataFileName,
+      contents,
+      promptIfNecessary: !silentAuth,
+    );
+  }
+
+  Future<CloudBackupFile?> _readFile(
+    String fileName, {
+    required bool promptIfNecessary,
+  }) async {
+    final api = await _driveApi(promptIfNecessary: promptIfNecessary);
     if (api == null) {
       return null;
     }
 
-    final file = await _findBackupFile(api);
+    final file = await _findFile(api, fileName);
     final fileId = file?.id;
     if (fileId == null) {
       return null;
@@ -107,25 +145,28 @@ class GoogleDriveBackupStore implements CloudBackupStore {
     );
   }
 
-  @override
-  Future<int> writeBackup(String contents) async {
-    final api = await _driveApi(promptIfNecessary: true);
+  Future<int> _writeFile(
+    String fileName,
+    String contents, {
+    required bool promptIfNecessary,
+  }) async {
+    final api = await _driveApi(promptIfNecessary: promptIfNecessary);
     if (api == null) {
       throw StateError('Google Drive is not connected.');
     }
 
     final bytes = utf8.encode(contents);
-    final existingFile = await _findBackupFile(api);
+    final existingFile = await _findFile(api, fileName);
     final media = drive.Media(Stream.value(bytes), bytes.length);
     final metadata = drive.File()
-      ..name = backupFileName
+      ..name = fileName
       ..parents = ['appDataFolder'];
 
     if (existingFile?.id == null) {
       await api.files.create(metadata, uploadMedia: media);
     } else {
       await api.files.update(
-        drive.File()..name = backupFileName,
+        drive.File()..name = fileName,
         existingFile!.id!,
         uploadMedia: media,
       );
@@ -154,10 +195,10 @@ class GoogleDriveBackupStore implements CloudBackupStore {
     return drive.DriveApi(GoogleDriveHttpClient(headers));
   }
 
-  Future<drive.File?> _findBackupFile(drive.DriveApi api) async {
+  Future<drive.File?> _findFile(drive.DriveApi api, String fileName) async {
     final result = await api.files.list(
       spaces: 'appDataFolder',
-      q: "name = '$backupFileName' and trashed = false",
+      q: "name = '$fileName' and trashed = false",
       $fields: 'files(id, name, size, modifiedTime)',
       pageSize: 1,
     );

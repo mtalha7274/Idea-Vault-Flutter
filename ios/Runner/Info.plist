@@ -26,19 +26,17 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Idea Vault uses your microphone to let you dictate ideas hands-free.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Idea Vault uses your camera to capture images and extract text into your ideas.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Idea Vault uses your photo library to extract text from selected images.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Idea Vault uses speech recognition to turn your spoken ideas into notes.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Idea Vault uses Face ID to unlock locked notes.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>idea_vault_auto_cloud_backup_periodic</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
