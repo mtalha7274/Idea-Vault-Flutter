@@ -237,178 +237,166 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final primaryColor = theme.primary;
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardVisible = keyboardHeight > 0;
 
-    return AnimatedScale(
-      scale: isKeyboardVisible ? 0 : 1,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeInOutCubic,
-      child: AnimatedOpacity(
-        opacity: isKeyboardVisible ? 0 : 1,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInOut,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            AnimatedBuilder(
-              animation: _listenLabelController,
-              builder: (context, child) {
-                final showLabel = widget.isListening ||
-                    widget.isActivating ||
-                    _listenLabelController.value > 0;
-                if (!showLabel) {
-                  return const SizedBox.shrink();
-                }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedBuilder(
+          animation: _listenLabelController,
+          builder: (context, child) {
+            final showLabel = widget.isListening ||
+                widget.isActivating ||
+                _listenLabelController.value > 0;
+            if (!showLabel) {
+              return const SizedBox.shrink();
+            }
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    FadeTransition(
-                      opacity: _listenLabelFadeAnimation,
-                      child: SlideTransition(
-                        position: _listenLabelSlideAnimation,
-                        child: child,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                  ],
-                );
-              },
-              child: IgnorePointer(
-                ignoring: !widget.isListening,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FadeTransition(
+                  opacity: _listenLabelFadeAnimation,
+                  child: SlideTransition(
+                    position: _listenLabelSlideAnimation,
+                    child: child,
                   ),
-                  decoration: BoxDecoration(
-                    color: theme.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                ),
+                const SizedBox(height: 28),
+              ],
+            );
+          },
+          child: IgnorePointer(
+            ignoring: !widget.isListening,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: theme.surface,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
-                  child: TranslatedText(
-                    ViewConstants.ideaEditorListening,
-                    style: ideaVaultLabel(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w700,
-                      color: primaryColor,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
+                ],
+              ),
+              child: TranslatedText(
+                ViewConstants.ideaEditorListening,
+                style: ideaVaultLabel(
+                  context,
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: primaryColor,
+                  letterSpacing: 0.2,
                 ),
               ),
             ),
-            Tooltip(
-              key: widget.tooltipKey,
-              message: ViewConstants.ideaEditorMicLongPressToTalk.tr(),
-              triggerMode: TooltipTriggerMode.manual,
-              showDuration: const Duration(seconds: 3),
-              child: GestureDetector(
-                key: const Key('idea-editor-mic-fab'),
-                behavior: HitTestBehavior.opaque,
-                onTap: widget.onTap,
-                onLongPress: _handleLongPressStart,
-                onLongPressEnd: (_) => _handleLongPressEnd(),
-                onTapDown: _handleTapDown,
-                onTapUp: _handleTapUp,
-                onTapCancel: _handleTapCancel,
+          ),
+        ),
+        Tooltip(
+          key: widget.tooltipKey,
+          message: ViewConstants.ideaEditorMicLongPressToTalk.tr(),
+          triggerMode: TooltipTriggerMode.manual,
+          showDuration: const Duration(seconds: 3),
+          child: GestureDetector(
+            key: const Key('idea-editor-mic-fab'),
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            onLongPress: _handleLongPressStart,
+            onLongPressEnd: (_) => _handleLongPressEnd(),
+            onTapDown: _handleTapDown,
+            onTapUp: _handleTapUp,
+            onTapCancel: _handleTapCancel,
+            child: SizedBox(
+              width: _micSize,
+              height: _micSize,
+              child: OverflowBox(
+                alignment: Alignment.center,
+                maxWidth: _micSize * 2.4,
+                maxHeight: _micSize * 2.4,
                 child: SizedBox(
-                  width: _micSize,
-                  height: _micSize,
-                  child: OverflowBox(
+                  width: _micSize * 2.4,
+                  height: _micSize * 2.4,
+                  child: Stack(
                     alignment: Alignment.center,
-                    maxWidth: _micSize * 2.4,
-                    maxHeight: _micSize * 2.4,
-                    child: SizedBox(
-                      width: _micSize * 2.4,
-                      height: _micSize * 2.4,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        clipBehavior: Clip.none,
-                        children: [
-                          RepaintBoundary(
-                            child: AnimatedBuilder(
-                              animation: _rippleController,
-                              builder: (context, child) {
-                                return CustomPaint(
-                                  size: Size.square(_micSize * 2.4),
-                                  painter: _SpeechRipplePainter(
-                                    progress: _rippleController.value,
-                                    color: primaryColor,
-                                    activeCount: widget.isListening
-                                        ? _rippleCount
-                                        : widget.isActivating
-                                            ? 1
-                                            : 0,
+                    clipBehavior: Clip.none,
+                    children: [
+                      RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _rippleController,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              size: Size.square(_micSize * 2.4),
+                              painter: _SpeechRipplePainter(
+                                progress: _rippleController.value,
+                                color: primaryColor,
+                                activeCount: widget.isListening
+                                    ? _rippleCount
+                                    : widget.isActivating
+                                        ? 1
+                                        : 0,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      AnimatedBuilder(
+                        animation: Listenable.merge([
+                          _pressController,
+                          _phaseController,
+                          _breathController,
+                        ]),
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _resolveMicScale(),
+                            child: child,
+                          );
+                        },
+                        child: Material(
+                          elevation: widget.isListening ? 8 : 6,
+                          shadowColor: primaryColor.withValues(alpha: 0.35),
+                          color: primaryColor,
+                          shape: const CircleBorder(),
+                          child: SizedBox.square(
+                            dimension: _micSize,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 250),
+                              switchInCurve: Curves.easeOutBack,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: ScaleTransition(
+                                    scale: animation,
+                                    child: child,
                                   ),
                                 );
                               },
-                            ),
-                          ),
-                          AnimatedBuilder(
-                            animation: Listenable.merge([
-                              _pressController,
-                              _phaseController,
-                              _breathController,
-                            ]),
-                            builder: (context, child) {
-                              return Transform.scale(
-                                scale: _resolveMicScale(),
-                                child: child,
-                              );
-                            },
-                            child: Material(
-                              elevation: widget.isListening ? 8 : 6,
-                              shadowColor: primaryColor.withValues(alpha: 0.35),
-                              color: primaryColor,
-                              shape: const CircleBorder(),
-                              child: SizedBox.square(
-                                dimension: _micSize,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 250),
-                                  switchInCurve: Curves.easeOutBack,
-                                  switchOutCurve: Curves.easeInCubic,
-                                  transitionBuilder: (child, animation) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: ScaleTransition(
-                                        scale: animation,
-                                        child: child,
-                                      ),
-                                    );
-                                  },
-                                  child: Icon(
-                                    widget.isListening
-                                        ? Icons.graphic_eq_rounded
-                                        : Icons.mic_rounded,
-                                    key: ValueKey<bool>(widget.isListening),
-                                    size: 28,
-                                    color: theme.onPrimary,
-                                  ),
-                                ),
+                              child: Icon(
+                                widget.isListening
+                                    ? Icons.graphic_eq_rounded
+                                    : Icons.mic_rounded,
+                                key: ValueKey<bool>(widget.isListening),
+                                size: 28,
+                                color: theme.onPrimary,
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

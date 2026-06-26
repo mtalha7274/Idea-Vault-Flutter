@@ -382,13 +382,9 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    await authenticateAndOpenNote(
-      context,
-      _noteLockAuthService,
-      _noteLockBiometricService,
-      ideaId: idea.id,
-      nextRoute: () => IdeaEditorScreen(ideaId: idea.id),
-    );
+    // Don't auto-resume locked notes on cold start — auth on every open is
+    // disruptive on Android where the process is frequently killed.
+    await ideasProvider.clearEditorState();
   }
 
   Future<void> _checkFreshInstallBackup() async {
