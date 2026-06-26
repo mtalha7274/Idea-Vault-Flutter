@@ -56,16 +56,53 @@ void main() {
       expect(find.text(ViewConstants.ideaEditorListening), findsNothing);
     });
 
-    testWidgets('builds while activating without listening label', (tester) async {
+    testWidgets('shows listening label while activating', (tester) async {
       await pumpFab(
         tester,
         isListening: false,
         isActivating: true,
       );
 
+      await tester.pump();
+
       expect(find.byKey(const Key('idea-editor-mic-fab')), findsOneWidget);
       expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
-      expect(find.text(ViewConstants.ideaEditorListening), findsNothing);
+      expect(find.text(ViewConstants.ideaEditorListening), findsOneWidget);
+    });
+
+    testWidgets('shows listening label immediately when activating',
+        (tester) async {
+      await pumpFab(
+        tester,
+        isListening: false,
+        isActivating: true,
+      );
+
+      await tester.pump();
+
+      expect(find.text(ViewConstants.ideaEditorListening), findsOneWidget);
+    });
+
+    testWidgets('keeps listening label when transitioning activating to listening',
+        (tester) async {
+      await pumpFab(
+        tester,
+        isListening: false,
+        isActivating: true,
+      );
+      await tester.pump();
+
+      expect(find.text(ViewConstants.ideaEditorListening), findsOneWidget);
+
+      await pumpFab(
+        tester,
+        isListening: true,
+        isActivating: false,
+      );
+      await tester.pump();
+
+      expect(find.text(ViewConstants.ideaEditorListening), findsOneWidget);
+      expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
     });
 
     testWidgets('shows listening label and active icon when listening',

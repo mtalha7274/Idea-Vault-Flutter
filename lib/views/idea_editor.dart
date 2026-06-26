@@ -156,7 +156,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       } else {
         _persistEditorState();
       }
+      unawaited(_prewarmSpeechToText());
     });
+  }
+
+  Future<void> _prewarmSpeechToText() async {
+    try {
+      await _ensureSpeechReady();
+    } catch (_) {}
   }
 
   @override
@@ -210,13 +217,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           Scaffold(
             backgroundColor: theme.background,
             resizeToAvoidBottomInset: true,
-            floatingActionButton: SpeechToTextMicFab(
-              isListening: _isListening,
-              isActivating: _isSpeechActivating,
-              tooltipKey: _micTooltipKey,
-              onTap: _handleMicSingleTap,
-              onLongPressStart: _handleMicLongPress,
-              onLongPressEnd: _handleMicLongPressEnd,
+            floatingActionButton: Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              child: SpeechToTextMicFab(
+                isListening: _isListening,
+                isActivating: _isSpeechActivating,
+                tooltipKey: _micTooltipKey,
+                onTap: _handleMicSingleTap,
+                onLongPressStart: _handleMicLongPress,
+                onLongPressEnd: _handleMicLongPressEnd,
+              ),
             ),
             body: SafeArea(
               bottom: false,
@@ -1043,6 +1053,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     _partialSpeechText = '';
     _lastInsertedSpeechOffset = _contentController.selection.start;
 
+    await _setListeningState(true);
+
     await _speechToText.listen(
       onResult: _handleSpeechResult,
       listenOptions: SpeechListenOptions(
@@ -1053,11 +1065,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
 
     if (!mounted || !_speechToText.isListening) {
+      await _setListeningState(false);
       await _setSpeechActivating(false);
       return;
     }
-
-    await _setListeningState(true);
   }
 
   Future<void> _handleMicLongPressEnd() async {

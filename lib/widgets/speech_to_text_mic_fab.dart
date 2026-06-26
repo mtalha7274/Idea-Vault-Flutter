@@ -80,8 +80,8 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
 
     _listenLabelController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
-      reverseDuration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 150),
+      reverseDuration: const Duration(milliseconds: 120),
     );
     _listenLabelSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.4),
@@ -140,17 +140,15 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
         ..reset();
     }
 
-    if (widget.isListening) {
+    final shouldShowLabel = widget.isListening || widget.isActivating;
+
+    if (shouldShowLabel) {
       _startRippleLoop();
       if (_listenLabelController.status != AnimationStatus.completed) {
         _listenLabelController.forward();
       }
     } else {
-      if (widget.isActivating) {
-        _startRippleLoop();
-      } else {
-        _stopRipples();
-      }
+      _stopRipples();
       if (_listenLabelController.value > 0) {
         _listenLabelController.reverse();
       }
@@ -258,6 +256,7 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
               animation: _listenLabelController,
               builder: (context, child) {
                 final showLabel = widget.isListening ||
+                    widget.isActivating ||
                     _listenLabelController.value > 0;
                 if (!showLabel) {
                   return const SizedBox.shrink();
@@ -274,7 +273,7 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
                         child: child,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 28),
                   ],
                 );
               },
@@ -324,75 +323,85 @@ class _SpeechToTextMicFabState extends State<SpeechToTextMicFab>
                 onTapUp: _handleTapUp,
                 onTapCancel: _handleTapCancel,
                 child: SizedBox(
-                  width: _micSize * 2.4,
-                  height: _micSize * 2.4,
-                  child: Stack(
+                  width: _micSize,
+                  height: _micSize,
+                  child: OverflowBox(
                     alignment: Alignment.center,
-                    children: [
-                      RepaintBoundary(
-                        child: AnimatedBuilder(
-                          animation: _rippleController,
-                          builder: (context, child) {
-                            return CustomPaint(
-                              size: Size.square(_micSize * 2.4),
-                              painter: _SpeechRipplePainter(
-                                progress: _rippleController.value,
-                                color: primaryColor,
-                                activeCount: widget.isListening
-                                    ? _rippleCount
-                                    : widget.isActivating
-                                        ? 1
-                                        : 0,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      AnimatedBuilder(
-                        animation: Listenable.merge([
-                          _pressController,
-                          _phaseController,
-                          _breathController,
-                        ]),
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _resolveMicScale(),
-                            child: child,
-                          );
-                        },
-                        child: Material(
-                          elevation: widget.isListening ? 8 : 6,
-                          shadowColor: primaryColor.withValues(alpha: 0.35),
-                          color: primaryColor,
-                          shape: const CircleBorder(),
-                          child: SizedBox.square(
-                            dimension: _micSize,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 250),
-                              switchInCurve: Curves.easeOutBack,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: ScaleTransition(
-                                    scale: animation,
-                                    child: child,
+                    maxWidth: _micSize * 2.4,
+                    maxHeight: _micSize * 2.4,
+                    child: SizedBox(
+                      width: _micSize * 2.4,
+                      height: _micSize * 2.4,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: _rippleController,
+                              builder: (context, child) {
+                                return CustomPaint(
+                                  size: Size.square(_micSize * 2.4),
+                                  painter: _SpeechRipplePainter(
+                                    progress: _rippleController.value,
+                                    color: primaryColor,
+                                    activeCount: widget.isListening
+                                        ? _rippleCount
+                                        : widget.isActivating
+                                            ? 1
+                                            : 0,
                                   ),
                                 );
                               },
-                              child: Icon(
-                                widget.isListening
-                                    ? Icons.graphic_eq_rounded
-                                    : Icons.mic_rounded,
-                                key: ValueKey<bool>(widget.isListening),
-                                size: 28,
-                                color: theme.onPrimary,
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: Listenable.merge([
+                              _pressController,
+                              _phaseController,
+                              _breathController,
+                            ]),
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _resolveMicScale(),
+                                child: child,
+                              );
+                            },
+                            child: Material(
+                              elevation: widget.isListening ? 8 : 6,
+                              shadowColor: primaryColor.withValues(alpha: 0.35),
+                              color: primaryColor,
+                              shape: const CircleBorder(),
+                              child: SizedBox.square(
+                                dimension: _micSize,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 250),
+                                  switchInCurve: Curves.easeOutBack,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder: (child, animation) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      ),
+                                    );
+                                  },
+                                  child: Icon(
+                                    widget.isListening
+                                        ? Icons.graphic_eq_rounded
+                                        : Icons.mic_rounded,
+                                    key: ValueKey<bool>(widget.isListening),
+                                    size: 28,
+                                    color: theme.onPrimary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
