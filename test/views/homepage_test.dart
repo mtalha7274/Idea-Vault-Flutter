@@ -9,6 +9,9 @@ import 'package:idea_vault/config/config.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
+import 'package:idea_vault/core/services/backup/cloud_usage_metadata_sync_service.dart';
+import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
+import 'package:idea_vault/data/repositories/local/app_install_state.dart';
 import 'package:idea_vault/core/services/note_lock_auth_service.dart';
 import 'package:idea_vault/core/services/note_lock_biometric_service.dart';
 import 'package:idea_vault/core/services/premium/paywall_provider.dart';
@@ -149,6 +152,7 @@ void main() {
         CloudBackupSettingsRepo(storage),
         backupService ?? _FakeCloudBackupService(),
         _FakeCloudBackupScheduler(),
+        InitialCloudAuthCoordinator(AppInstallStateRepo(storage)),
       );
     }
 
@@ -1193,11 +1197,12 @@ void main() {
       );
     });
 
-    testWidgets('toggles idea cards between list and remembered grid layout',
+    testWidgets('homepage renders grid layout and hides layout menu item',
         (tester) async {
       late String firstIdeaId;
       late String secondIdeaId;
       await tester.runAsync(() async {
+        await sortPreferencesRepo.saveLayoutOption(IdeaLayoutOption.list);
         final firstIdea = await provider.saveIdea(
           title: 'First layout card',
           sections: [
@@ -1229,34 +1234,6 @@ void main() {
       final secondCard = find.byKey(Key('idea-card-$secondIdeaId'));
 
       expect(
-        (tester.getTopLeft(firstCard).dx - tester.getTopLeft(secondCard).dx)
-            .abs(),
-        lessThan(1),
-      );
-      expect(
-        tester.getTopLeft(firstCard).dy,
-        greaterThan(tester.getTopLeft(secondCard).dy),
-      );
-
-      await tester.tap(find.byKey(const Key('ideas-more-menu')));
-      await settleUi(tester);
-      await tester.tap(find.byKey(const Key('ideas-menu-layout')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 320));
-
-      expect(
-        tester.getTopLeft(firstCard).dx,
-        greaterThan(tester.getTopLeft(secondCard).dx),
-      );
-      expect(
-        (tester.getTopLeft(firstCard).dy - tester.getTopLeft(secondCard).dy)
-            .abs(),
-        lessThan(1),
-      );
-
-      await pumpIdeasApp(tester);
-
-      expect(
         tester.getTopLeft(firstCard).dx,
         greaterThan(tester.getTopLeft(secondCard).dx),
       );
@@ -1268,18 +1245,12 @@ void main() {
 
       await tester.tap(find.byKey(const Key('ideas-more-menu')));
       await settleUi(tester);
-      await tester.tap(find.byKey(const Key('ideas-menu-layout')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 320));
 
+      expect(find.byKey(const Key('ideas-menu-layout')), findsNothing);
+      expect(find.byKey(const Key('ideas-menu-filter')), findsOneWidget);
       expect(
-        (tester.getTopLeft(firstCard).dx - tester.getTopLeft(secondCard).dx)
-            .abs(),
-        lessThan(1),
-      );
-      expect(
-        tester.getTopLeft(firstCard).dy,
-        greaterThan(tester.getTopLeft(secondCard).dy),
+        sortPreferencesRepo.getLayoutOption(),
+        IdeaLayoutOption.grid,
       );
     });
 

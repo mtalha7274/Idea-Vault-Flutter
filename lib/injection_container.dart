@@ -26,6 +26,7 @@ import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
 import 'core/services/backup/cloud_usage_metadata_sync_service.dart';
+import 'core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'core/services/note_lock_auth_service.dart';
 import 'core/services/note_lock_biometric_service.dart';
 import 'core/services/premium/bypass_paywall_subscription_service.dart';
@@ -94,6 +95,8 @@ Future<void> initializeDependencies() async {
     sl<PaidFeatureUsageRepo>(),
     sl<CloudBackupService>(),
   ));
+  sl.registerSingleton<InitialCloudAuthCoordinator>(
+      InitialCloudAuthCoordinator(sl<AppInstallStateRepo>()));
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
@@ -115,6 +118,7 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupSettingsRepo>(),
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
+        sl<InitialCloudAuthCoordinator>(),
         usageMetadataSync: sl<CloudUsageMetadataSyncService>(),
       ));
   sl.registerFactory<PaywallViewModel>(() => PaywallViewModel(

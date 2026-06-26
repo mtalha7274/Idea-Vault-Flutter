@@ -25,7 +25,10 @@ class CloudBackupSettingsRepo {
         lastBackupAt: DateTime.tryParse(json['lastBackupAt'] as String? ?? ''),
         lastBackupSizeBytes: json['lastBackupSizeBytes'] as int?,
         isBusy: false,
-        restorePromptAvailable: false,
+        restorePromptAvailable:
+            json['restorePromptAvailable'] as bool? ?? false,
+        freshInstallRestoreCheckCompleted:
+            json['freshInstallRestoreCheckCompleted'] as bool? ?? false,
       );
     } catch (_) {
       return const CloudBackupState.initial();
@@ -41,6 +44,9 @@ class CloudBackupSettingsRepo {
         'email': state.email,
         'lastBackupAt': state.lastBackupAt?.toIso8601String(),
         'lastBackupSizeBytes': state.lastBackupSizeBytes,
+        'restorePromptAvailable': state.restorePromptAvailable,
+        'freshInstallRestoreCheckCompleted':
+            state.freshInstallRestoreCheckCompleted,
       }),
     );
   }

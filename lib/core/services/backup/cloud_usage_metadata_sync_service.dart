@@ -10,7 +10,10 @@ class CloudUsageMetadataSyncService {
   final PaidFeatureUsageRepo _usageRepo;
   final CloudBackupService _backupService;
 
-  Future<void> syncFromCloud({bool silentAuth = true}) async {
+  Future<void> syncFromCloud({
+    bool silentAuth = true,
+    bool overrideLocal = false,
+  }) async {
     try {
       final metadata = await _backupService.restoreUsageMetadata(
         silentAuth: silentAuth,
@@ -18,7 +21,11 @@ class CloudUsageMetadataSyncService {
       if (metadata == null) {
         return;
       }
-      await _usageRepo.mergeCloudUsageMetadata(metadata);
+      if (overrideLocal) {
+        await _usageRepo.applyCloudUsageMetadataFromRestore(metadata);
+      } else {
+        await _usageRepo.mergeCloudUsageMetadata(metadata);
+      }
     } catch (_) {}
   }
 

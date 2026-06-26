@@ -146,6 +146,32 @@ void main() {
       expect(repo.hasSeenFreeUsageIntro, isTrue);
     });
 
+    test('applies cloud usage from restore without preserving higher local usage',
+        () async {
+      await repo.incrementUsage();
+      await repo.incrementUsage();
+      await repo.incrementUsage();
+      await repo.markFreeUsageIntroSeen();
+      await repo.markHalfLimitReviewRequested();
+      await repo.initializeFreeUsageGrantIfNeeded();
+
+      await repo.applyCloudUsageMetadataFromRestore(
+        CloudUsageMetadata(
+          version: CloudUsageMetadata.currentVersion,
+          updatedAt: DateTime.utc(2026, 6, 25),
+          usageCount: 1,
+          freeUsageGrantLimit: 12,
+          introSeen: false,
+          halfLimitReviewRequested: false,
+        ),
+      );
+
+      expect(repo.usageCount, 1);
+      expect(repo.freeUsageGrantLimit, 12);
+      expect(repo.hasSeenFreeUsageIntro, isFalse);
+      expect(repo.hasRequestedHalfLimitReview, isFalse);
+    });
+
     test('clears usage and metadata state', () async {
       await repo.incrementUsage();
       await repo.markHalfLimitReviewRequested();

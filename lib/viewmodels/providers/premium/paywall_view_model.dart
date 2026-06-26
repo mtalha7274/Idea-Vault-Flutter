@@ -68,7 +68,6 @@ class PaywallViewModel with ChangeNotifier {
     await _subscriptionService.initialize();
     final state = await _subscriptionService.getSubscriptionState();
     _offering = await _paywallProvider.loadOffering();
-    await _usageMetadataSync?.syncFromCloud();
     await _setSubscriptionState(state);
   }
 

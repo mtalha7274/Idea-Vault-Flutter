@@ -89,6 +89,37 @@ class PaidFeatureUsageRepo {
     );
   }
 
+  Future<void> applyCloudUsageMetadataFromRestore(
+    CloudUsageMetadata metadata,
+  ) async {
+    await _localStorage.setString(
+      key: _key,
+      value: metadata.usageCount.toString(),
+    );
+
+    final grantLimit = metadata.freeUsageGrantLimit;
+    if (grantLimit == null) {
+      await _localStorage.delete(key: _freeUsageGrantLimitKey);
+    } else {
+      await _localStorage.setString(
+        key: _freeUsageGrantLimitKey,
+        value: grantLimit.toString(),
+      );
+    }
+
+    if (metadata.introSeen) {
+      await markFreeUsageIntroSeen();
+    } else {
+      await _localStorage.delete(key: _freeUsageIntroSeenKey);
+    }
+
+    if (metadata.halfLimitReviewRequested) {
+      await markHalfLimitReviewRequested();
+    } else {
+      await _localStorage.delete(key: _halfLimitReviewRequestedKey);
+    }
+  }
+
   Future<void> mergeCloudUsageMetadata(CloudUsageMetadata metadata) async {
     final nextUsageCount = max(usageCount, metadata.usageCount);
     await _localStorage.setString(

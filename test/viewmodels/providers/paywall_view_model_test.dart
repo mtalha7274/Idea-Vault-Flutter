@@ -8,6 +8,8 @@ import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
 import 'package:idea_vault/core/services/backup/cloud_usage_metadata_sync_service.dart';
 import 'package:idea_vault/core/services/premium/paywall_provider.dart';
 import 'package:idea_vault/core/services/premium/subscription_service.dart';
+import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
+import 'package:idea_vault/data/repositories/local/app_install_state.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
 import 'package:idea_vault/data/repositories/local/paid_feature_usage.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
@@ -16,6 +18,7 @@ import 'package:idea_vault/models/backup/cloud_usage_metadata.dart';
 import 'package:idea_vault/models/premium/paywall_offering.dart';
 import 'package:idea_vault/models/premium/premium_feature.dart';
 import 'package:idea_vault/models/premium/subscription_state.dart';
+import 'package:idea_vault/viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'package:idea_vault/viewmodels/providers/premium/paywall_view_model.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -185,6 +188,18 @@ void main() {
         introSeen: true,
         halfLimitReviewRequested: true,
       );
+      final installStateRepo = AppInstallStateRepo(storage);
+      final backupProvider = CloudBackupProvider(
+        backupSettingsRepo,
+        cloudBackupService,
+        cloudBackupScheduler,
+        InitialCloudAuthCoordinator(installStateRepo),
+        usageMetadataSync: CloudUsageMetadataSyncService(
+          usageRepo,
+          cloudBackupService,
+        ),
+      );
+      await backupProvider.checkForFreshInstallBackup(hasLocalIdeas: false);
       viewModel = PaywallViewModel(
         subscriptionService,
         LocalPaywallProvider(subscriptionService),
@@ -340,6 +355,9 @@ class _FakeCloudBackupService extends CloudBackupService {
   int disconnectCount = 0;
   CloudUsageMetadata? restoreUsageMetadataResult;
   CloudUsageMetadata? backedUpUsageMetadata;
+
+  @override
+  Future<bool> backupExists() async => false;
 
   @override
   Future<void> disconnect() async {

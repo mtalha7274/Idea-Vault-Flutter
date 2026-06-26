@@ -82,7 +82,8 @@ class _HomepageState extends State<Homepage> {
         ? sl<NoteLockBiometricService>()
         : NoteLockBiometricService();
     _sortOption = _sortPreferencesRepo.getSortOption();
-    _layoutOption = _sortPreferencesRepo.getLayoutOption();
+    _layoutOption = IdeaLayoutOption.grid;
+    unawaited(_sortPreferencesRepo.saveLayoutOption(IdeaLayoutOption.grid));
     _quickAdditionController = TextEditingController();
     _quickAdditionFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -147,10 +148,6 @@ class _HomepageState extends State<Homepage> {
                                     _isSelectionMode ? null : _openSearchScreen,
                                 onSortPressed:
                                     _isSelectionMode ? null : _showSortSheet,
-                                layoutOption: _layoutOption,
-                                onLayoutPressed: _isSelectionMode
-                                    ? null
-                                    : _toggleLayoutOption,
                               ),
                               SizedBox(height: 18.h),
                               if (_hasCloudBackupProvider(context)) ...[
@@ -461,7 +458,6 @@ class _HomepageState extends State<Homepage> {
 
     await usageRepo.initializeFreeUsageGrantIfNeeded();
     await usageRepo.markFreeUsageIntroSeen();
-    await paywall.syncUsageMetadataToCloud();
     if (!mounted) {
       return;
     }
@@ -711,17 +707,6 @@ class _HomepageState extends State<Homepage> {
       _sortOption = selectedSortOption;
     });
     await _sortPreferencesRepo.saveSortOption(selectedSortOption);
-  }
-
-  Future<void> _toggleLayoutOption() async {
-    final nextLayoutOption = _layoutOption == IdeaLayoutOption.list
-        ? IdeaLayoutOption.grid
-        : IdeaLayoutOption.list;
-
-    setState(() {
-      _layoutOption = nextLayoutOption;
-    });
-    await _sortPreferencesRepo.saveLayoutOption(nextLayoutOption);
   }
 }
 
@@ -1142,8 +1127,6 @@ class _Header extends StatelessWidget {
     required this.onDeletePressed,
     required this.onSearchPressed,
     required this.onSortPressed,
-    required this.layoutOption,
-    required this.onLayoutPressed,
   });
 
   final int ideaCount;
@@ -1152,8 +1135,6 @@ class _Header extends StatelessWidget {
   final VoidCallback? onDeletePressed;
   final VoidCallback? onSearchPressed;
   final VoidCallback? onSortPressed;
-  final IdeaLayoutOption layoutOption;
-  final VoidCallback? onLayoutPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -1250,41 +1231,10 @@ class _Header extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                 ),
                 onSelected: (action) {
-                  switch (action) {
-                    case _HomepageMenuAction.layout:
-                      onLayoutPressed?.call();
-                      break;
-                    case _HomepageMenuAction.filter:
-                      onSortPressed?.call();
-                      break;
-                  }
+                  onSortPressed?.call();
                 },
                 itemBuilder: (menuContext) {
                   return [
-                    PopupMenuItem<_HomepageMenuAction>(
-                      key: const Key('ideas-menu-layout'),
-                      value: _HomepageMenuAction.layout,
-                      child: Row(
-                        children: [
-                          Icon(
-                            layoutOption == IdeaLayoutOption.list
-                                ? Icons.grid_view_rounded
-                                : Icons.view_agenda_rounded,
-                            color: theme.primary,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TranslatedText(
-                              ViewConstants.homepageMenuChangeLayout,
-                              style: menuItemBodyStyle,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     PopupMenuItem<_HomepageMenuAction>(
                       key: const Key('ideas-menu-filter'),
                       value: _HomepageMenuAction.filter,
@@ -1320,7 +1270,6 @@ class _Header extends StatelessWidget {
 }
 
 enum _HomepageMenuAction {
-  layout,
   filter,
 }
 
