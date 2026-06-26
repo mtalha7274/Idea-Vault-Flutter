@@ -40,55 +40,62 @@ class IdeaMarkdownEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.surface,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-        child: isPreviewMode
-            ? ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) {
-                  return _PreviewPane(
-                    markdown: value.text,
-                    placeholder: placeholder,
-                  );
-                },
-              )
-            : TextField(
-                key: const Key('idea-markdown-text-field'),
-                controller: controller,
-                focusNode: focusNode,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
-                scrollPhysics: const NeverScrollableScrollPhysics(),
-                scrollPadding: EdgeInsets.only(
-                  bottom: Platform.isIOS ? 64 : 20,
-                ),
-                inputFormatters: [_BulletListFormatter()],
-                style: ideaVaultBody(
-                  context,
-                  size: _editorBodyTextSize,
-                  weight: FontWeight.w500,
-                  color: theme.primaryText,
-                  height: 1.72,
-                ),
-                decoration: InputDecoration(
-                  hintText: placeholder,
-                  hintStyle: ideaVaultBody(
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.surface,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+          child: isPreviewMode
+              ? ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    return SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: _PreviewPane(
+                        markdown: value.text,
+                        placeholder: placeholder,
+                      ),
+                    );
+                  },
+                )
+              : TextField(
+                  key: const Key('idea-markdown-text-field'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.sentences,
+                  scrollPadding: EdgeInsets.only(
+                    bottom: Platform.isIOS ? 52 : 12,
+                  ),
+                  inputFormatters: [_BulletListFormatter()],
+                  style: ideaVaultBody(
                     context,
                     size: _editorBodyTextSize,
                     weight: FontWeight.w500,
-                    color: theme.outline,
+                    color: theme.primaryText,
                     height: 1.72,
                   ),
-                  border: InputBorder.none,
-                  isCollapsed: true,
+                  decoration: InputDecoration(
+                    hintText: placeholder,
+                    hintStyle: ideaVaultBody(
+                      context,
+                      size: _editorBodyTextSize,
+                      weight: FontWeight.w500,
+                      color: theme.outline,
+                      height: 1.72,
+                    ),
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

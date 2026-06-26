@@ -223,6 +223,12 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               child: _wrapEditorBodyWithKeyboardActions(
                 context,
                 CustomScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  physics: _EditorOuterScrollPhysics(
+                    _contentFocusNode,
+                    parent: const AlwaysScrollableScrollPhysics(),
+                  ),
                   slivers: [
                     _buildCollapsibleEditorHeader(context, currentIdea),
                     SliverPersistentHeader(
@@ -412,6 +418,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return child;
     }
     return KeyboardActions(
+      autoScroll: false,
       config: keyboardActionbuildConfig(
         context,
         [_titleFocusNode, _contentFocusNode],
@@ -1861,6 +1868,36 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       'title': _titleController.text,
       'sections': sectionsSnapshot,
     });
+  }
+}
+
+class _EditorOuterScrollPhysics extends ScrollPhysics {
+  const _EditorOuterScrollPhysics(this.contentFocusNode, {super.parent});
+
+  final FocusNode contentFocusNode;
+
+  @override
+  _EditorOuterScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _EditorOuterScrollPhysics(
+      contentFocusNode,
+      parent: buildParent(ancestor),
+    );
+  }
+
+  @override
+  double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
+    if (contentFocusNode.hasFocus) {
+      return 0.0;
+    }
+    return super.applyPhysicsToUserOffset(position, offset);
+  }
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    if (contentFocusNode.hasFocus && value != position.pixels) {
+      return value - position.pixels;
+    }
+    return super.applyBoundaryConditions(position, value);
   }
 }
 
