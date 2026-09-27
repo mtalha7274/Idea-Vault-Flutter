@@ -15,29 +15,21 @@ import '../config/router/app_router.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/helpers.dart';
-import '../data/repositories/remote/idea_organization_repository.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
-import '../models/premium/premium_feature.dart';
 import '../viewmodels/providers/ideas_provider.dart';
-import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import '../widgets/ai_loading_overlay.dart';
 import '../widgets/idea_markdown_editor.dart';
 import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/sheets/idea_editor_section_sheet.dart';
 import '../widgets/sheets/idea_options_sheet.dart';
-import '../widgets/sheets/organise_section_sheet.dart';
 import '../core/constants/view_constants.dart';
 import '../widgets/translated_text.dart';
 import 'export_for_ai_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
-/// Aligned with SECTION_CONTENT_MAX_CHARS in Cloud Functions (`organizeSection`).
-const int ideaSectionAiMaxCharacterLimit = 4200;
-const int ideaSectionAiWarningCharacterLimit = 4000;
 const String _untitledSectionName = 'Untitled';
 
 class IdeaEditorScreen extends StatefulWidget {
@@ -64,7 +56,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   late String _activeSectionId;
   late String _lastSavedSnapshot;
   late IdeasProvider _ideasProvider;
-  late IdeaOrganizationRepository _organizationRepo;
   late NoteLockAuthService _noteLockAuthService;
   late NoteLockBiometricService _noteLockBiometricService;
 
@@ -75,7 +66,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   bool _isPreviewMode = false;
   bool _isAutosaving = false;
   bool _hasSaveFailed = false;
-  bool _isOrganizing = false;
 
   @override
   void initState() {
@@ -84,7 +74,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
     final ideasProvider = context.read<IdeasProvider>();
     _ideasProvider = ideasProvider;
-    _organizationRepo = sl<IdeaOrganizationRepository>();
     _noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
         ? sl<NoteLockAuthService>()
         : NoteLockAuthService();
@@ -207,11 +196,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                           focusNode: _contentFocusNode,
                           isPreviewMode: _isPreviewMode,
                           onPreviewToggle: _togglePreviewMode,
-                          onOrganize: () =>
-                              unawaited(_onOrganizeToolbarPressed()),
-                          organizeEnabled: !_isOrganizing,
-                          exceedsAiCharacterLimit:
-                              _sectionExceedsAiWarningCharacterLimit,
                         ),
                       ),
                     ),
@@ -229,7 +213,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
               ),
             ),
           ),
-          if (_isOrganizing) _buildOrganizingOverlay(context),
           if (isEditorLocked) _buildLockedEditorOverlay(context, currentIdea),
         ],
       ),
@@ -483,13 +466,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
-  Widget _buildOrganizingOverlay(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: const AiLoadingOverlay(),
-    );
-  }
-
   Widget _buildAddSectionTab() {
     return Tooltip(
       message: ViewConstants.ideaEditorAddSectionTooltip.tr(),
@@ -622,60 +598,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   void _handleEditorContentChanged() {
     _updateActiveSectionContent(_contentController.text);
-  }
-
-  bool get _sectionExceedsAiWarningCharacterLimit =>
-      _contentPlainTextForEditing().length > ideaSectionAiWarningCharacterLimit;
-
-  bool get _sectionExceedsAiMaxCharacterLimit =>
-      _contentPlainTextForEditing().length > ideaSectionAiMaxCharacterLimit;
-
-  String _contentPlainTextForEditing() {
-    var plain = _contentController.text;
-    if (plain.endsWith('\n')) {
-      plain = plain.substring(0, plain.length - 1);
-    }
-    return plain;
-  }
-
-  Future<void> _onOrganizeToolbarPressed() async {
-    if (_contentPlainTextForEditing().trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
-        ),
-      );
-      return;
-    }
-
-    if (_sectionExceedsAiMaxCharacterLimit) {
-      await showOrganizeSectionSheet(
-        context,
-        warningCharacterLimit: ideaSectionAiWarningCharacterLimit,
-        maxCharacterLimit: ideaSectionAiMaxCharacterLimit,
-        exceedsWarningLimit: _sectionExceedsAiWarningCharacterLimit,
-        exceedsMaxLimit: true,
-      );
-      return;
-    }
-
-    final hasAccess = await _ensurePremiumAccess(PremiumFeature.aiOrganize);
-    if (!hasAccess || !mounted) {
-      return;
-    }
-
-    final proceed = await showOrganizeSectionSheet(
-      context,
-      warningCharacterLimit: ideaSectionAiWarningCharacterLimit,
-      maxCharacterLimit: ideaSectionAiMaxCharacterLimit,
-      exceedsWarningLimit: _sectionExceedsAiWarningCharacterLimit,
-      exceedsMaxLimit: _sectionExceedsAiMaxCharacterLimit,
-    );
-
-    if (proceed && mounted) {
-      await _handleOrganize();
-    }
   }
 
   void _replaceEditorContent(String content) {
@@ -977,14 +899,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
-  Future<bool> _ensurePremiumAccess(PremiumFeature feature) async {
-    try {
-      return context.read<PaywallViewModel>().ensureAccess(context, feature);
-    } on ProviderNotFoundException {
-      return true;
-    }
-  }
-
   Future<void> _confirmDeleteIdea() async {
     await _flushAutosave();
     if (!mounted) {
@@ -1164,50 +1078,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final currentIdea = _ideasProvider.findById(ideaId);
     if (currentIdea?.isLocked == true) {
       _noteLockAuthService.markIdeaLocked(ideaId);
-    }
-  }
-
-  Future<void> _handleOrganize() async {
-    final currentText = _contentPlainTextForEditing().trim();
-
-    if (currentText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              TranslatedText(ViewConstants.ideaEditorSnackbarNothingToOrganize),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isOrganizing = true;
-    });
-
-    try {
-      final organizedContent =
-          await _organizationRepo.organizeIdea(currentText);
-      _replaceEditorContent(organizedContent);
-      _updateActiveSectionContent(organizedContent);
-      _scheduleAutosave();
-
-      if (mounted) {
-        setState(() {
-          _isOrganizing = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isOrganizing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                TranslatedText(ViewConstants.ideaEditorSnackbarOrganizeFailed),
-          ),
-        );
-      }
     }
   }
 

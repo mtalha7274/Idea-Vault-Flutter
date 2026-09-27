@@ -3,9 +3,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class Config {
   static final bool debug = dotenv.env['DEBUG'] == 'true';
 
-  static const bool bypassPaywall = false;
-  static final int paidFeatureFreeUsageLimit = Config.debug ? 3 : 50;
-
   // Themes
   static const String light = 'light';
   static const String dark = 'dark';

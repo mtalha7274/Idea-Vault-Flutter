@@ -3,7 +3,6 @@ import 'dart:io';
 
 import '../../../models/backup/cloud_backup_account.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
-import '../../../models/backup/cloud_usage_metadata.dart';
 import '../../../models/idea.dart';
 import '../../../models/random_addition.dart';
 import 'cloud_backup_store.dart';
@@ -54,24 +53,5 @@ class CloudBackupService {
     }
     final decoded = jsonDecode(file.contents) as Map<String, dynamic>;
     return CloudBackupSnapshot.fromJson(decoded);
-  }
-
-  Future<int> backUpUsageMetadata(
-    CloudUsageMetadata metadata, {
-    bool silentAuth = false,
-  }) async {
-    final encoded = const JsonEncoder.withIndent('  ').convert(metadata);
-    return _store.writeUsageMetadata(encoded, silentAuth: silentAuth);
-  }
-
-  Future<CloudUsageMetadata?> restoreUsageMetadata({
-    bool silentAuth = false,
-  }) async {
-    final file = await _store.readUsageMetadata(silentAuth: silentAuth);
-    if (file == null) {
-      return null;
-    }
-    final decoded = jsonDecode(file.contents) as Map<String, dynamic>;
-    return CloudUsageMetadata.fromJson(decoded);
   }
 }

@@ -7,20 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
 
-import '../core/constants/view_constants.dart';
-import '../core/extensions/int.dart';
 import '../viewmodels/providers/theme_provider.dart';
-import 'translated_text.dart';
 import '../views/ideas/idea_vault_theme.dart';
 
 const double _editorBodyTextSize = 17;
 const double _previewH2Scale = 1.15;
 
-/// Width of the fade strip before the Organize control (toolbar surface → opaque).
+/// Width of the fade strip at the end of the scrollable toolbar row (surface → opaque).
 const double _toolbarScrollFadeWidth = 44;
-
-/// Slightly larger than format tools so AI organise reads as the primary toolbar action.
-const double _toolbarOrganizeIconSize = 24;
 
 class IdeaMarkdownEditor extends StatelessWidget {
   const IdeaMarkdownEditor({
@@ -107,9 +101,6 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
     required this.focusNode,
     required this.isPreviewMode,
     required this.onPreviewToggle,
-    required this.onOrganize,
-    this.organizeEnabled = true,
-    this.exceedsAiCharacterLimit = false,
     this.showPreviewToggle = false,
   });
 
@@ -117,9 +108,6 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
   final FocusNode focusNode;
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
-  final VoidCallback onOrganize;
-  final bool organizeEnabled;
-  final bool exceedsAiCharacterLimit;
   final bool showPreviewToggle;
 
   @override
@@ -136,9 +124,6 @@ class IdeaEditorToolbarContainer extends StatelessWidget {
           focusNode: focusNode,
           isPreviewMode: isPreviewMode,
           onPreviewToggle: onPreviewToggle,
-          onOrganize: onOrganize,
-          organizeEnabled: organizeEnabled,
-          exceedsAiCharacterLimit: exceedsAiCharacterLimit,
           showPreviewToggle: showPreviewToggle,
         ),
       ),
@@ -153,9 +138,6 @@ class IdeaEditorToolbar extends StatelessWidget {
     required this.focusNode,
     required this.isPreviewMode,
     required this.onPreviewToggle,
-    required this.onOrganize,
-    this.organizeEnabled = true,
-    this.exceedsAiCharacterLimit = false,
     this.showPreviewToggle = false,
   });
 
@@ -163,9 +145,6 @@ class IdeaEditorToolbar extends StatelessWidget {
   final FocusNode focusNode;
   final bool isPreviewMode;
   final VoidCallback onPreviewToggle;
-  final VoidCallback onOrganize;
-  final bool organizeEnabled;
-  final bool exceedsAiCharacterLimit;
   final bool showPreviewToggle;
 
   @override
@@ -252,12 +231,6 @@ class IdeaEditorToolbar extends StatelessWidget {
               );
             },
           ),
-        ),
-        const SizedBox(width: 6),
-        _ToolbarOrganizeButton(
-          onPressed: onOrganize,
-          enabled: organizeEnabled,
-          exceedsCharacterLimit: exceedsAiCharacterLimit,
         ),
         if (showPreviewToggle) ...[
           const SizedBox(width: 8),
@@ -482,86 +455,6 @@ class _ToolbarIconButton extends StatelessWidget {
             ),
             icon: Icon(icon, size: iconSize),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ToolbarOrganizeButton extends StatelessWidget {
-  const _ToolbarOrganizeButton({
-    required this.onPressed,
-    required this.enabled,
-    required this.exceedsCharacterLimit,
-  });
-
-  final VoidCallback onPressed;
-  final bool enabled;
-  final bool exceedsCharacterLimit;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    final overLimit = exceedsCharacterLimit;
-    final foregroundColor = !enabled
-        ? theme.textMuted.withValues(alpha: 0.55)
-        : overLimit
-            ? theme.warning
-            : theme.primary;
-    final backgroundColor = enabled && overLimit
-        ? theme.warning.withValues(alpha: 0.08)
-        : theme.surfaceLow;
-
-    return Tooltip(
-      message: exceedsCharacterLimit
-          ? 'Long text — review before organizing'
-          : 'Organise with AI',
-      child: IgnorePointer(
-        ignoring: !enabled,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            IconButton(
-              key: const Key('idea-editor-organize'),
-              onPressed: enabled ? onPressed : () {},
-              style: IconButton.styleFrom(
-                backgroundColor: backgroundColor,
-                foregroundColor: foregroundColor,
-              ),
-              icon: Icon(
-                overLimit
-                    ? Icons.warning_amber_rounded
-                    : Icons.auto_fix_high_rounded,
-                size: _toolbarOrganizeIconSize,
-              ),
-            ),
-            Positioned(
-              top: 3.d,
-              left: 3.d,
-              child: IgnorePointer(
-                child: Container(
-                  width: 16.d,
-                  height: 16.d,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.purple,
-                    shape: BoxShape.circle,
-                  ),
-                  child: TranslatedText(
-                    ViewConstants.organizeToolbarAiBadge,
-                    style: TextStyle(
-                      fontSize: 8.f,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      height: 1,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

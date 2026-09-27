@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
-import 'package:idea_vault/core/services/backup/cloud_usage_metadata_sync_service.dart';
 import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'package:idea_vault/data/repositories/local/app_install_state.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';

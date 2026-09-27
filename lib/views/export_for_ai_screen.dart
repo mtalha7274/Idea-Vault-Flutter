@@ -9,8 +9,6 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../models/idea.dart';
-import '../models/premium/premium_feature.dart';
-import '../viewmodels/providers/premium/paywall_view_model.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_action_button.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
@@ -169,11 +167,6 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
       return;
     }
 
-    final hasAccess = await _ensurePremiumAccess(PremiumFeature.exportForAi);
-    if (!hasAccess || !mounted) {
-      return;
-    }
-
     final buffer = StringBuffer()
       ..writeln(
         ViewConstants.exportForAiClipboardIdeaLine.tr(
@@ -204,11 +197,6 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
 
     if (selectedSections.isEmpty) {
       _showMessageKey(ViewConstants.exportToPdfSnackbarSelectSection);
-      return;
-    }
-
-    final hasAccess = await _ensurePremiumAccess(PremiumFeature.exportPdf);
-    if (!hasAccess || !mounted) {
       return;
     }
 
@@ -247,14 +235,6 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
         return;
       }
       _showMessageKey(ViewConstants.exportToPdfSnackbarFailed);
-    }
-  }
-
-  Future<bool> _ensurePremiumAccess(PremiumFeature feature) async {
-    try {
-      return context.read<PaywallViewModel>().ensureAccess(context, feature);
-    } on ProviderNotFoundException {
-      return true;
     }
   }
 

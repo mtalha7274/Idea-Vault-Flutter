@@ -6,7 +6,6 @@ import 'package:easy_localization_loader/easy_localization_loader.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:idea_vault/views/home.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 import 'config/config.dart';
 import 'config/languages/language_config.dart';
@@ -14,13 +13,11 @@ import 'core/services/app_install_bootstrap_service.dart';
 import 'core/services/backup/cloud_backup_background_task.dart';
 import 'core/constants/app_assets.dart';
 import 'core/utils/device_orientation.dart';
-import 'firebase_options.dart';
 import 'injection_container.dart';
 import 'viewmodels/providers/language_provider.dart';
 import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
-import 'viewmodels/providers/premium/paywall_view_model.dart';
 import 'viewmodels/providers/random_additions_provider.dart';
 import 'viewmodels/providers/theme_provider.dart';
 import 'core/utils/helpers.dart';
@@ -44,10 +41,6 @@ void main() async {
   }
 
   WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
   await initializeDependencies();
   await sl<AppInstallBootstrapService>().runFreshInstallTasks();
@@ -76,10 +69,6 @@ class MainApp extends StatelessWidget {
       ChangeNotifierProvider<IdeasProvider>(create: (_) => sl()),
       ChangeNotifierProvider<RandomAdditionsProvider>(create: (_) => sl()),
       ChangeNotifierProvider<CloudBackupProvider>(create: (_) => sl()),
-      ChangeNotifierProvider<PaywallViewModel>(
-        create: (_) => sl<PaywallViewModel>()..initialize(),
-        lazy: false,
-      ),
       ChangeNotifierProvider<ThemeProvider>(create: (_) => sl()),
       ChangeNotifierProvider<LanguageProvider>(create: (_) => sl()),
       ChangeNotifierProvider<InfoProvider>(create: (_) => sl(), lazy: false),
@@ -112,7 +101,6 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(context.read<PaywallViewModel>().refreshSubscription());
       unawaited(_runAutoBackupCatchUp(context));
     }
   }

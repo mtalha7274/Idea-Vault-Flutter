@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/backup/cloud_backup_scheduler.dart';
 import '../../../core/services/backup/cloud_backup_service.dart';
-import '../../../core/services/backup/cloud_usage_metadata_sync_service.dart';
 import '../../../core/services/backup/initial_cloud_auth_coordinator.dart';
 import '../../../data/repositories/local/cloud_backup_settings.dart';
 import '../../../models/backup/cloud_backup_snapshot.dart';
@@ -15,16 +14,13 @@ class CloudBackupProvider with ChangeNotifier {
     this._settingsRepo,
     this._backupService,
     this._scheduler,
-    this._initialCloudAuthCoordinator, {
-    CloudUsageMetadataSyncService? usageMetadataSync,
-  })  : _usageMetadataSync = usageMetadataSync,
-        _state = _settingsRepo.getState();
+    this._initialCloudAuthCoordinator,
+  ) : _state = _settingsRepo.getState();
 
   final CloudBackupSettingsRepo _settingsRepo;
   final CloudBackupService _backupService;
   final CloudBackupScheduler _scheduler;
   final InitialCloudAuthCoordinator _initialCloudAuthCoordinator;
-  final CloudUsageMetadataSyncService? _usageMetadataSync;
 
   CloudBackupState _state;
   CloudBackupState get state => _state;
@@ -42,8 +38,6 @@ class CloudBackupProvider with ChangeNotifier {
         email: account.email,
       );
       await _settingsRepo.saveState(_state);
-      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
-      await _usageMetadataSync?.syncToCloud(silentAuth: true);
       await _scheduler.scheduleDailyBackup();
     });
   }
@@ -51,17 +45,6 @@ class CloudBackupProvider with ChangeNotifier {
   Future<void> disableCloudBackup() async {
     await _runBusy(() async {
       await _backupService.disconnect();
-      await _scheduler.cancelDailyBackup();
-      _state = const CloudBackupState.initial();
-      await _settingsRepo.clear();
-    });
-  }
-
-  Future<void> disableCloudBackupForUsageLimit() async {
-    await _runBusy(() async {
-      try {
-        await _backupService.disconnect();
-      } catch (_) {}
       await _scheduler.cancelDailyBackup();
       _state = const CloudBackupState.initial();
       await _settingsRepo.clear();
@@ -76,8 +59,6 @@ class CloudBackupProvider with ChangeNotifier {
       }
       _state = _state.copyWith(email: account.email, enabled: true);
       await _settingsRepo.saveState(_state);
-      await _usageMetadataSync?.syncFromCloud(silentAuth: false);
-      await _usageMetadataSync?.syncToCloud(silentAuth: true);
     });
   }
 
@@ -95,18 +76,19 @@ class CloudBackupProvider with ChangeNotifier {
   Future<void> backUpNow(
     List<Idea> ideas, {
     List<RandomAddition> randomAdditions = const [],
+    bool silentAuth = false,
   }) async {
     await _runBusy(() async {
       final sizeBytes = await _backupService.backUpIdeas(
         ideas,
         randomAdditions: randomAdditions,
+        silentAuth: silentAuth,
       );
       _state = _state.copyWith(
         lastBackupAt: DateTime.now(),
         lastBackupSizeBytes: sizeBytes,
       );
       await _settingsRepo.saveState(_state);
-      await _usageMetadataSync?.syncToCloud();
     });
   }
 
@@ -129,21 +111,19 @@ class CloudBackupProvider with ChangeNotifier {
             CloudBackupScheduler.backupInterval) {
       return;
     }
-    await backUpNow(ideas, randomAdditions: randomAdditions);
+    // Auto backup runs on cold start and on resume, without the user asking for
+    // it, so it must never be allowed to put an account picker or a consent
+    // screen on screen. If authorization has lapsed the backup is simply
+    // skipped until the user triggers one from the backup screen.
+    await backUpNow(
+      ideas,
+      randomAdditions: randomAdditions,
+      silentAuth: true,
+    );
   }
 
   Future<CloudBackupSnapshot?> fetchRestoreSnapshot() async {
     return _backupService.restoreSnapshot();
-  }
-
-  Future<void> syncUsageMetadataFromCloud({
-    bool silentAuth = true,
-    bool overrideLocal = false,
-  }) async {
-    await _usageMetadataSync?.syncFromCloud(
-      silentAuth: silentAuth,
-      overrideLocal: overrideLocal,
-    );
   }
 
   Future<void> checkForFreshInstallBackup({required bool hasLocalIdeas}) async {
@@ -156,7 +136,6 @@ class CloudBackupProvider with ChangeNotifier {
     await _initialCloudAuthCoordinator.runOncePerInstall(() async {
       try {
         final exists = await _backupService.backupExists();
-        await _usageMetadataSync?.syncFromCloud(silentAuth: true);
         _state = _state.copyWith(
           freshInstallRestoreCheckCompleted: true,
           restorePromptAvailable: exists,

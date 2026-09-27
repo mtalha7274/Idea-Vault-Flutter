@@ -1,14 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
-import 'package:idea_vault/core/services/backup/cloud_usage_metadata_sync_service.dart';
 import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'package:idea_vault/data/repositories/local/app_install_state.dart';
 import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
-import 'package:idea_vault/data/repositories/local/paid_feature_usage.dart';
 import 'package:idea_vault/models/backup/cloud_backup_snapshot.dart';
 import 'package:idea_vault/models/backup/cloud_backup_state.dart';
-import 'package:idea_vault/models/backup/cloud_usage_metadata.dart';
 import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/models/random_addition.dart';
 import 'package:idea_vault/viewmodels/providers/backup/cloud_backup_provider.dart';
@@ -25,15 +22,12 @@ void main() {
     late _FakeCloudBackupScheduler scheduler;
     late CloudBackupProvider provider;
 
-    CloudBackupProvider buildProvider({
-      CloudUsageMetadataSyncService? usageMetadataSync,
-    }) {
+    CloudBackupProvider buildProvider() {
       return CloudBackupProvider(
         settingsRepo,
         backupService,
         scheduler,
         coordinator,
-        usageMetadataSync: usageMetadataSync,
       );
     }
 
@@ -108,6 +102,36 @@ void main() {
 
       expect(backupService.backUpCount, 1);
       expect(provider.state.lastBackupAt, isNotNull);
+    });
+
+    test('runAutoBackupIfDue backs up without prompting for auth', () async {
+      await settingsRepo.saveState(
+        const CloudBackupState.initial().copyWith(
+          enabled: true,
+          autoBackupEnabled: true,
+          email: 'user@example.com',
+        ),
+      );
+      provider = buildProvider();
+
+      await provider.runAutoBackupIfDue(sampleIdeas);
+
+      expect(backupService.lastBackUpSilentAuth, isTrue);
+    });
+
+    test('backUpNow allows prompting for auth', () async {
+      await settingsRepo.saveState(
+        const CloudBackupState.initial().copyWith(
+          enabled: true,
+          autoBackupEnabled: true,
+          email: 'user@example.com',
+        ),
+      );
+      provider = buildProvider();
+
+      await provider.backUpNow(sampleIdeas);
+
+      expect(backupService.lastBackUpSilentAuth, isFalse);
     });
 
     test('runAutoBackupIfDue skips when backup is recent', () async {
@@ -225,60 +249,6 @@ void main() {
       expect(backupService.backupExistsCount, 1);
     });
 
-    test('checkForFreshInstallBackup syncs usage metadata during initial auth',
-        () async {
-      backupService.restoreUsageMetadataResult = CloudUsageMetadata(
-        version: CloudUsageMetadata.currentVersion,
-        updatedAt: DateTime.utc(2026, 6, 25),
-        usageCount: 2,
-        freeUsageGrantLimit: 5,
-        introSeen: true,
-        halfLimitReviewRequested: false,
-      );
-      final usageRepo = PaidFeatureUsageRepo(storage);
-      provider = buildProvider(
-        usageMetadataSync: CloudUsageMetadataSyncService(
-          usageRepo,
-          backupService,
-        ),
-      );
-
-      await provider.checkForFreshInstallBackup(hasLocalIdeas: false);
-
-      expect(backupService.restoreUsageMetadataCount, 1);
-      expect(usageRepo.usageCount, 2);
-      expect(installStateRepo.hasInitialCloudAuthCheckCompleted, isTrue);
-    });
-
-    test('syncUsageMetadataFromCloud overrides local usage on restore', () async {
-      backupService.restoreUsageMetadataResult = CloudUsageMetadata(
-        version: CloudUsageMetadata.currentVersion,
-        updatedAt: DateTime.utc(2026, 6, 25),
-        usageCount: 1,
-        freeUsageGrantLimit: 12,
-        introSeen: false,
-        halfLimitReviewRequested: false,
-      );
-      final usageRepo = PaidFeatureUsageRepo(storage);
-      await usageRepo.incrementUsage();
-      await usageRepo.incrementUsage();
-      await usageRepo.incrementUsage();
-      await usageRepo.markFreeUsageIntroSeen();
-      provider = buildProvider(
-        usageMetadataSync: CloudUsageMetadataSyncService(
-          usageRepo,
-          backupService,
-        ),
-      );
-
-      await provider.syncUsageMetadataFromCloud(overrideLocal: true);
-
-      expect(backupService.restoreUsageMetadataCount, 1);
-      expect(usageRepo.usageCount, 1);
-      expect(usageRepo.freeUsageGrantLimit, 12);
-      expect(usageRepo.hasSeenFreeUsageIntro, isFalse);
-    });
-
     test('fetchRestoreSnapshot delegates to backup service', () async {
       final snapshot = CloudBackupSnapshot.fromIdeas(sampleIdeas);
       backupService.restoreSnapshotResult = snapshot;
@@ -293,13 +263,12 @@ void main() {
 
 class _FakeCloudBackupService extends CloudBackupService {
   int backUpCount = 0;
+  bool? lastBackUpSilentAuth;
   int backupExistsCount = 0;
   int restoreSnapshotCount = 0;
-  int restoreUsageMetadataCount = 0;
   bool backupExistsResult = false;
   bool shouldThrowOnBackupExists = false;
   CloudBackupSnapshot? restoreSnapshotResult;
-  CloudUsageMetadata? restoreUsageMetadataResult;
 
   @override
   Future<int> backUpIdeas(
@@ -308,6 +277,7 @@ class _FakeCloudBackupService extends CloudBackupService {
     bool silentAuth = false,
   }) async {
     backUpCount += 1;
+    lastBackUpSilentAuth = silentAuth;
     return 128;
   }
 
@@ -324,14 +294,6 @@ class _FakeCloudBackupService extends CloudBackupService {
   Future<CloudBackupSnapshot?> restoreSnapshot() async {
     restoreSnapshotCount += 1;
     return restoreSnapshotResult;
-  }
-
-  @override
-  Future<CloudUsageMetadata?> restoreUsageMetadata({
-    bool silentAuth = false,
-  }) async {
-    restoreUsageMetadataCount += 1;
-    return restoreUsageMetadataResult;
   }
 }
 

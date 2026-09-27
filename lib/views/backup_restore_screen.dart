@@ -533,10 +533,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       }
       await ideasProvider.replaceIdeas(snapshot.ideas);
       await randomAdditionsProvider.replaceAdditions(snapshot.randomAdditions);
-      await backupProvider.syncUsageMetadataFromCloud(
-        silentAuth: false,
-        overrideLocal: true,
-      );
       if (!mounted) {
         return;
       }

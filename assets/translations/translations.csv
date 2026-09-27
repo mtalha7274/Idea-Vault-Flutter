@@ -29,45 +29,8 @@ noEmailAppAvailable,No email app available
 errorOpeningCamera,Error opening camera
 cameraAccessDenied,Camera access denied
 requestTimeout,Request timeout
-organizeOverLimitDialogBody,The AI might not work properly over {limit} characters and may lose extra information.
-organizeMaxLimitDialogBody,AI Organize works with up to {limit} characters. Shorten this section and try again.
-organizeSectionSheetTitle,Organise section
-organizeSectionSheetDescription,The text in this section will be restructured and clarified with AI. Other sections stay as they are.
-organizeSectionSheetConfirmButton,Organise
-organizeToolbarAiBadge,AI
-brainstorm,Brainstorm
 ideaEditorTitleEdit,Edit Idea
 ideaEditorTitleNew,New Idea
-paywallTitle,Idea Vault Pro
-paywallSubtitle,Unlock the full power of Idea Vault.
-paywallProUnlocks,Pro unlocks
-paywallFeatureAiOrganize,Extended AI Organize
-paywallFeatureAiBrainstorm,Idea Export for any AI
-paywallFeatureCloudBackup,Cloud backup
-paywallFeatureExportPdf,Export to PDF
-paywallFeatureEarlyAccess,Early access to new features
-paywallFeaturePrioritySupport,Priority support
-paywallPlanYearly,Yearly
-paywallYearlyHeadlinePrice,{yearlyPrice}/yr
-paywallYearlyPriceLine,{monthlyPrice}/mo
-paywallYearlySubtitle,Billed annually
-paywallTrialLabel,{days}-day free trial
-paywallBadgeSave,Save {percent}%
-paywallBadgeMostPopular,Most popular
-paywallPlanMonthly,Monthly
-paywallMonthlyPriceLine,{monthlyPrice}/mo
-paywallMonthlySubtitle,Billed monthly
-paywallFooterYearly,"Try free for {trialDays} days, then {yearlyPrice}/yr"
-paywallFooterMonthly,Get Idea Vault Pro for {monthlyPrice}/mo
-paywallCtaStartTrial,Start Free Trial
-paywallCtaGetMonthly,Get Pro Monthly
-paywallCtaSubscribeYearly,Subscribe
-paywallFooterYearlyNoTrial,{yearlyPrice}/yr
-paywallCloseTooltip,Close
-paywallComingSoon,Coming soon
-paywallRestorePurchases,Restore Purchases
-paywallTermsOfService,Terms of Service
-paywallFooterDot,•
 exportForAiScreenTitle,Export for AI
 exportToPdfScreenTitle,Export to PDF
 exportForAiScreenSubtitle,"Select the sections you want, copy, and paste into ChatGPT, Claude, or any AI to brainstorm with full context."
@@ -141,18 +104,8 @@ homepageSortOldestFirst,Oldest First
 homepageSortMostSections,Most Sections
 homepageSwitchToGridTooltip,Switch to grid view
 homepageSwitchToListTooltip,Switch to list view
-homepageGetIdeaVaultPro,Get Idea Vault Pro
 homepageBackupOffIndicator,Backup is off
 homepageBackupOffAction,Turn on
-freeUsageDrawerTitle,Free Pro uses
-freeUsageScreenTitle,Your free Pro uses are ready
-freeUsageScreenBody,Try Idea Vault Pro features with free uses before you choose whether to upgrade.
-freeUsageScreenAction,Start creating
-freeUsageScreenDrawerTitle,Enjoy your free Pro usage
-freeUsageScreenDrawerBody,Keep trying Pro features with your remaining free usage before deciding whether to upgrade.
-freeUsageScreenDrawerAction,Continue
-freeUsageCurrentUsageTitle,Current Pro usage
-freeUsageProgressSemantic,{used} of {limit} free Pro uses used
 homepageEmptyTitle,Nothing saved yet
 homepageEmptySubtitle,"Start with one fast idea, then break it into requirements, design notes, or any custom section you need."
 homepageIdeaCardOneSection,1 section
@@ -187,10 +140,7 @@ ideaEditorTitleHint,Enter idea title...
 ideaEditorAddSectionTooltip,Add section
 ideaEditorPlaceholderDefaultSection,Start articulating your vision here.
 ideaEditorPlaceholderNamedSection,Capture {section} here.
-ideaEditorSnackbarNothingToOrganize,Nothing to organize
-ideaEditorSnackbarOrganizeFailed,Failed to organize. Please try again.
 ideaEditorSnackbarDuplicateSection,That section already exists.
-paywallPurchaseUnavailable,Purchase is unavailable. Please try again.
 backupRestoreCloudUpdateFailed,Cloud backup could not be updated. Please try again.
 backupRestoreLastBackupNever,Never
 backupRestoreNoBackupYet,No backup yet

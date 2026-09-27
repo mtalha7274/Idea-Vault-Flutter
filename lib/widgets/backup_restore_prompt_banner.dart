@@ -98,10 +98,6 @@ class _BackupRestorePromptBannerState extends State<BackupRestorePromptBanner> {
       }
       await ideasProvider.replaceIdeas(snapshot.ideas);
       await additionsProvider.replaceAdditions(snapshot.randomAdditions);
-      await backupProvider.syncUsageMetadataFromCloud(
-        silentAuth: false,
-        overrideLocal: true,
-      );
       await backupProvider.dismissRestorePrompt();
       if (!mounted) {
         return;

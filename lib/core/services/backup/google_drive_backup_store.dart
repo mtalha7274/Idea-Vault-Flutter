@@ -18,7 +18,6 @@ class GoogleDriveBackupStore implements CloudBackupStore {
   final String? _serverClientId;
 
   static const String backupFileName = 'idea_vault_backup.json';
-  static const String usageMetadataFileName = 'idea_vault_usage_metadata.json';
   static const List<String> scopes = [
     drive.DriveApi.driveAppdataScope,
   ];
@@ -88,29 +87,9 @@ class GoogleDriveBackupStore implements CloudBackupStore {
   }
 
   @override
-  Future<CloudBackupFile?> readUsageMetadata({bool silentAuth = false}) {
-    return _readFile(
-      usageMetadataFileName,
-      promptIfNecessary: !silentAuth,
-    );
-  }
-
-  @override
   Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
     return _writeFile(
       backupFileName,
-      contents,
-      promptIfNecessary: !silentAuth,
-    );
-  }
-
-  @override
-  Future<int> writeUsageMetadata(
-    String contents, {
-    bool silentAuth = false,
-  }) {
-    return _writeFile(
-      usageMetadataFileName,
       contents,
       promptIfNecessary: !silentAuth,
     );
@@ -177,14 +156,20 @@ class GoogleDriveBackupStore implements CloudBackupStore {
 
   Future<drive.DriveApi?> _driveApi({required bool promptIfNecessary}) async {
     await initialize();
-    final account =
-        _account ?? await _googleSignIn.attemptLightweightAuthentication();
-    if (account == null) {
-      return null;
-    }
-    _account = account;
 
-    final headers = await account.authorizationClient.authorizationHeaders(
+    // Drive access only needs an *authorization* token, which Play Services
+    // hands back from its cache without any UI. Re-authenticating here instead
+    // (attemptLightweightAuthentication) routes through Credential Manager,
+    // which pops the "Signing you in" bottom sheet on Android every time the
+    // app cold starts. Fall back to the account-less authorization client when
+    // no account has been resolved in this session, e.g. after a cold start or
+    // in the background isolate, where there is no activity to attach UI to.
+    final authorizationClient =
+        _account?.authorizationClient ?? _googleSignIn.authorizationClient;
+
+    // With promptIfNecessary false this never shows UI: it returns null when
+    // the scopes are not already authorized.
+    final headers = await authorizationClient.authorizationHeaders(
       scopes,
       promptIfNecessary: promptIfNecessary,
     );

@@ -3,10 +3,6 @@ class AppAssets {
   static const String _translations = "assets/translations";
   static const String translations = "$_translations/translations.csv";
 
-  // Animations
-  static const String _animations = "assets/animations";
-  static const String giftAnimation = "$_animations/giftAnimation.json";
-
   // Icons
   static const String _icons = "assets/icons";
   static const String more = "$_icons/more.svg";
@@ -22,6 +18,4 @@ class AppAssets {
   static const String galleryButton = "$_icons/galleryButton.svg";
   static const String captureButton = "$_icons/captureButton.svg";
   static const String backButton = "$_icons/backButton.svg";
-  static const String crown = "$_icons/crown.png";
-  static const String gift = "$_icons/gift.png";
 }

@@ -35,57 +35,8 @@ class ViewConstants {
   static const String more = "more";
   static const String requestTimeout = "requestTimeout";
 
-  /// `{limit}` = formatted warning character count (keep in sync with [ideaSectionAiWarningCharacterLimit]).
-  static const String organizeOverLimitDialogBody =
-      'organizeOverLimitDialogBody';
-
-  /// `{limit}` = formatted max character count (keep in sync with backend / [ideaSectionAiMaxCharacterLimit]).
-  static const String organizeMaxLimitDialogBody = 'organizeMaxLimitDialogBody';
-
-  static const String organizeSectionSheetTitle = 'organizeSectionSheetTitle';
-  static const String organizeSectionSheetDescription =
-      'organizeSectionSheetDescription';
-  static const String organizeSectionSheetConfirmButton =
-      'organizeSectionSheetConfirmButton';
-
-  static const String organizeToolbarAiBadge = 'organizeToolbarAiBadge';
-
-  static const String brainstorm = 'brainstorm';
-
   static const String ideaEditorTitleEdit = 'ideaEditorTitleEdit';
   static const String ideaEditorTitleNew = 'ideaEditorTitleNew';
-
-  static const String paywallTitle = 'paywallTitle';
-  static const String paywallSubtitle = 'paywallSubtitle';
-  static const String paywallProUnlocks = 'paywallProUnlocks';
-  static const String paywallFeatureAiOrganize = 'paywallFeatureAiOrganize';
-  static const String paywallFeatureAiBrainstorm = 'paywallFeatureAiBrainstorm';
-  static const String paywallFeatureCloudBackup = 'paywallFeatureCloudBackup';
-  static const String paywallFeatureExportPdf = 'paywallFeatureExportPdf';
-  static const String paywallFeatureEarlyAccess = 'paywallFeatureEarlyAccess';
-  static const String paywallFeaturePrioritySupport =
-      'paywallFeaturePrioritySupport';
-  static const String paywallPlanYearly = 'paywallPlanYearly';
-  static const String paywallYearlyHeadlinePrice = 'paywallYearlyHeadlinePrice';
-  static const String paywallYearlyPriceLine = 'paywallYearlyPriceLine';
-  static const String paywallYearlySubtitle = 'paywallYearlySubtitle';
-  static const String paywallTrialLabel = 'paywallTrialLabel';
-  static const String paywallBadgeSave = 'paywallBadgeSave';
-  static const String paywallBadgeMostPopular = 'paywallBadgeMostPopular';
-  static const String paywallPlanMonthly = 'paywallPlanMonthly';
-  static const String paywallMonthlyPriceLine = 'paywallMonthlyPriceLine';
-  static const String paywallMonthlySubtitle = 'paywallMonthlySubtitle';
-  static const String paywallFooterYearly = 'paywallFooterYearly';
-  static const String paywallFooterMonthly = 'paywallFooterMonthly';
-  static const String paywallCtaStartTrial = 'paywallCtaStartTrial';
-  static const String paywallCtaGetMonthly = 'paywallCtaGetMonthly';
-  static const String paywallCtaSubscribeYearly = 'paywallCtaSubscribeYearly';
-  static const String paywallFooterYearlyNoTrial = 'paywallFooterYearlyNoTrial';
-  static const String paywallCloseTooltip = 'paywallCloseTooltip';
-  static const String paywallComingSoon = 'paywallComingSoon';
-  static const String paywallRestorePurchases = 'paywallRestorePurchases';
-  static const String paywallTermsOfService = 'paywallTermsOfService';
-  static const String paywallFooterDot = 'paywallFooterDot';
 
   static const String exportForAiScreenTitle = 'exportForAiScreenTitle';
   static const String exportToPdfScreenTitle = 'exportToPdfScreenTitle';
@@ -189,19 +140,8 @@ class ViewConstants {
       'homepageSwitchToGridTooltip';
   static const String homepageSwitchToListTooltip =
       'homepageSwitchToListTooltip';
-  static const String homepageGetIdeaVaultPro = 'homepageGetIdeaVaultPro';
   static const String homepageBackupOffIndicator = 'homepageBackupOffIndicator';
   static const String homepageBackupOffAction = 'homepageBackupOffAction';
-  static const String freeUsageDrawerTitle = 'freeUsageDrawerTitle';
-  static const String freeUsageScreenTitle = 'freeUsageScreenTitle';
-  static const String freeUsageScreenBody = 'freeUsageScreenBody';
-  static const String freeUsageScreenAction = 'freeUsageScreenAction';
-  static const String freeUsageScreenDrawerTitle = 'freeUsageScreenDrawerTitle';
-  static const String freeUsageScreenDrawerBody = 'freeUsageScreenDrawerBody';
-  static const String freeUsageScreenDrawerAction =
-      'freeUsageScreenDrawerAction';
-  static const String freeUsageCurrentUsageTitle = 'freeUsageCurrentUsageTitle';
-  static const String freeUsageProgressSemantic = 'freeUsageProgressSemantic';
   static const String homepageEmptyTitle = 'homepageEmptyTitle';
   static const String homepageEmptySubtitle = 'homepageEmptySubtitle';
   static const String homepageIdeaCardOneSection = 'homepageIdeaCardOneSection';
@@ -254,14 +194,8 @@ class ViewConstants {
       'ideaEditorPlaceholderDefaultSection';
   static const String ideaEditorPlaceholderNamedSection =
       'ideaEditorPlaceholderNamedSection';
-  static const String ideaEditorSnackbarNothingToOrganize =
-      'ideaEditorSnackbarNothingToOrganize';
-  static const String ideaEditorSnackbarOrganizeFailed =
-      'ideaEditorSnackbarOrganizeFailed';
   static const String ideaEditorSnackbarDuplicateSection =
       'ideaEditorSnackbarDuplicateSection';
-
-  static const String paywallPurchaseUnavailable = 'paywallPurchaseUnavailable';
 
   static const String backupRestoreCloudUpdateFailed =
       'backupRestoreCloudUpdateFailed';

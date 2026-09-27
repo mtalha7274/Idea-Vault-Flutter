@@ -1,8 +1,6 @@
 import 'dart:io';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,22 +16,15 @@ import 'data/repositories/local/idea_editor_state.dart';
 import 'data/repositories/local/idea_list_preferences.dart';
 import 'data/repositories/local/app_install_state.dart';
 import 'data/repositories/local/ideas.dart';
-import 'data/repositories/local/paid_feature_usage.dart';
 import 'data/repositories/local/random_additions.dart';
 import 'data/repositories/local/cloud_backup_settings.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
 import 'core/services/backup/cloud_backup_service.dart';
-import 'core/services/backup/cloud_usage_metadata_sync_service.dart';
 import 'core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'core/services/note_lock_auth_service.dart';
 import 'core/services/note_lock_biometric_service.dart';
-import 'core/services/premium/bypass_paywall_subscription_service.dart';
-import 'core/services/premium/paywall_provider.dart';
-import 'core/services/premium/revenuecat_subscription_service.dart';
-import 'core/services/premium/subscription_service.dart';
-import 'data/repositories/remote/idea_organization_repository.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
@@ -41,7 +32,6 @@ import 'viewmodels/providers/ideas_provider.dart';
 import 'viewmodels/providers/random_additions_provider.dart';
 import 'viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'viewmodels/providers/info_provider.dart';
-import 'viewmodels/providers/premium/paywall_view_model.dart';
 import 'viewmodels/providers/theme_provider.dart';
 
 final sl = GetIt.instance;
@@ -72,14 +62,9 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<CloudBackupScheduler>(const CloudBackupScheduler());
   sl.registerSingleton<NoteLockAuthService>(NoteLockAuthService());
   sl.registerSingleton<NoteLockBiometricService>(NoteLockBiometricService());
-  sl.registerSingleton<SubscriptionService>(_buildSubscriptionService());
-  sl.registerSingleton<PaywallProvider>(_buildPaywallProvider());
 
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
-
-  // Firebase
-  sl.registerSingleton<FirebaseFunctions>(FirebaseFunctions.instance);
 
   // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
@@ -88,13 +73,6 @@ Future<void> initializeDependencies() async {
       AppInstallStateRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CloudBackupSettingsRepo>(
       CloudBackupSettingsRepo(sl<LocalStorageManager>()));
-  sl.registerSingleton<PaidFeatureUsageRepo>(
-      PaidFeatureUsageRepo(sl<LocalStorageManager>()));
-  sl.registerSingleton<CloudUsageMetadataSyncService>(
-      CloudUsageMetadataSyncService(
-    sl<PaidFeatureUsageRepo>(),
-    sl<CloudBackupService>(),
-  ));
   sl.registerSingleton<InitialCloudAuthCoordinator>(
       InitialCloudAuthCoordinator(sl<AppInstallStateRepo>()));
   sl.registerSingleton<IdeaListPreferencesRepo>(
@@ -106,8 +84,6 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
       CountryRepo(sl<ApiManager>(instanceName: AppConstants.countryUrl)));
-  sl.registerSingleton<IdeaOrganizationRepository>(
-      IdeaOrganizationRepository(sl<FirebaseFunctions>()));
 
   // Providers
   sl.registerFactory<IdeasProvider>(
@@ -119,16 +95,6 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
         sl<InitialCloudAuthCoordinator>(),
-        usageMetadataSync: sl<CloudUsageMetadataSyncService>(),
-      ));
-  sl.registerFactory<PaywallViewModel>(() => PaywallViewModel(
-        sl<SubscriptionService>(),
-        sl<PaywallProvider>(),
-        sl<PaidFeatureUsageRepo>(),
-        sl<CloudBackupSettingsRepo>(),
-        sl<CloudBackupService>(),
-        sl<CloudBackupScheduler>(),
-        usageMetadataSync: sl<CloudUsageMetadataSyncService>(),
       ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
@@ -148,41 +114,10 @@ Future<void> initializeDependencies() async {
       if (additions.isNotEmpty) {
         return true;
       }
-      final usageRepo = sl<PaidFeatureUsageRepo>();
-      if (usageRepo.usageCount != 0 || usageRepo.hasFreeUsageIntroMetadata) {
-        return true;
-      }
       final backupState = sl<CloudBackupSettingsRepo>().getState();
       return backupState.enabled ||
           backupState.email != null ||
           backupState.lastBackupAt != null;
     },
   ));
-}
-
-SubscriptionService _buildSubscriptionService() {
-  final provider = dotenv.env['SUBSCRIPTION_PROVIDER']?.trim().toLowerCase();
-  final SubscriptionService inner;
-  switch (provider) {
-    case 'revenuecat':
-    case null:
-    case '':
-      inner = RevenueCatSubscriptionService();
-      break;
-    default:
-      inner = RevenueCatSubscriptionService();
-  }
-  return BypassPaywallSubscriptionService(inner);
-}
-
-PaywallProvider _buildPaywallProvider() {
-  final provider = dotenv.env['PAYWALL_PROVIDER']?.trim().toLowerCase();
-  switch (provider) {
-    case 'local':
-    case null:
-    case '':
-      return LocalPaywallProvider(sl<SubscriptionService>());
-    default:
-      return LocalPaywallProvider(sl<SubscriptionService>());
-  }
 }

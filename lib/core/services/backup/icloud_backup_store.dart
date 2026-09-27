@@ -50,8 +50,6 @@ class ICloudBackupStore implements CloudBackupStore {
         _tempBackupFileOverride = tempBackupFile;
 
   static const String backupRelativePath = 'Backups/idea_vault_backup.json';
-  static const String usageMetadataRelativePath =
-      'Backups/idea_vault_usage_metadata.json';
   static const Duration downloadTimeout = Duration(seconds: 30);
 
   final String containerId;
@@ -94,31 +92,11 @@ class ICloudBackupStore implements CloudBackupStore {
   }
 
   @override
-  Future<CloudBackupFile?> readUsageMetadata({bool silentAuth = false}) {
-    return _readFile(
-      usageMetadataRelativePath,
-      tempFileName: 'idea_vault_usage_metadata.json',
-    );
-  }
-
-  @override
   Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
     return _writeFile(
       backupRelativePath,
       contents,
       tempFileName: 'idea_vault_backup.json',
-    );
-  }
-
-  @override
-  Future<int> writeUsageMetadata(
-    String contents, {
-    bool silentAuth = false,
-  }) {
-    return _writeFile(
-      usageMetadataRelativePath,
-      contents,
-      tempFileName: 'idea_vault_usage_metadata.json',
     );
   }
 
