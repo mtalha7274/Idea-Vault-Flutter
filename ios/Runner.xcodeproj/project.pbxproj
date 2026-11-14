@@ -201,6 +201,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				15C643C4A9ACFD285C46D8BE /* [CP] Embed Pods Frameworks */,
 				C7FAEE1363724027B89C29F5 /* [CP] Copy Pods Resources */,
+				A1D5E0F2C3B4A5968778695A /* Generate Native Asset dSYMs */,
 			);
 			buildRules = (
 			);
@@ -283,6 +284,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A1D5E0F2C3B4A5968778695A /* Generate Native Asset dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Native Asset dSYMs";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/scripts/native_asset_dsyms.sh\"\n";
+		};
 		15C643C4A9ACFD285C46D8BE /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
