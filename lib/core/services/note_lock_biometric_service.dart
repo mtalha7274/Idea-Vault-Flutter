@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
+import 'note_lock_session_guard.dart';
+
 enum BiometricAuthResult {
   success,
   canceled,
@@ -86,7 +88,11 @@ class NoteLockBiometricService {
       if (checkBiometrics != null) {
         return await checkBiometrics();
       }
-      return await _localAuthentication.canCheckBiometrics;
+      if (!await _localAuthentication.canCheckBiometrics) {
+        return false;
+      }
+      final available = await _localAuthentication.getAvailableBiometrics();
+      return available.isNotEmpty;
     } catch (_) {
       return false;
     }
@@ -108,14 +114,18 @@ class NoteLockBiometricService {
 
   Future<BiometricAuthResult> authenticate(String localizedReason) async {
     try {
-      final didAuthenticate = await _performAuthenticate(localizedReason);
+      final didAuthenticate = await NoteLockSessionGuard.runWithoutRelock(
+        () => _performAuthenticate(localizedReason),
+      );
       if (didAuthenticate) {
         return BiometricAuthResult.success;
       }
       return BiometricAuthResult.canceled;
     } on LocalAuthException catch (error) {
       if (error.code == LocalAuthExceptionCode.userCanceled ||
-          error.code == LocalAuthExceptionCode.systemCanceled) {
+          error.code == LocalAuthExceptionCode.systemCanceled ||
+          error.code == LocalAuthExceptionCode.userRequestedFallback ||
+          error.code == LocalAuthExceptionCode.timeout) {
         return BiometricAuthResult.canceled;
       }
       return BiometricAuthResult.failed;
@@ -144,13 +154,13 @@ class NoteLockBiometricService {
     if (authenticate != null) {
       return authenticate(
         localizedReason: localizedReason,
-        biometricOnly: false,
+        biometricOnly: true,
         persistAcrossBackgrounding: true,
       );
     }
     return _localAuthentication.authenticate(
       localizedReason: localizedReason,
-      biometricOnly: false,
+      biometricOnly: true,
       persistAcrossBackgrounding: true,
     );
   }

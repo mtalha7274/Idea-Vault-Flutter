@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/editor/note_markup.dart';
+import '../../core/services/vault/note_vault_service.dart';
 import '../../data/repositories/local/idea_editor_state.dart';
 import '../../data/repositories/local/ideas.dart';
 import '../../models/idea.dart';
@@ -8,14 +10,16 @@ import '../../models/idea_editor_state.dart';
 class IdeasProvider with ChangeNotifier {
   IdeasProvider(
     this._ideasRepo,
-    this._ideaEditorStateRepo,
-  ) {
+    this._ideaEditorStateRepo, {
+    NoteVaultService? vault,
+  }) : _vault = vault {
     _resumeEditorState = _ideaEditorStateRepo.getState();
     ensureLoaded();
   }
 
   final IdeasRepo _ideasRepo;
   final IdeaEditorStateRepo _ideaEditorStateRepo;
+  final NoteVaultService? _vault;
   List<Idea> _ideas = const [];
   IdeaEditorState? _resumeEditorState;
   Future<void>? _loadFuture;
@@ -24,9 +28,21 @@ class IdeasProvider with ChangeNotifier {
   List<Idea> get ideas => List.unmodifiable(_ideas);
   IdeaEditorState? get resumeEditorState => _resumeEditorState;
   bool get isLoading => _isLoading;
+  NoteVaultService? get vault => _vault;
+
+  Future<bool> encryptsLockedIdeas() async {
+    final vault = _vault;
+    return vault != null && await vault.isSetUp();
+  }
 
   Future<void> ensureLoaded() {
     return _loadFuture ??= _loadIdeas();
+  }
+
+  Future<void> reloadFromStorage() {
+    final future = _loadIdeas();
+    _loadFuture = future;
+    return future;
   }
 
   Idea? findById(String id) {
@@ -84,7 +100,7 @@ class IdeasProvider with ChangeNotifier {
     }
 
     final now = DateTime.now();
-    final savedIdea = Idea(
+    var savedIdea = Idea(
       id: existingIdea?.id ?? generateIdeaVaultId('idea'),
       title: normalizedTitle,
       createdAt: existingIdea?.createdAt ?? now,
@@ -94,6 +110,17 @@ class IdeasProvider with ChangeNotifier {
       isLocked: existingIdea?.isLocked ?? false,
       sections: normalizedSections,
     );
+
+    final vault = _vault;
+    if (savedIdea.isLocked && await encryptsLockedIdeas()) {
+      try {
+        savedIdea = await vault!.encryptIdea(savedIdea);
+      } finally {
+        vault!.releaseIfIdle();
+      }
+    } else if (existingIdea?.isEncrypted ?? false) {
+      return null;
+    }
 
     await _ideasRepo.upsertIdea(savedIdea);
 
@@ -123,7 +150,8 @@ class IdeasProvider with ChangeNotifier {
     }
 
     final idea = _ideas[existingIndex];
-    if (!idea.sections.any((section) => section.id == sectionId) ||
+    if ((!idea.isEncrypted &&
+            !idea.sections.any((section) => section.id == sectionId)) ||
         idea.lastOpenedSectionId == sectionId) {
       return;
     }
@@ -151,7 +179,30 @@ class IdeasProvider with ChangeNotifier {
     }
 
     final idea = _ideas[existingIndex];
-    if (idea.isLocked == isLocked) {
+    if (idea.isLocked == isLocked && !(isLocked && _needsEncryption(idea))) {
+      return;
+    }
+
+    final vault = _vault;
+    if (vault != null && (idea.isEncrypted || await vault.isSetUp())) {
+      final Idea stored;
+      try {
+        if (isLocked) {
+          stored = await vault.encryptIdea(idea.copyWith(isLocked: true));
+        } else {
+          final plain = await vault.decryptIdea(idea);
+          stored = await _withFreeSectionIds(
+            plain.copyWith(isLocked: false, titleHidden: false),
+          );
+        }
+      } finally {
+        vault.releaseIfIdle();
+      }
+      await _ideasRepo.upsertIdea(stored);
+      if (isLocked) {
+        await _ideasRepo.compact();
+      }
+      _replaceInMemory(stored);
       return;
     }
 
@@ -164,6 +215,73 @@ class IdeasProvider with ChangeNotifier {
     nextIdeas[existingIndex] = idea.copyWith(isLocked: isLocked);
     _ideas = nextIdeas;
     notifyListeners();
+  }
+
+  bool _needsEncryption(Idea idea) =>
+      idea.isLocked && !idea.isEncrypted && _vault != null;
+
+  void _replaceInMemory(Idea stored) {
+    final index = _ideas.indexWhere((idea) => idea.id == stored.id);
+    final nextIdeas = [..._ideas];
+    if (index == -1) {
+      nextIdeas.add(stored);
+    } else {
+      nextIdeas[index] = stored;
+    }
+    _ideas = _sortIdeas(nextIdeas);
+    notifyListeners();
+  }
+
+  Future<Idea> _withFreeSectionIds(Idea idea) async {
+    final taken = await _ideasRepo.sectionIdsNotOwnedBy(idea.id);
+    if (!idea.sections.any((section) => taken.contains(section.id))) {
+      return idea;
+    }
+    final remapped = <String, String>{};
+    final sections = [
+      for (final section in idea.sections)
+        if (taken.contains(section.id))
+          section.copyWith(
+            id: remapped[section.id] = generateIdeaVaultId('section'),
+          )
+        else
+          section,
+    ];
+    final lastOpened = idea.lastOpenedSectionId;
+    return idea.copyWith(
+      sections: sections,
+      lastOpenedSectionId:
+          lastOpened == null ? null : remapped[lastOpened] ?? lastOpened,
+    );
+  }
+
+  Future<Idea?> openLockedIdea(String ideaId) async {
+    await ensureLoaded();
+    final idea = findById(ideaId);
+    if (idea == null || !idea.isEncrypted) {
+      return idea;
+    }
+    final vault = _vault;
+    if (vault == null) {
+      return null;
+    }
+    try {
+      return await vault.decryptIdea(idea);
+    } finally {
+      vault.releaseIfIdle();
+    }
+  }
+
+  Future<int> encryptPendingLockedIdeas() async {
+    final vault = _vault;
+    if (vault == null || !await vault.isSetUp()) {
+      return 0;
+    }
+    final count = await vault.encryptPlaintextLockedIdeas();
+    if (count > 0) {
+      await reloadFromStorage();
+    }
+    return count;
   }
 
   Future<void> deleteIdeas(Iterable<String> ideaIds) async {
@@ -204,7 +322,7 @@ class IdeasProvider with ChangeNotifier {
       return null;
     }
 
-    final idea = findById(ideaId);
+    final idea = await openLockedIdea(ideaId);
     if (idea == null) {
       return null;
     }
@@ -216,7 +334,7 @@ class IdeasProvider with ChangeNotifier {
           section.copyWith(
             content: _appendSectionContent(
               section.content,
-              trimmedContent,
+              NoteMarkup.escapeLiteral(trimmedContent),
             ),
           )
         else

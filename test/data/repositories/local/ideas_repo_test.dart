@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idea_vault/data/managers/local/ideas_database.dart';
 import 'package:idea_vault/data/repositories/local/ideas.dart';
+import 'package:idea_vault/data/repositories/local/local_vault.dart';
+import 'package:idea_vault/models/backup/cloud_backup_restore.dart';
+import 'package:idea_vault/models/random_addition.dart';
 import 'package:idea_vault/models/idea.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -171,6 +174,96 @@ void main() {
       if (await tempDirectory.exists()) {
         await tempDirectory.delete(recursive: true);
       }
+    });
+  });
+
+  group('LocalVaultRepo', () {
+    late IdeasDatabaseManager databaseManager;
+    late LocalVaultRepo vault;
+
+    Idea vaultIdea(String id, {String? sectionId}) {
+      return Idea(
+        id: id,
+        title: 'Idea $id',
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+        sections: [
+          IdeaSection(
+            id: sectionId ?? 'section-$id',
+            name: 'Idea',
+            content: 'content $id',
+          ),
+        ],
+      );
+    }
+
+    RandomAddition vaultNote(String id) {
+      return RandomAddition(
+        id: id,
+        content: 'note $id',
+        createdAt: DateTime.utc(2026, 1, 2),
+      );
+    }
+
+    setUp(() async {
+      databaseManager = await createTestIdeasDatabaseManager();
+      vault = LocalVaultRepo(databaseManager);
+      await vault.replaceAll(
+        LocalVaultContent(
+          ideas: [vaultIdea('old-1'), vaultIdea('old-2')],
+          randomAdditions: [vaultNote('old-note')],
+        ),
+      );
+    });
+
+    tearDown(() async {
+      await disposeTestIdeasDatabaseManager(databaseManager);
+    });
+
+    test('replaces ideas, sections and notes together', () async {
+      await vault.replaceAll(
+        LocalVaultContent(
+          ideas: [vaultIdea('new-1')],
+          randomAdditions: [vaultNote('new-note')],
+        ),
+      );
+
+      final content = await vault.read();
+      expect(content.ideas.single.id, 'new-1');
+      expect(content.ideas.single.sections.single.content, 'content new-1');
+      expect(content.randomAdditions.single.id, 'new-note');
+    });
+
+    test('a failed replace rolls back and leaves the old data intact',
+        () async {
+      await expectLater(
+        vault.replaceAll(
+          LocalVaultContent(
+            ideas: [
+              vaultIdea('new-1', sectionId: 'duplicate'),
+              vaultIdea('new-2', sectionId: 'duplicate'),
+            ],
+            randomAdditions: [vaultNote('new-note')],
+          ),
+        ),
+        throwsA(anything),
+      );
+
+      final content = await vault.read();
+      expect(content.ideas.map((idea) => idea.id),
+          unorderedEquals(['old-1', 'old-2']));
+      expect(content.randomAdditions.single.id, 'old-note');
+    });
+
+    test('writes merged ideas and notes without touching others', () async {
+      await vault.writeMerged(
+        ideas: [vaultIdea('merged')],
+        randomAdditions: [vaultNote('merged-note')],
+      );
+
+      final content = await vault.read();
+      expect(content.ideas, hasLength(3));
+      expect(content.randomAdditions, hasLength(2));
     });
   });
 }

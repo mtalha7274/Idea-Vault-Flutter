@@ -223,4 +223,237 @@ class ViewConstants {
   static const String backupRestoreFormatBytesB = 'backupRestoreFormatBytesB';
   static const String backupRestoreFormatBytesKb = 'backupRestoreFormatBytesKb';
   static const String backupRestoreFormatBytesMb = 'backupRestoreFormatBytesMb';
+  static const String searchResultInSection = 'searchResultInSection';
+  static const String searchIdeasEmptyPromptAll = 'searchIdeasEmptyPromptAll';
+  static const String editorDraftDiscard = 'editorDraftDiscard';
+  static const String noteLockTooManyAttempts = 'noteLockTooManyAttempts';
+  static const String noteLockWrongPinAttemptsLeft =
+      'noteLockWrongPinAttemptsLeft';
+  static const String noteLockUseBiometricAndroid =
+      'noteLockUseBiometricAndroid';
+  static const String noteLockEnableBiometricUnlockActionAndroid =
+      'noteLockEnableBiometricUnlockActionAndroid';
+  static const String noteLockEnableBiometricNeedsPin =
+      'noteLockEnableBiometricNeedsPin';
+  static const String noteLockSettingsBiometric = 'noteLockSettingsBiometric';
+  static const String noteLockBiometricEnabledSnackbar =
+      'noteLockBiometricEnabledSnackbar';
+  static const String noteLockBiometricDisabledSnackbar =
+      'noteLockBiometricDisabledSnackbar';
+  static const String noteLockPickerLockedSubtitle =
+      'noteLockPickerLockedSubtitle';
+  static const String backupFoundTitle = 'backupFoundTitle';
+  static const String backupFoundSummary = 'backupFoundSummary';
+  static const String backupFoundBodyEmptyDevice = 'backupFoundBodyEmptyDevice';
+  static const String backupFoundBodyOtherDevice = 'backupFoundBodyOtherDevice';
+  static const String backupFoundUnreadable = 'backupFoundUnreadable';
+  static const String backupChoiceRestore = 'backupChoiceRestore';
+  static const String backupChoiceStartFresh = 'backupChoiceStartFresh';
+  static const String backupChoiceMerge = 'backupChoiceMerge';
+  static const String backupChoiceMergeHint = 'backupChoiceMergeHint';
+  static const String backupChoiceReplaceDevice = 'backupChoiceReplaceDevice';
+  static const String backupChoiceReplaceHint = 'backupChoiceReplaceHint';
+  static const String backupChoiceKeepDevice = 'backupChoiceKeepDevice';
+  static const String backupChoiceKeepHint = 'backupChoiceKeepHint';
+  static const String backupChoiceReplace = 'backupChoiceReplace';
+  static const String backupUnknownDevice = 'backupUnknownDevice';
+  static const String backupThisDevice = 'backupThisDevice';
+  static const String backupLegacyLabel = 'backupLegacyLabel';
+  static const String backupRestoreConfirmTitle = 'backupRestoreConfirmTitle';
+  static const String backupRestoreConfirmBodyHasData =
+      'backupRestoreConfirmBodyHasData';
+  static const String backupRestoreConfirmBodyEmpty =
+      'backupRestoreConfirmBodyEmpty';
+  static const String backupMergeResult = 'backupMergeResult';
+  static const String backupMergeCopyFromBackup = 'backupMergeCopyFromBackup';
+  static const String backupMergeCopyFromDevice = 'backupMergeCopyFromDevice';
+  static const String backupUndoRestore = 'backupUndoRestore';
+  static const String backupUndoRestoreHint = 'backupUndoRestoreHint';
+  static const String backupUndoRestoreConfirmTitle =
+      'backupUndoRestoreConfirmTitle';
+  static const String backupUndoRestoreConfirmBody =
+      'backupUndoRestoreConfirmBody';
+  static const String backupUndoRestoreDone = 'backupUndoRestoreDone';
+  static const String backupPickerTitle = 'backupPickerTitle';
+  static const String backupPickerCounts = 'backupPickerCounts';
+  static const String backupPickerUnknownCounts = 'backupPickerUnknownCounts';
+  static const String backupPickerContinue = 'backupPickerContinue';
+  static const String backupErrorOffline = 'backupErrorOffline';
+  static const String backupErrorTimeout = 'backupErrorTimeout';
+  static const String backupErrorSignInRequired = 'backupErrorSignInRequired';
+  static const String backupErrorSignInCancelled = 'backupErrorSignInCancelled';
+  static const String backupErrorICloudUnavailable =
+      'backupErrorICloudUnavailable';
+  static const String backupErrorEmptyBackup = 'backupErrorEmptyBackup';
+  static const String backupErrorInvalidBackup = 'backupErrorInvalidBackup';
+  static const String backupErrorNewerVersion = 'backupErrorNewerVersion';
+  static const String backupErrorIntegrity = 'backupErrorIntegrity';
+  static const String backupErrorUnknown = 'backupErrorUnknown';
+  static const String backupStatusHealthy = 'backupStatusHealthy';
+  static const String backupStatusStale = 'backupStatusStale';
+  static const String backupStatusNever = 'backupStatusNever';
+  static const String backupStatusPending = 'backupStatusPending';
+  static const String backupStatusNeedsSetup = 'backupStatusNeedsSetup';
+  static const String backupStatusFinishSetup = 'backupStatusFinishSetup';
+  static const String backupActionSignInAgain = 'backupActionSignInAgain';
+  static const String backupActionTryAgain = 'backupActionTryAgain';
+  static const String backupAlsoBackedUpFrom = 'backupAlsoBackedUpFrom';
+  static const String backupIcloudAccountTitle = 'backupIcloudAccountTitle';
+  static const String backupIcloudAccountValue = 'backupIcloudAccountValue';
+  static const String backupUpToDate = 'backupUpToDate';
+  static const String backupUploadPending = 'backupUploadPending';
+  static const String backupEmptyConfirmTitle = 'backupEmptyConfirmTitle';
+  static const String backupEmptyConfirmBody = 'backupEmptyConfirmBody';
+  static const String backupEmptyConfirmButton = 'backupEmptyConfirmButton';
+  static const String backupBusyMessage = 'backupBusyMessage';
+  static const String backupTurnOffTitle = 'backupTurnOffTitle';
+  static const String backupTurnOffBody = 'backupTurnOffBody';
+  static const String backupTurnOffButton = 'backupTurnOffButton';
+  static const String backupDeleteCloud = 'backupDeleteCloud';
+  static const String backupDeleteCloudTitle = 'backupDeleteCloudTitle';
+  static const String backupDeleteCloudBody = 'backupDeleteCloudBody';
+  static const String backupDeleteCloudConfirmTitle =
+      'backupDeleteCloudConfirmTitle';
+  static const String backupDeleteCloudConfirmBody =
+      'backupDeleteCloudConfirmBody';
+  static const String backupDeleteCloudButton = 'backupDeleteCloudButton';
+  static const String backupDeleteCloudDone = 'backupDeleteCloudDone';
+  static const String backupNeedsAttention = 'backupNeedsAttention';
+  static const String backupNeedsAttentionAction = 'backupNeedsAttentionAction';
+  static const String backupHavePrompt = 'backupHavePrompt';
+  static const String backupDismiss = 'backupDismiss';
+  static const String homepageEmptyCreateFirstIdea =
+      'homepageEmptyCreateFirstIdea';
+  static const String homeQuickNoteCountOverflow = 'homeQuickNoteCountOverflow';
+  static const String selectionCount = 'selectionCount';
+  static const String selectionClearTooltip = 'selectionClearTooltip';
+  static const String selectionSelectAllTooltip = 'selectionSelectAllTooltip';
+  static const String selectionDeleteTooltip = 'selectionDeleteTooltip';
+  static const String selectionCopyTooltip = 'selectionCopyTooltip';
+  static const String selectionCopiedOne = 'selectionCopiedOne';
+  static const String selectionCopiedMany = 'selectionCopiedMany';
+  static const String selectionFiledManySnackbar = 'selectionFiledManySnackbar';
+  static const String selectionFilePartialFailure =
+      'selectionFilePartialFailure';
+  static const String selectionDeleteConfirm = 'selectionDeleteConfirm';
+  static const String selectionDeleteIdeaTitleOne =
+      'selectionDeleteIdeaTitleOne';
+  static const String selectionDeleteIdeasTitleMany =
+      'selectionDeleteIdeasTitleMany';
+  static const String selectionDeleteIdeaBodyOne = 'selectionDeleteIdeaBodyOne';
+  static const String selectionDeleteIdeasBodyMany =
+      'selectionDeleteIdeasBodyMany';
+  static const String selectionDeleteNoteTitleOne =
+      'selectionDeleteNoteTitleOne';
+  static const String selectionDeleteNotesTitleMany =
+      'selectionDeleteNotesTitleMany';
+  static const String selectionDeleteNoteBodyOne = 'selectionDeleteNoteBodyOne';
+  static const String selectionDeleteNotesBodyMany =
+      'selectionDeleteNotesBodyMany';
+  static const String editorToolbarHeading = 'editorToolbarHeading';
+  static const String editorToolbarBold = 'editorToolbarBold';
+  static const String editorToolbarItalic = 'editorToolbarItalic';
+  static const String editorToolbarBulletList = 'editorToolbarBulletList';
+  static const String editorToolbarNumberedList = 'editorToolbarNumberedList';
+  static const String editorToolbarChecklist = 'editorToolbarChecklist';
+  static const String editorToolbarCodeBlock = 'editorToolbarCodeBlock';
+  static const String editorToolbarInlineCode = 'editorToolbarInlineCode';
+  static const String editorToolbarLink = 'editorToolbarLink';
+  static const String editorToolbarUndo = 'editorToolbarUndo';
+  static const String editorToolbarRedo = 'editorToolbarRedo';
+  static const String editorPlainTextMarker = 'editorPlainTextMarker';
+  static const String editorLinkDialogTitle = 'editorLinkDialogTitle';
+  static const String editorLinkDialogUrlHint = 'editorLinkDialogUrlHint';
+  static const String editorLinkDialogTextHint = 'editorLinkDialogTextHint';
+  static const String editorLinkDialogSave = 'editorLinkDialogSave';
+  static const String editorLinkDialogRemove = 'editorLinkDialogRemove';
+  static const String editorLinkDialogOpen = 'editorLinkDialogOpen';
+  static const String editorLinkDialogCancel = 'editorLinkDialogCancel';
+  static const String editorLinkOpenFailed = 'editorLinkOpenFailed';
+  static const String editorLinkSheetAddTitle = 'editorLinkSheetAddTitle';
+  static const String editorLinkSheetEditTitle = 'editorLinkSheetEditTitle';
+  static const String editorLinkPreviewOpen = 'editorLinkPreviewOpen';
+  static const String editorLinkPreviewCopy = 'editorLinkPreviewCopy';
+  static const String editorLinkCopied = 'editorLinkCopied';
+  static const String editorToolbarMore = 'editorToolbarMore';
+  static const String editorToolbarBack = 'editorToolbarBack';
+  static const String editorSectionSheetEditTitle =
+      'editorSectionSheetEditTitle';
+  static const String editorSectionSheetAddTitle = 'editorSectionSheetAddTitle';
+  static const String editorSectionSheetEditBody = 'editorSectionSheetEditBody';
+  static const String editorSectionSheetAddBody = 'editorSectionSheetAddBody';
+  static const String editorSectionSheetNameHint = 'editorSectionSheetNameHint';
+  static const String editorSectionSheetCancel = 'editorSectionSheetCancel';
+  static const String editorSectionSheetDelete = 'editorSectionSheetDelete';
+  static const String editorSectionSheetSave = 'editorSectionSheetSave';
+  static const String editorSectionSheetAdd = 'editorSectionSheetAdd';
+  static const String editorClassicEditorOn = 'editorClassicEditorOn';
+  static const String editorClassicEditorOff = 'editorClassicEditorOff';
+  static const String vaultCreatePassphraseBody = 'vaultCreatePassphraseBody';
+  static const String vaultNewPassphraseBody = 'vaultNewPassphraseBody';
+  static const String vaultPassphraseTooShort = 'vaultPassphraseTooShort';
+  static const String vaultPinWrongLength = 'vaultPinWrongLength';
+  static const String vaultSetupFailed = 'vaultSetupFailed';
+  static const String vaultUseSixDigitPin = 'vaultUseSixDigitPin';
+  static const String vaultUsePassphrase = 'vaultUsePassphrase';
+  static const String vaultForgotPin = 'vaultForgotPin';
+  static const String vaultPassphraseHint = 'vaultPassphraseHint';
+  static const String vaultContinue = 'vaultContinue';
+  static const String vaultUnwrapTitle = 'vaultUnwrapTitle';
+  static const String vaultUnwrapBody = 'vaultUnwrapBody';
+  static const String vaultMigrationBody = 'vaultMigrationBody';
+  static const String vaultUseRecoveryCode = 'vaultUseRecoveryCode';
+  static const String vaultRecoveryCodeTitle = 'vaultRecoveryCodeTitle';
+  static const String vaultRecoveryCodeBody = 'vaultRecoveryCodeBody';
+  static const String vaultRecoveryCodeCopy = 'vaultRecoveryCodeCopy';
+  static const String vaultRecoveryCodeCopied = 'vaultRecoveryCodeCopied';
+  static const String vaultRecoveryCodeSaved = 'vaultRecoveryCodeSaved';
+  static const String vaultRecoveryEntryTitle = 'vaultRecoveryEntryTitle';
+  static const String vaultRecoveryEntryBody = 'vaultRecoveryEntryBody';
+  static const String vaultRecoveryEntryHint = 'vaultRecoveryEntryHint';
+  static const String vaultRecoveryCodeWrong = 'vaultRecoveryCodeWrong';
+  static const String vaultForgotTitle = 'vaultForgotTitle';
+  static const String vaultForgotBody = 'vaultForgotBody';
+  static const String vaultForgotUseBiometric = 'vaultForgotUseBiometric';
+  static const String vaultForgotReset = 'vaultForgotReset';
+  static const String vaultResetConfirmTitle = 'vaultResetConfirmTitle';
+  static const String vaultResetConfirmBody = 'vaultResetConfirmBody';
+  static const String vaultResetConfirmAction = 'vaultResetConfirmAction';
+  static const String vaultResetFinalTitle = 'vaultResetFinalTitle';
+  static const String vaultResetFinalBody = 'vaultResetFinalBody';
+  static const String vaultResetFinalAction = 'vaultResetFinalAction';
+  static const String vaultResetDone = 'vaultResetDone';
+  static const String vaultNewPinTitle = 'vaultNewPinTitle';
+  static const String vaultUpgradeTitle = 'vaultUpgradeTitle';
+  static const String vaultUpgradeBody = 'vaultUpgradeBody';
+  static const String vaultUpgradeAction = 'vaultUpgradeAction';
+  static const String vaultUpgradeSkip = 'vaultUpgradeSkip';
+  static const String vaultMigrationDone = 'vaultMigrationDone';
+  static const String vaultOpenFailed = 'vaultOpenFailed';
+  static const String vaultLoadingNote = 'vaultLoadingNote';
+  static const String vaultLockedNoteTitle = 'vaultLockedNoteTitle';
+  static const String vaultBackupUnwrapTitle = 'vaultBackupUnwrapTitle';
+  static const String vaultBackupUnwrapBody = 'vaultBackupUnwrapBody';
+  static const String vaultBackupUnwrapSkip = 'vaultBackupUnwrapSkip';
+  static const String vaultRestoreNotImported = 'vaultRestoreNotImported';
+  static const String vaultRestoreNeedsPin = 'vaultRestoreNeedsPin';
+  static const String vaultCleanupPendingTitle = 'vaultCleanupPendingTitle';
+  static const String vaultCleanupPendingBody = 'vaultCleanupPendingBody';
+  static const String vaultCleanupRetry = 'vaultCleanupRetry';
+  static const String vaultCleanupDone = 'vaultCleanupDone';
+  static const String vaultCleanupFailed = 'vaultCleanupFailed';
+  static const String vaultSettingsHideTitles = 'vaultSettingsHideTitles';
+  static const String vaultSettingsHideTitlesBody =
+      'vaultSettingsHideTitlesBody';
+  static const String vaultSettingsRecoveryCode = 'vaultSettingsRecoveryCode';
+  static const String vaultRecoveryRegenerateTitle =
+      'vaultRecoveryRegenerateTitle';
+  static const String vaultRecoveryRegenerateBody =
+      'vaultRecoveryRegenerateBody';
+  static const String vaultRecoveryRegenerateAction =
+      'vaultRecoveryRegenerateAction';
+  static const String vaultCancel = 'vaultCancel';
+  static const String vaultNeedsUnlockFirst = 'vaultNeedsUnlockFirst';
+  static const String vaultLockedNoteHiddenHint = 'vaultLockedNoteHiddenHint';
+  static const String vaultVerifyPinBody = 'vaultVerifyPinBody';
 }

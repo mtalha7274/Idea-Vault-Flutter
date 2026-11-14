@@ -4,12 +4,15 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/utils/idea_display.dart';
 import '../../core/constants/view_constants.dart';
 import '../../core/utils/idea_search.dart';
 import '../../data/repositories/local/idea_list_preferences.dart';
 import '../../models/idea.dart';
 import '../../viewmodels/providers/theme_provider.dart';
 import '../../views/ideas/idea_vault_theme.dart';
+import '../selection/selection_check_badge.dart';
+import '../selection/selection_style.dart';
 
 enum IdeaCardLayout {
   list,
@@ -24,6 +27,8 @@ class IdeasLayout extends StatelessWidget {
     required this.onTap,
     this.selectedIdeaIds = const {},
     this.onLongPress,
+    this.searchResults = const {},
+    this.isSelectionActive = false,
   });
 
   static const Duration _animationDuration = Duration(milliseconds: 260);
@@ -33,6 +38,8 @@ class IdeasLayout extends StatelessWidget {
   final Set<String> selectedIdeaIds;
   final ValueChanged<Idea> onTap;
   final ValueChanged<Idea>? onLongPress;
+  final Map<String, IdeaSearchResult> searchResults;
+  final bool isSelectionActive;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +73,9 @@ class IdeasLayout extends StatelessWidget {
                       idea: ideas[index],
                       layout: metrics.cardLayout,
                       isSelected: selectedIdeaIds.contains(ideas[index].id),
+                      isSelectionActive:
+                          isSelectionActive || selectedIdeaIds.isNotEmpty,
+                      searchResult: searchResults[ideas[index].id],
                       onTap: () => onTap(ideas[index]),
                       onLongPress: onLongPress == null
                           ? null
@@ -154,58 +164,105 @@ class IdeaCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.onLongPress,
+    this.searchResult,
+    this.isSelectionActive = false,
   });
+
+  static const double selectedBorderWidth = 2;
 
   final Idea idea;
   final IdeaCardLayout layout;
   final bool isSelected;
+  final bool isSelectionActive;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final IdeaSearchResult? searchResult;
+
+  IdeaSearchSnippet? get _searchSnippet =>
+      idea.isLocked ? null : searchResult?.snippet;
 
   bool get _isGrid => layout == IdeaCardLayout.grid;
+
+  bool get _showsBadge => isSelectionActive || isSelected;
+
+  double get _badgeSize => _isGrid ? 24 : 26;
+
+  double get _badgeInset => _isGrid ? 10 : 14;
+
+  double get _badgeReserve => _showsBadge ? _badgeSize - 2 : 0;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final radius = BorderRadius.circular(_isGrid ? 22 : 28);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: Key('idea-card-${idea.id}'),
-        borderRadius: radius,
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: isSelected ? theme.accentTint : theme.surface,
-            borderRadius: radius,
-            border: Border.all(
-              color: isSelected
-                  ? theme.primary.withValues(alpha: 0.32)
-                  : Colors.transparent,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: child,
-              ),
-              child: idea.isLocked
-                  ? _buildLockedCard(context)
-                  : Padding(
-                      key: ValueKey('unlocked-${idea.id}'),
-                      padding: EdgeInsets.all(_isGrid ? 14 : 22),
-                      child: _isGrid
-                          ? _buildGridContent(context)
-                          : _buildListContent(context),
+    return Semantics(
+      selected: _showsBadge ? isSelected : null,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('idea-card-${idea.id}'),
+              borderRadius: radius,
+              onTap: onTap,
+              onLongPress: onLongPress,
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? selectionCardFillColor(theme)
+                      : theme.surface,
+                  borderRadius: radius,
+                  border: Border.all(
+                    width: selectedBorderWidth,
+                    color: isSelected ? theme.primary : Colors.transparent,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: radius,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: child,
                     ),
+                    child: idea.isLocked
+                        ? _buildLockedCard(context)
+                        : Padding(
+                            key: ValueKey('unlocked-${idea.id}'),
+                            padding: EdgeInsets.all(_isGrid ? 14 : 22),
+                            child: _isGrid
+                                ? _buildGridContent(context)
+                                : _buildListContent(context),
+                          ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          if (_showsBadge)
+            PositionedDirectional(
+              top: _badgeInset,
+              end: _badgeInset,
+              child: IgnorePointer(
+                child: SelectionCheckBadge(
+                  key: Key('idea-card-badge-${idea.id}'),
+                  isSelected: isSelected,
+                  size: _badgeSize,
+                ),
+              ),
+            ),
+        ],
       ),
+    );
+  }
+
+  Widget _reserveBadgeSpace(Widget child) {
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsetsDirectional.only(end: _badgeReserve),
+      child: child,
     );
   }
 
@@ -242,7 +299,7 @@ class IdeaCard extends StatelessWidget {
                   _cardPadding,
                   0,
                 ),
-                child: _buildLockedTitle(context),
+                child: _reserveBadgeSpace(_buildLockedTitle(context)),
               ),
               Expanded(
                 child: Center(
@@ -341,7 +398,7 @@ class IdeaCard extends StatelessWidget {
 
   Widget _buildLockedTitle(BuildContext context) {
     return Text(
-      idea.title,
+      ideaDisplayTitle(idea),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: ideaVaultHeadline(
@@ -392,7 +449,7 @@ class IdeaCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            IdeaSectionCountPill(idea: idea),
+            _reserveBadgeSpace(IdeaSectionCountPill(idea: idea)),
           ],
         ),
         SizedBox(height: 14),
@@ -400,18 +457,27 @@ class IdeaCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                ideaPreviewText(idea),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: ideaVaultBody(
-                  context,
-                  size: 15,
-                  weight: FontWeight.w500,
-                  color: theme.textMuted,
-                  height: 1.65,
+              if (_searchSnippet != null)
+                _IdeaSearchSnippetView(
+                  snippet: _searchSnippet!,
+                  sectionName: searchResult?.sectionName,
+                  textSize: 15,
+                  labelSize: 12,
+                  height: 1.55,
+                )
+              else
+                Text(
+                  ideaPreviewText(idea),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: ideaVaultBody(
+                    context,
+                    size: 15,
+                    weight: FontWeight.w500,
+                    color: theme.textMuted,
+                    height: 1.65,
+                  ),
                 ),
-              ),
               const Spacer(),
               IdeaUpdatedAtLabel(
                 updatedAt: idea.updatedAt,
@@ -430,15 +496,17 @@ class IdeaCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          idea.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: ideaVaultHeadline(
-            context,
-            size: 17,
-            weight: FontWeight.w800,
-            height: 1.18,
+        _reserveBadgeSpace(
+          Text(
+            idea.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: ideaVaultHeadline(
+              context,
+              size: 17,
+              weight: FontWeight.w800,
+              height: 1.18,
+            ),
           ),
         ),
         Expanded(
@@ -452,18 +520,26 @@ class IdeaCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: Text(
-                  ideaPreviewText(idea),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: ideaVaultBody(
-                    context,
-                    size: 13,
-                    weight: FontWeight.w500,
-                    color: theme.textMuted,
-                    height: 1.45,
-                  ),
-                ),
+                child: _searchSnippet != null
+                    ? _IdeaSearchSnippetView(
+                        snippet: _searchSnippet!,
+                        sectionName: searchResult?.sectionName,
+                        textSize: 13,
+                        labelSize: 11,
+                        height: 1.4,
+                      )
+                    : Text(
+                        ideaPreviewText(idea),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: ideaVaultBody(
+                          context,
+                          size: 13,
+                          weight: FontWeight.w500,
+                          color: theme.textMuted,
+                          height: 1.45,
+                        ),
+                      ),
               ),
               const SizedBox(height: 10),
               IdeaUpdatedAtLabel(
@@ -473,6 +549,87 @@ class IdeaCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IdeaSearchSnippetView extends StatelessWidget {
+  const _IdeaSearchSnippetView({
+    required this.snippet,
+    required this.sectionName,
+    required this.textSize,
+    required this.labelSize,
+    required this.height,
+  });
+
+  final IdeaSearchSnippet snippet;
+  final String? sectionName;
+  final double textSize;
+  final double labelSize;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    final baseStyle = ideaVaultBody(
+      context,
+      size: textSize,
+      weight: FontWeight.w500,
+      color: theme.textMuted,
+      height: height,
+    );
+    final highlightStyle = baseStyle.copyWith(
+      color: theme.primary,
+      fontWeight: FontWeight.w800,
+      backgroundColor: theme.accentTint,
+    );
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    for (final range in snippet.highlights) {
+      if (range.start > cursor) {
+        spans.add(TextSpan(text: snippet.text.substring(cursor, range.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: snippet.text.substring(range.start, range.end),
+          style: highlightStyle,
+        ),
+      );
+      cursor = range.end;
+    }
+    if (cursor < snippet.text.length) {
+      spans.add(TextSpan(text: snippet.text.substring(cursor)));
+    }
+    final section = sectionName;
+    return Column(
+      key: const Key('idea-card-search-snippet'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (section != null && section.trim().isNotEmpty) ...[
+          Text(
+            ViewConstants.searchResultInSection.tr(
+              namedArgs: {'section': section},
+            ),
+            key: const Key('idea-card-search-section'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ideaVaultLabel(
+              context,
+              size: labelSize,
+              weight: FontWeight.w700,
+              color: theme.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+        Text.rich(
+          TextSpan(style: baseStyle, children: spans),
+          key: const Key('idea-card-search-snippet-text'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

@@ -54,6 +54,26 @@ void main() {
       expect(provider.additions, [second]);
     });
 
+    test('keeps additions in time order for copy and filing', () async {
+      final later = RandomAddition(
+        id: 'later',
+        content: 'Later',
+        createdAt: DateTime.utc(2026, 5, 17),
+      );
+      final earlier = RandomAddition(
+        id: 'earlier',
+        content: 'Earlier',
+        createdAt: DateTime.utc(2026, 5, 16),
+      );
+
+      await provider.replaceAdditions([later, earlier]);
+
+      expect(provider.additions.map((addition) => addition.id), [
+        'earlier',
+        'later',
+      ]);
+    });
+
     test('replaces random additions on restore', () async {
       await provider.addAddition('Local draft');
       final restoredAddition = RandomAddition(

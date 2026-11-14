@@ -7,11 +7,12 @@ class IdeasDatabaseManager {
   });
 
   static const String databaseName = 'idea_vault.db';
-  static const int databaseVersion = 4;
+  static const int databaseVersion = 5;
 
   static const String ideasTable = 'ideas';
   static const String sectionsTable = 'idea_sections';
   static const String randomAdditionsTable = 'random_additions';
+  static const String noteVaultTable = 'note_vault';
 
   final String? databasePath;
   Database? _database;
@@ -32,6 +33,7 @@ class IdeasDatabaseManager {
       version: databaseVersion,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
+        await db.rawQuery('PRAGMA secure_delete = ON');
       },
       onCreate: (db, _) async {
         await db.execute('''
@@ -41,7 +43,9 @@ class IdeasDatabaseManager {
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             last_opened_section_id TEXT,
-            is_locked INTEGER NOT NULL DEFAULT 0
+            is_locked INTEGER NOT NULL DEFAULT 0,
+            encrypted_payload TEXT,
+            title_hidden INTEGER NOT NULL DEFAULT 0
           )
         ''');
 
@@ -67,6 +71,7 @@ class IdeasDatabaseManager {
         ''');
 
         await _createRandomAdditionsTable(db);
+        await _createNoteVaultTable(db);
       },
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
@@ -81,6 +86,15 @@ class IdeasDatabaseManager {
           await db.execute(
             'ALTER TABLE $ideasTable ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0',
           );
+        }
+        if (oldVersion < 5) {
+          await db.execute(
+            'ALTER TABLE $ideasTable ADD COLUMN encrypted_payload TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE $ideasTable ADD COLUMN title_hidden INTEGER NOT NULL DEFAULT 0',
+          );
+          await _createNoteVaultTable(db);
         }
       },
     );
@@ -101,6 +115,26 @@ class IdeasDatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_random_additions_created_at
       ON $randomAdditionsTable (created_at)
     ''');
+  }
+
+  Future<void> _createNoteVaultTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $noteVaultTable (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        key_id TEXT NOT NULL,
+        lock_block TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> compact() async {
+    final db = await database;
+    await db.rawQuery('PRAGMA secure_delete = ON');
+    await db.execute('VACUUM');
+    try {
+      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (_) {}
   }
 
   Future<void> close() async {

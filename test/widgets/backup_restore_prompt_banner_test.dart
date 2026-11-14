@@ -1,17 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
-import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
-import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
-import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
-import 'package:idea_vault/data/repositories/local/app_install_state.dart';
-import 'package:idea_vault/data/repositories/local/cloud_backup_settings.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
 import 'package:idea_vault/main.dart' show navigatorKey;
-import 'package:idea_vault/models/backup/cloud_backup_snapshot.dart';
-import 'package:idea_vault/models/idea.dart';
 import 'package:idea_vault/viewmodels/providers/backup/cloud_backup_provider.dart';
 import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
 import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
@@ -19,53 +15,31 @@ import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/widgets/backup_restore_prompt_banner.dart';
 import 'package:provider/provider.dart';
 
-import '../helpers/in_memory_ideas_repo.dart';
-import '../helpers/in_memory_random_additions_repo.dart';
-import '../helpers/memory_local_storage.dart';
+import '../helpers/backup_test_harness.dart';
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
   group('BackupRestorePromptBanner', () {
-    late MemoryLocalStorageManager storage;
+    late BackupTestHarness harness;
     late IdeasProvider ideasProvider;
     late RandomAdditionsProvider additionsProvider;
     late ThemeProvider themeProvider;
-    late _FakeCloudBackupService backupService;
     late CloudBackupProvider backupProvider;
 
-    final restoredIdea = Idea(
-      id: 'restored-idea',
-      title: 'Restored idea',
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-      sections: const [],
-    );
-
-    setUp(() async {
-      storage = MemoryLocalStorageManager();
+    Future<void> setUpHarness({required bool isIOS}) async {
+      harness = BackupTestHarness(isIOS: isIOS);
       ideasProvider = IdeasProvider(
-        InMemoryIdeasRepo(),
-        IdeaEditorStateRepo(storage),
+        harness.vault.memoryIdeasRepo,
+        IdeaEditorStateRepo(harness.storage),
       );
       additionsProvider = RandomAdditionsProvider(
-        InMemoryRandomAdditionsRepo(),
+        harness.vault.memoryAdditionsRepo,
       );
-      themeProvider = ThemeProvider(ThemeRepo(storage));
-      backupService = _FakeCloudBackupService();
-      backupProvider = CloudBackupProvider(
-        CloudBackupSettingsRepo(storage),
-        backupService,
-        _FakeCloudBackupScheduler(),
-        InitialCloudAuthCoordinator(AppInstallStateRepo(storage)),
-      );
+      themeProvider = ThemeProvider(ThemeRepo(harness.storage));
+      backupProvider = harness.buildProvider();
       await ideasProvider.ensureLoaded();
       await additionsProvider.ensureLoaded();
-    });
-
-    Future<void> showPrompt() async {
-      backupService.backupExistsResult = true;
-      await backupProvider.checkForFreshInstallBackup(hasLocalIdeas: false);
     }
 
     Future<void> pumpBanner(WidgetTester tester) async {
@@ -93,83 +67,150 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> settleAsyncAction(WidgetTester tester) async {
-      await tester.runAsync(() async {
-        for (var attempt = 0; attempt < 20; attempt++) {
+    Future<void> settleAsync(WidgetTester tester) async {
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await tester.runAsync(() async {
           await Future<void>.delayed(const Duration(milliseconds: 10));
-          if (!backupProvider.state.restorePromptAvailable ||
-              find
-                  .text(ViewConstants.backupRestoreNoBackupFound)
-                  .evaluate()
-                  .isNotEmpty) {
-            break;
-          }
-        }
-      });
+        });
+        await tester.pump();
+      }
       await tester.pumpAndSettle();
     }
 
-    testWidgets('is hidden when restore prompt is unavailable', (tester) async {
+    Future<void> showIosPrompt() async {
+      putBackupFile(
+        harness.store,
+        ideas: [backupTestIdea('restored', title: 'Restored idea')],
+      );
+      await backupProvider.checkForFreshInstallBackup(hasLocalContent: false);
+    }
+
+    testWidgets('is hidden on iOS when no backup was found', (tester) async {
+      await setUpHarness(isIOS: true);
       await pumpBanner(tester);
 
-      expect(find.text(ViewConstants.backupRestorePromptFound), findsNothing);
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsNothing);
     });
 
-    testWidgets('restores backup and dismisses prompt on first tap',
+    testWidgets('restores immediately on first tap when the vault is empty',
         (tester) async {
-      await showPrompt();
-      backupService.restoreSnapshotResult = CloudBackupSnapshot.fromIdeas([
-        restoredIdea,
-      ]);
+      await setUpHarness(isIOS: true);
+      await showIosPrompt();
       await pumpBanner(tester);
+      expect(find.text(ViewConstants.backupRestorePromptFound), findsOneWidget);
 
-      await tester
-          .tap(find.text(ViewConstants.backupRestoreConfirmRestoreButton));
-      await settleAsyncAction(tester);
+      await tester.tap(find.byKey(BackupRestorePromptBanner.restoreKey));
+      await settleAsync(tester);
 
       expect(ideasProvider.ideas.single.title, 'Restored idea');
-      expect(backupService.restoreSnapshotCount, 1);
+      expect(find.byKey(const Key('backup-action-sheet')), findsNothing);
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsNothing);
     });
 
-    testWidgets(
-        'keeps prompt visible and shows feedback when backup is missing',
-        (tester) async {
-      await showPrompt();
-      backupService.restoreSnapshotResult = null;
+    testWidgets('dismiss hides the banner and is remembered', (tester) async {
+      await setUpHarness(isIOS: true);
+      await showIosPrompt();
       await pumpBanner(tester);
 
-      await tester
-          .tap(find.text(ViewConstants.backupRestoreConfirmRestoreButton));
-      await settleAsyncAction(tester);
+      await tester.tap(find.byKey(BackupRestorePromptBanner.dismissKey));
+      await settleAsync(tester);
 
-      expect(backupProvider.state.restorePromptAvailable, isTrue);
-      expect(find.text(ViewConstants.backupRestorePromptFound), findsOneWidget);
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsNothing);
       expect(
-          find.text(ViewConstants.backupRestoreNoBackupFound), findsOneWidget);
+        harness.buildProvider().restoreBannerKind(hasLocalContent: false),
+        isNull,
+      );
+    });
+
+    testWidgets('auto-hides as soon as a random note exists', (tester) async {
+      await setUpHarness(isIOS: true);
+      await showIosPrompt();
+      await pumpBanner(tester);
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsOneWidget);
+
+      await tester.runAsync(() => additionsProvider.addAddition('A thought'));
+      await settleAsync(tester);
+
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsNothing);
+      expect(backupProvider.state.restorePromptAvailable, isFalse);
+    });
+
+    testWidgets('keeps the banner and shows the reason when restore fails',
+        (tester) async {
+      await setUpHarness(isIOS: true);
+      await showIosPrompt();
+      harness.store.readError = const SocketException('offline');
+      await pumpBanner(tester);
+
+      await tester.tap(find.byKey(BackupRestorePromptBanner.restoreKey));
+      await settleAsync(tester);
+
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsOneWidget);
+      expect(find.text(ViewConstants.backupErrorOffline), findsOneWidget);
       expect(ideasProvider.ideas, isEmpty);
     });
+
+    testWidgets('Android shows a neutral one-time card on an empty vault',
+        (tester) async {
+      await setUpHarness(isIOS: false);
+      await pumpBanner(tester);
+
+      expect(find.text(ViewConstants.backupHavePrompt), findsOneWidget);
+      expect(harness.store.listCount, 0);
+    });
+
+    testWidgets('Android card starts sign-in and restores the newest backup',
+        (tester) async {
+      await setUpHarness(isIOS: false);
+      putBackupFile(
+        harness.store,
+        ideas: [backupTestIdea('cloud', title: 'From cloud')],
+      );
+      await pumpBanner(tester);
+
+      await tester.tap(find.byKey(BackupRestorePromptBanner.restoreKey));
+      await settleAsync(tester);
+
+      expect(harness.store.connectCount, 1);
+      expect(ideasProvider.ideas.single.title, 'From cloud');
+      expect(backupProvider.state.enabled, isFalse);
+    });
+
+    testWidgets('Android card hides itself when no backup exists',
+        (tester) async {
+      await setUpHarness(isIOS: false);
+      await pumpBanner(tester);
+
+      await tester.tap(find.byKey(BackupRestorePromptBanner.restoreKey));
+      await settleAsync(tester);
+
+      expect(find.byKey(BackupRestorePromptBanner.bannerKey), findsNothing);
+      expect(
+        find.text(ViewConstants.backupRestoreNoBackupFound),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('is disabled while a backup or restore is running',
+        (tester) async {
+      await setUpHarness(isIOS: false);
+      await pumpBanner(tester);
+      final gate = Completer<void>();
+      harness.store.listGate = gate.future;
+      final pending = backupProvider.listRestoreEntries();
+      await tester.pump();
+
+      final button = tester.widget<TextButton>(
+        find.byKey(BackupRestorePromptBanner.restoreKey),
+      );
+      expect(button.onPressed, isNull);
+      gate.complete();
+      await pending;
+      await tester.pump();
+      final enabled = tester.widget<TextButton>(
+        find.byKey(BackupRestorePromptBanner.restoreKey),
+      );
+      expect(enabled.onPressed, isNotNull);
+    });
   });
-}
-
-class _FakeCloudBackupService extends CloudBackupService {
-  bool backupExistsResult = false;
-  CloudBackupSnapshot? restoreSnapshotResult;
-  int restoreSnapshotCount = 0;
-
-  @override
-  Future<bool> backupExists() async => backupExistsResult;
-
-  @override
-  Future<CloudBackupSnapshot?> restoreSnapshot() async {
-    restoreSnapshotCount += 1;
-    return restoreSnapshotResult;
-  }
-}
-
-class _FakeCloudBackupScheduler extends CloudBackupScheduler {
-  @override
-  Future<void> cancelDailyBackup() async {}
-
-  @override
-  Future<void> scheduleDailyBackup() async {}
 }

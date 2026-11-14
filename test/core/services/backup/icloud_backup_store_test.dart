@@ -3,16 +3,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icloud_storage/icloud_storage.dart';
+import 'package:idea_vault/core/services/backup/cloud_backup_store.dart';
 import 'package:idea_vault/core/services/backup/icloud_backup_store.dart';
+import 'package:idea_vault/models/backup/cloud_backup_entry.dart';
 
 void main() {
   group('ICloudBackupStore', () {
     late Directory tempDirectory;
-    late File backupFile;
 
     setUp(() async {
       tempDirectory = await Directory.systemTemp.createTemp('icloud_backup_');
-      backupFile = File('${tempDirectory.path}/idea_vault_backup.json');
     });
 
     tearDown(() async {
@@ -21,11 +21,22 @@ void main() {
       }
     });
 
+    final snapshotName = CloudBackupEntry.buildFileName(
+      formatVersion: 3,
+      createdAt: DateTime.utc(2026, 11, 1),
+      deviceShortId: 'abcd1234',
+      ideaCount: 2,
+      randomAdditionCount: 1,
+    );
+
     test('waits for download progress to complete before reading backup',
         () async {
       final store = ICloudBackupStore(
         gather: ({required containerId}) async => [
-          _icloudFile(sizeInBytes: 12),
+          _icloudFile(
+            relativePath: ICloudBackupStore.backupRelativePath,
+            sizeInBytes: 12,
+          ),
         ],
         download: ({
           required containerId,
@@ -44,39 +55,146 @@ void main() {
             }),
           );
         },
-        tempBackupFile: () async => backupFile,
+        tempDirectory: () async => tempDirectory,
       );
 
-      final backup = await store.readBackup();
+      final files = await store.listFiles();
+      final backup = await store.readFile(files.single);
 
-      expect(backup?.contents, 'backup-json');
-      expect(backup?.sizeBytes, 11);
+      expect(backup.contents, 'backup-json');
+      expect(backup.sizeBytes, 11);
     });
 
-    test('does not report empty iCloud metadata as restorable backup',
+    test('lists legacy and snapshot files but ignores uploading and empty ones',
         () async {
       final store = ICloudBackupStore(
         gather: ({required containerId}) async => [
-          _icloudFile(sizeInBytes: 0),
+          _icloudFile(
+            relativePath: ICloudBackupStore.backupRelativePath,
+            sizeInBytes: 0,
+          ),
+          _icloudFile(
+            relativePath: ICloudBackupStore.relativePathFor(snapshotName),
+            sizeInBytes: 40,
+          ),
+          _icloudFile(
+            relativePath: ICloudBackupStore.relativePathFor(
+              snapshotName.replaceFirst('i2', 'i3'),
+            ),
+            sizeInBytes: 40,
+            isUploading: true,
+          ),
+          _icloudFile(relativePath: 'Backups/other.json', sizeInBytes: 40),
         ],
-        tempBackupFile: () async => backupFile,
+        tempDirectory: () async => tempDirectory,
       );
 
-      expect(await store.backupExists(), isFalse);
+      final files = await store.listFiles();
+
+      expect(files.map((file) => file.name), [snapshotName]);
+    });
+
+    test('waits for the upload progress stream before reporting success',
+        () async {
+      var progressClosed = false;
+      final store = ICloudBackupStore(
+        gather: ({required containerId}) async => const [],
+        upload: ({
+          required containerId,
+          required filePath,
+          required destinationRelativePath,
+          onProgress,
+        }) async {
+          final controller = StreamController<double>();
+          onProgress?.call(controller.stream);
+          unawaited(
+            Future<void>(() async {
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+              controller.add(100);
+              progressClosed = true;
+              await controller.close();
+            }),
+          );
+        },
+        tempDirectory: () async => tempDirectory,
+      );
+
+      final result = await store.writeFile(snapshotName, '{}');
+
+      expect(progressClosed, isTrue);
+      expect(result.pending, isFalse);
+      expect(result.sizeBytes, 2);
+    });
+
+    test('reports a pending upload when the progress stream times out',
+        () async {
+      final controller = StreamController<double>();
+      addTearDown(controller.close);
+      final store = ICloudBackupStore(
+        gather: ({required containerId}) async => const [],
+        upload: ({
+          required containerId,
+          required filePath,
+          required destinationRelativePath,
+          onProgress,
+        }) async {
+          onProgress?.call(controller.stream);
+        },
+        tempDirectory: () async => tempDirectory,
+        uploadTimeout: const Duration(milliseconds: 30),
+      );
+
+      final result = await store.writeFile(snapshotName, '{}');
+
+      expect(result.pending, isTrue);
+    });
+
+    test('upload state reflects iCloud metadata', () async {
+      var uploaded = false;
+      final store = ICloudBackupStore(
+        gather: ({required containerId}) async => [
+          _icloudFile(
+            relativePath: ICloudBackupStore.relativePathFor(snapshotName),
+            sizeInBytes: 40,
+            isUploading: !uploaded,
+            isUploaded: uploaded,
+          ),
+        ],
+        tempDirectory: () async => tempDirectory,
+      );
+
+      expect(
+        await store.uploadState(snapshotName),
+        CloudBackupUploadState.pending,
+      );
+      uploaded = true;
+      expect(
+        await store.uploadState(snapshotName),
+        CloudBackupUploadState.complete,
+      );
+      expect(
+        await store.uploadState('missing.json'),
+        CloudBackupUploadState.missing,
+      );
     });
   });
 }
 
-ICloudFile _icloudFile({required int sizeInBytes}) {
+ICloudFile _icloudFile({
+  required String relativePath,
+  required int sizeInBytes,
+  bool isUploading = false,
+  bool isUploaded = true,
+}) {
   return ICloudFile.fromMap({
-    'relativePath': ICloudBackupStore.backupRelativePath,
+    'relativePath': relativePath,
     'sizeInBytes': sizeInBytes,
     'creationDate': 0.0,
     'contentChangeDate': 0.0,
     'isDownloading': false,
     'downloadStatus': 'NSMetadataUbiquitousItemDownloadingStatusCurrent',
-    'isUploading': false,
-    'isUploaded': true,
+    'isUploading': isUploading,
+    'isUploaded': isUploaded,
     'hasUnresolvedConflicts': false,
   });
 }

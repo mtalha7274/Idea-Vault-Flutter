@@ -97,6 +97,8 @@ class Idea extends Equatable {
     required List<IdeaSection> sections,
     this.lastOpenedSectionId,
     this.isLocked = false,
+    this.encryptedPayload,
+    this.titleHidden = false,
   }) : sections = List.unmodifiable(
           sections.map((section) => section.copyWith()).toList(),
         );
@@ -112,6 +114,8 @@ class Idea extends Equatable {
           DateTime.now(),
       lastOpenedSectionId: json['lastOpenedSectionId'] as String?,
       isLocked: json['isLocked'] as bool? ?? false,
+      encryptedPayload: json['encryptedPayload'] as String?,
+      titleHidden: json['titleHidden'] as bool? ?? false,
       sections: rawSections
           .whereType<Map<String, dynamic>>()
           .map(IdeaSection.fromJson)
@@ -125,7 +129,11 @@ class Idea extends Equatable {
   final DateTime updatedAt;
   final String? lastOpenedSectionId;
   final bool isLocked;
+  final String? encryptedPayload;
+  final bool titleHidden;
   final List<IdeaSection> sections;
+
+  bool get isEncrypted => encryptedPayload != null;
 
   Idea copyWith({
     String? id,
@@ -135,6 +143,9 @@ class Idea extends Equatable {
     String? lastOpenedSectionId,
     bool? isLocked,
     List<IdeaSection>? sections,
+    String? encryptedPayload,
+    bool clearEncryptedPayload = false,
+    bool? titleHidden,
   }) {
     return Idea(
       id: id ?? this.id,
@@ -144,6 +155,10 @@ class Idea extends Equatable {
       lastOpenedSectionId: lastOpenedSectionId ?? this.lastOpenedSectionId,
       isLocked: isLocked ?? this.isLocked,
       sections: sections ?? this.sections,
+      encryptedPayload: clearEncryptedPayload
+          ? null
+          : encryptedPayload ?? this.encryptedPayload,
+      titleHidden: titleHidden ?? this.titleHidden,
     );
   }
 
@@ -155,6 +170,8 @@ class Idea extends Equatable {
       'updatedAt': updatedAt.toIso8601String(),
       'lastOpenedSectionId': lastOpenedSectionId,
       'isLocked': isLocked,
+      if (encryptedPayload != null) 'encryptedPayload': encryptedPayload,
+      if (titleHidden) 'titleHidden': true,
       'sections': sections.map((section) => section.toJson()).toList(),
     };
   }
@@ -167,6 +184,8 @@ class Idea extends Equatable {
         updatedAt,
         lastOpenedSectionId,
         isLocked,
+        encryptedPayload,
+        titleHidden,
         sections,
       ];
 }

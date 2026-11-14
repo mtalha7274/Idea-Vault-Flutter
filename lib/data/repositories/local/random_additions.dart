@@ -65,4 +65,23 @@ class RandomAdditionsRepo {
       await batch.commit(noResult: true);
     });
   }
+
+  static Future<void> writeAdditionRow(
+    DatabaseExecutor executor,
+    RandomAddition addition,
+  ) async {
+    await executor.insert(
+      IdeasDatabaseManager.randomAdditionsTable,
+      {
+        'id': addition.id,
+        'content': addition.content,
+        'created_at': addition.createdAt.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  static Future<void> deleteAllAdditionRows(DatabaseExecutor executor) async {
+    await executor.delete(IdeasDatabaseManager.randomAdditionsTable);
+  }
 }

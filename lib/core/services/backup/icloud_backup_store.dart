@@ -7,6 +7,7 @@ import 'package:icloud_storage/icloud_storage_platform_interface.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../models/backup/cloud_backup_account.dart';
+import '../../../models/backup/cloud_backup_entry.dart';
 import 'cloud_backup_store.dart';
 
 typedef ICloudGather = Future<List<ICloudFile>> Function({
@@ -24,6 +25,10 @@ typedef ICloudUpload = Future<void> Function({
   required String destinationRelativePath,
   StreamHandler<double>? onProgress,
 });
+typedef ICloudDelete = Future<void> Function({
+  required String containerId,
+  required String relativePath,
+});
 
 class ICloudBackupStore implements CloudBackupStore {
   ICloudBackupStore({
@@ -31,7 +36,11 @@ class ICloudBackupStore implements CloudBackupStore {
     ICloudGather? gather,
     ICloudDownload? download,
     ICloudUpload? upload,
+    ICloudDelete? delete,
     Future<File> Function()? tempBackupFile,
+    Future<Directory> Function()? tempDirectory,
+    this.downloadTimeout = defaultDownloadTimeout,
+    this.uploadTimeout = defaultUploadTimeout,
   })  : _gather = gather ?? ICloudStorage.gather,
         _download = download ?? ICloudStorage.download,
         _upload = upload ??
@@ -47,16 +56,40 @@ class ICloudBackupStore implements CloudBackupStore {
                   destinationRelativePath: destinationRelativePath,
                   onProgress: onProgress,
                 )),
-        _tempBackupFileOverride = tempBackupFile;
+        _delete = delete ?? ICloudStorage.delete,
+        _tempBackupFileOverride = tempBackupFile,
+        _tempDirectoryOverride = tempDirectory;
 
-  static const String backupRelativePath = 'Backups/idea_vault_backup.json';
-  static const Duration downloadTimeout = Duration(seconds: 30);
+  static const String backupFolder = 'Backups';
+  static const String backupRelativePath =
+      '$backupFolder/${CloudBackupEntry.legacyFileName}';
+  static const String uploadTempFileName = 'idea_vault_backup_upload.json';
+  static const Duration defaultDownloadTimeout = Duration(seconds: 120);
+  static const Duration defaultUploadTimeout = Duration(seconds: 60);
 
   final String containerId;
+  final Duration downloadTimeout;
+  final Duration uploadTimeout;
   final ICloudGather _gather;
   final ICloudDownload _download;
   final ICloudUpload _upload;
+  final ICloudDelete _delete;
   final Future<File> Function()? _tempBackupFileOverride;
+  final Future<Directory> Function()? _tempDirectoryOverride;
+
+  static String relativePathFor(String name) => '$backupFolder/$name';
+
+  static String? _nameFromRelativePath(String relativePath) {
+    const prefix = '$backupFolder/';
+    if (!relativePath.startsWith(prefix)) {
+      return null;
+    }
+    final name = relativePath.substring(prefix.length);
+    if (name.contains('/') || !CloudBackupEntry.isBackupFileName(name)) {
+      return null;
+    }
+    return name;
+  }
 
   @override
   Future<CloudBackupAccount?> connect(
@@ -66,74 +99,124 @@ class ICloudBackupStore implements CloudBackupStore {
   }
 
   @override
-  Future<void> disconnect() async {}
+  Future<void> signOut() async {}
 
   @override
-  Future<bool> backupExists() async {
-    return _fileExists(backupRelativePath);
-  }
-
-  Future<bool> _fileExists(String relativePath) async {
+  Future<List<CloudBackupFileInfo>> listFiles({bool silentAuth = false}) async {
     final files = await _gather(containerId: containerId);
-    return files.any(
-      (file) =>
-          file.relativePath == relativePath &&
-          file.sizeInBytes > 0 &&
-          !file.isUploading,
-    );
-  }
-
-  @override
-  Future<CloudBackupFile?> readBackup() async {
-    return _readFile(
-      backupRelativePath,
-      tempFileName: 'idea_vault_backup.json',
-    );
-  }
-
-  @override
-  Future<int> writeBackup(String contents, {bool silentAuth = false}) async {
-    return _writeFile(
-      backupRelativePath,
-      contents,
-      tempFileName: 'idea_vault_backup.json',
-    );
-  }
-
-  Future<CloudBackupFile?> _readFile(
-    String relativePath, {
-    required String tempFileName,
-  }) async {
-    if (!await _fileExists(relativePath)) {
-      return null;
+    final result = <CloudBackupFileInfo>[];
+    for (final file in files) {
+      final name = _nameFromRelativePath(file.relativePath);
+      if (name == null || file.isUploading || file.sizeInBytes <= 0) {
+        continue;
+      }
+      result.add(
+        CloudBackupFileInfo(
+          id: file.relativePath,
+          name: name,
+          modifiedAt: file.contentChangeDate.toUtc(),
+          sizeBytes: file.sizeInBytes,
+        ),
+      );
     }
+    return result;
+  }
 
-    final tempFile = await _tempFile(tempFileName);
+  @override
+  Future<CloudBackupFile> readFile(
+    CloudBackupFileInfo file, {
+    bool silentAuth = false,
+  }) async {
+    final tempFile = await _tempFile(file.name);
     if (await tempFile.exists()) {
       await tempFile.delete();
     }
-    await _downloadFile(relativePath, tempFile);
-    final bytes = await tempFile.readAsBytes();
-    return CloudBackupFile(
-      contents: utf8.decode(bytes),
-      sizeBytes: bytes.length,
-    );
+    try {
+      await _downloadFile(file.id, tempFile);
+      final bytes = await tempFile.readAsBytes();
+      return CloudBackupFile(
+        contents: utf8.decode(bytes),
+        sizeBytes: bytes.length,
+      );
+    } finally {
+      if (_tempBackupFileOverride == null && await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    }
   }
 
-  Future<int> _writeFile(
-    String relativePath,
+  @override
+  Future<CloudBackupWriteResult> writeFile(
+    String name,
     String contents, {
-    required String tempFileName,
+    bool silentAuth = false,
   }) async {
-    final tempFile = await _tempFile(tempFileName);
+    final tempFile = await _tempFile(uploadTempFileName);
     final bytes = utf8.encode(contents);
     await tempFile.writeAsBytes(bytes, flush: true);
+    final completer = Completer<void>();
+    StreamSubscription<double>? subscription;
     await _upload(
       containerId: containerId,
       filePath: tempFile.path,
-      destinationRelativePath: relativePath,
+      destinationRelativePath: relativePathFor(name),
+      onProgress: (stream) {
+        subscription = stream.listen(
+          (_) {},
+          onDone: () {
+            if (!completer.isCompleted) {
+              completer.complete();
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!completer.isCompleted) {
+              completer.completeError(error, stackTrace);
+            }
+          },
+          cancelOnError: true,
+        );
+      },
     );
-    return bytes.length;
+
+    if (subscription == null) {
+      return CloudBackupWriteResult(sizeBytes: bytes.length, pending: true);
+    }
+
+    try {
+      await completer.future.timeout(uploadTimeout);
+      return CloudBackupWriteResult(sizeBytes: bytes.length);
+    } on TimeoutException {
+      return CloudBackupWriteResult(sizeBytes: bytes.length, pending: true);
+    } finally {
+      await subscription?.cancel();
+    }
+  }
+
+  @override
+  Future<void> deleteFile(
+    CloudBackupFileInfo file, {
+    bool silentAuth = false,
+  }) {
+    return _delete(containerId: containerId, relativePath: file.id);
+  }
+
+  @override
+  Future<CloudBackupUploadState> uploadState(
+    String name, {
+    bool silentAuth = true,
+  }) async {
+    final files = await _gather(containerId: containerId);
+    final relativePath = relativePathFor(name);
+    for (final file in files) {
+      if (file.relativePath != relativePath) {
+        continue;
+      }
+      if (file.isUploaded && !file.isUploading) {
+        return CloudBackupUploadState.complete;
+      }
+      return CloudBackupUploadState.pending;
+    }
+    return CloudBackupUploadState.missing;
   }
 
   Future<File> _tempFile(String name) async {
@@ -141,7 +224,10 @@ class ICloudBackupStore implements CloudBackupStore {
     if (override != null) {
       return override();
     }
-    final directory = await getTemporaryDirectory();
+    final directoryOverride = _tempDirectoryOverride;
+    final directory = directoryOverride != null
+        ? await directoryOverride()
+        : await getTemporaryDirectory();
     return File('${directory.path}/$name');
   }
 

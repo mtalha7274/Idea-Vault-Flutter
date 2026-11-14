@@ -1,13 +1,21 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
+import '../core/editor/note_html.dart';
+import '../core/editor/note_markup.dart';
+import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_session_guard.dart';
+import '../injection_container.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_action_button.dart';
@@ -26,25 +34,100 @@ class ExportForAIScreen extends StatefulWidget {
     required this.ideaTitle,
     required this.sections,
     required this.mode,
+    this.isLocked = false,
   });
 
   final String ideaTitle;
   final List<IdeaSection> sections;
   final ExportMode mode;
+  final bool isLocked;
 
   @override
   State<ExportForAIScreen> createState() => _ExportForAIScreenState();
 }
 
-class _ExportForAIScreenState extends State<ExportForAIScreen> {
+class _ExportForAIScreenState extends State<ExportForAIScreen>
+    with WidgetsBindingObserver {
   late List<IdeaSection> _sections;
   late Set<String> _selectedSectionIds;
+  bool _holdsSecureWindow = false;
+  bool _showPrivacyCover = false;
+  bool _didRelock = false;
 
   @override
   void initState() {
     super.initState();
     _sections = widget.sections.map((section) => section.copyWith()).toList();
     _selectedSectionIds = _sections.map((section) => section.id).toSet();
+    if (widget.isLocked) {
+      WidgetsBinding.instance.addObserver(this);
+      NoteLockSecureWindow.acquire();
+      _holdsSecureWindow = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.isLocked) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
+    if (_holdsSecureWindow) {
+      _holdsSecureWindow = false;
+      NoteLockSecureWindow.release();
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.isLocked || NoteLockSessionGuard.isRelockSuppressed) {
+      return;
+    }
+    switch (state) {
+      case AppLifecycleState.paused:
+        _relock();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          _setPrivacyCover(true);
+        }
+      case AppLifecycleState.resumed:
+        if (!_didRelock) {
+          _setPrivacyCover(false);
+        }
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  void _setPrivacyCover(bool visible) {
+    if (!mounted || _showPrivacyCover == visible) {
+      return;
+    }
+    setState(() {
+      _showPrivacyCover = visible;
+    });
+  }
+
+  void _relock() {
+    if (_didRelock) {
+      return;
+    }
+    _didRelock = true;
+    if (sl.isRegistered<NoteLockAuthService>()) {
+      sl<NoteLockAuthService>().clearSessionUnlocks();
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showPrivacyCover = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+    });
   }
 
   @override
@@ -62,7 +145,7 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
       ExportMode.aiExport => ViewConstants.exportForAiCopyToClipboardButton,
       ExportMode.pdfExport => ViewConstants.exportToPdfButton,
     };
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: theme.background,
       appBar: IdeaVaultSubpageAppBar(titleKey: titleKey),
       body: SafeArea(
@@ -123,6 +206,32 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
           ],
         ),
       ),
+    );
+    if (!_showPrivacyCover) {
+      return scaffold;
+    }
+    return Stack(
+      children: [
+        scaffold,
+        Positioned.fill(
+          key: const Key('export-privacy-cover'),
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: ColoredBox(
+                color: theme.background.withValues(alpha: 0.96),
+                child: Center(
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    size: 44,
+                    color: theme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -201,8 +310,7 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
     }
 
     try {
-      final markdownContent = _buildPdfMarkdown(selectedSections);
-      final html = md.markdownToHtml(markdownContent);
+      final html = _buildPdfHtml(selectedSections);
       final styledHtml = '''
 <!DOCTYPE html>
 <html>
@@ -211,24 +319,33 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
   body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; }
   h1 { font-size: 24px; margin-bottom: 8px; }
   h2 { font-size: 18px; margin-top: 24px; margin-bottom: 4px; }
-  p { font-size: 14px; line-height: 1.6; }
-  code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
-  pre { background: #f4f4f4; padding: 12px; border-radius: 8px; }
-  ul { padding-left: 20px; }
+  h3 { font-size: 17px; margin: 6px 0 2px; }
+  h4 { font-size: 16px; margin: 6px 0 2px; }
+  h5 { font-size: 15px; margin: 6px 0 2px; }
+  p { font-size: 14px; line-height: 1.6; margin: 0; white-space: pre-wrap; }
+  li { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  li.check { list-style: none; margin-left: -18px; }
+  code { background: #f4f4f4; color: #c7254e; padding: 2px 6px; border-radius: 4px; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 8px; margin: 4px 0; white-space: pre-wrap; }
+  pre code { padding: 0; color: inherit; }
+  ul, ol { padding-left: 20px; margin: 0; }
+  blockquote { margin: 0; padding-left: 12px; border-left: 3px solid #ccc; color: #555; }
 </style>
 </head>
 <body>$html</body>
 </html>
 ''';
 
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async {
-          // ignore: deprecated_member_use
-          return await Printing.convertHtml(
-            format: format,
-            html: styledHtml,
-          );
-        },
+      await NoteLockSessionGuard.runWithoutRelock(
+        () => Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async {
+            // ignore: deprecated_member_use
+            return await Printing.convertHtml(
+              format: format,
+              html: styledHtml,
+            );
+          },
+        ),
       );
     } catch (_) {
       if (!mounted) {
@@ -238,18 +355,15 @@ class _ExportForAIScreenState extends State<ExportForAIScreen> {
     }
   }
 
-  String _buildPdfMarkdown(List<IdeaSection> selectedSections) {
-    final buffer = StringBuffer()..writeln('# ${widget.ideaTitle}');
+  String _buildPdfHtml(List<IdeaSection> selectedSections) {
+    final buffer = StringBuffer()
+      ..write('<h1>${escapeNoteHtml(widget.ideaTitle)}</h1>');
     for (final section in selectedSections) {
       buffer
-        ..writeln()
-        ..writeln('## ${section.name}')
-        ..write(section.content);
-      if (!section.content.endsWith('\n')) {
-        buffer.writeln();
-      }
+        ..write('<h2>${escapeNoteHtml(section.name)}</h2>')
+        ..write(noteDocumentToHtml(NoteMarkup.parse(section.content)));
     }
-    return buffer.toString().trimRight();
+    return buffer.toString();
   }
 
   void _showMessageKey(String key, {Map<String, String>? namedArgs}) {
@@ -358,7 +472,7 @@ class _ExportSectionTile extends StatelessWidget {
   }
 
   String? _firstContentLine(String content) {
-    final lines = content.split('\n');
+    final lines = NoteMarkup.plainText(content).split('\n');
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.isNotEmpty) {

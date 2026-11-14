@@ -2,37 +2,57 @@ import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../core/utils/idea_display.dart';
 import '../config/theme/base.dart';
 import '../core/constants/view_constants.dart';
+import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_biometric_service.dart';
+import '../core/utils/selection_controller.dart';
+import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/random_addition.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
+import '../widgets/note_lock_auth_dialog.dart';
+import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
 import '../widgets/random_addition_composer.dart';
+import '../widgets/selection/selection_bar.dart';
+import '../widgets/selection/selection_check_badge.dart';
+import '../widgets/selection/selection_style.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
 class RandomAdditionsScreen extends StatefulWidget {
-  const RandomAdditionsScreen({super.key});
+  const RandomAdditionsScreen({
+    super.key,
+    this.autofocusComposer = false,
+  });
+
+  final bool autofocusComposer;
 
   @override
   State<RandomAdditionsScreen> createState() => _RandomAdditionsScreenState();
 }
 
 class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
-  final Set<String> _selectedAdditionIds = <String>{};
+  final SelectionController _selection = SelectionController();
   late final TextEditingController _composerController;
+  late final RandomAdditionsProvider _additionsProvider;
 
-  bool get _isSelectionMode => _selectedAdditionIds.isNotEmpty;
+  bool get _isSelectionMode => _selection.isActive;
 
   @override
   void initState() {
     super.initState();
     _composerController = TextEditingController();
+    _selection.addListener(_onSelectionChanged);
+    _additionsProvider = context.read<RandomAdditionsProvider>();
+    _additionsProvider.addListener(_pruneSelection);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(context.read<RandomAdditionsProvider>().ensureLoaded());
       unawaited(context.read<IdeasProvider>().ensureLoaded());
@@ -41,8 +61,31 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
 
   @override
   void dispose() {
+    _additionsProvider.removeListener(_pruneSelection);
+    _selection.removeListener(_onSelectionChanged);
+    _selection.dispose();
     _composerController.dispose();
     super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _pruneSelection() {
+    _selection.retainExisting(
+      _additionsProvider.additions.map((addition) => addition.id),
+    );
+  }
+
+  List<RandomAddition> _selectedAdditionsInTimeOrder() {
+    final selected = _additionsProvider.additions
+        .where((addition) => _selection.isSelected(addition.id))
+        .toList();
+    selected.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return selected;
   }
 
   @override
@@ -52,49 +95,47 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
     final additions = additionsProvider.additions;
 
     return PopScope(
-      onPopInvokedWithResult: (_, __) =>
-          FocusManager.instance.primaryFocus?.unfocus(),
+      canPop: !_isSelectionMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _selection.clear();
+          return;
+        }
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
       child: Scaffold(
         key: const Key('random-additions-screen'),
         backgroundColor: theme.background,
-        appBar: IdeaVaultSubpageAppBar(
-          titleKey: ViewConstants.randomAdditionsTitle,
-          actions: [
-            if (_isSelectionMode)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: IconButton(
-                  key: const Key('random-additions-delete-button'),
-                  onPressed: _confirmDeleteSelection,
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.surfaceLow,
-                    foregroundColor: theme.primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
+        appBar: _isSelectionMode
+            ? SelectionAppBar(
+                count: _selection.count,
+                onClose: _selection.clear,
+                closeButtonKey: const Key('random-additions-selection-close'),
+                countKey: const Key('random-additions-selection-count'),
+                actions: [
+                  SelectionActionButton(
+                    key: const Key('random-additions-copy-button'),
+                    icon: Icons.copy_rounded,
+                    tooltipKey: ViewConstants.selectionCopyTooltip,
+                    onPressed: () => unawaited(_copySelection()),
                   ),
-                  icon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${_selectedAdditionIds.length}',
-                        style: ideaVaultLabel(
-                          context,
-                          size: 14,
-                          weight: FontWeight.w800,
-                          color: theme.primary,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.delete_outline_rounded, size: 22),
-                    ],
+                  SelectionActionButton(
+                    key: const Key('random-additions-file-button'),
+                    icon: Icons.playlist_add_rounded,
+                    tooltipKey: ViewConstants.randomAdditionsFileTooltip,
+                    onPressed: () => unawaited(_fileSelection()),
                   ),
-                ),
+                  SelectionActionButton(
+                    key: const Key('random-additions-delete-button'),
+                    icon: Icons.delete_outline_rounded,
+                    tooltipKey: ViewConstants.selectionDeleteTooltip,
+                    onPressed: () => unawaited(_confirmDeleteSelection()),
+                  ),
+                ],
+              )
+            : const IdeaVaultSubpageAppBar(
+                titleKey: ViewConstants.randomAdditionsTitle,
               ),
-          ],
-        ),
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -109,19 +150,19 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
                       : ListView.builder(
                           key: const Key('random-additions-list'),
                           reverse: true,
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                          padding: const EdgeInsets.fromLTRB(0, 8, 0, 2),
                           itemCount: additions.length,
                           itemBuilder: (context, index) {
                             final addition =
                                 additions[additions.length - 1 - index];
-                            return _RandomAdditionBubble(
+                            return _RandomAdditionRow(
+                              key: ValueKey('random-addition-${addition.id}'),
                               addition: addition,
-                              isSelected:
-                                  _selectedAdditionIds.contains(addition.id),
+                              isSelected: _selection.isSelected(addition.id),
+                              isSelectionActive: _isSelectionMode,
                               onTap: () => _handleAdditionTap(addition),
                               onLongPress: () =>
                                   _handleAdditionLongPress(addition),
-                              isLast: index == 0,
                             );
                           },
                         ),
@@ -139,6 +180,7 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
                       controller: _composerController,
                       fieldKey: const Key('random-additions-composer'),
                       sendButtonKey: const Key('random-additions-send'),
+                      autofocus: widget.autofocusComposer,
                       onSubmit: _submitAddition,
                     ),
                   ),
@@ -162,79 +204,96 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
 
   void _handleAdditionTap(RandomAddition addition) {
     if (_isSelectionMode) {
-      _toggleAdditionSelection(addition.id);
+      _selection.toggle(addition.id);
       return;
     }
 
-    unawaited(_showFilingSheet(addition));
+    unawaited(_fileAdditions([addition]));
   }
 
   void _handleAdditionLongPress(RandomAddition addition) {
-    setState(() {
-      _selectedAdditionIds.add(addition.id);
-    });
+    if (_isSelectionMode) {
+      _selection.toggle(addition.id);
+      return;
+    }
+    unawaited(HapticFeedback.selectionClick());
+    _selection.select(addition.id);
   }
 
-  void _toggleAdditionSelection(String additionId) {
-    setState(() {
-      if (_selectedAdditionIds.contains(additionId)) {
-        _selectedAdditionIds.remove(additionId);
-      } else {
-        _selectedAdditionIds.add(additionId);
-      }
-    });
+  Future<void> _copySelection() async {
+    final selected = _selectedAdditionsInTimeOrder();
+    if (selected.isEmpty) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(
+      ClipboardData(
+        text: selected.map((addition) => addition.content).join('\n\n'),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          selected.length == 1
+              ? ViewConstants.selectionCopiedOne.tr()
+              : ViewConstants.selectionCopiedMany.tr(
+                  namedArgs: {'count': '${selected.length}'},
+                ),
+        ),
+      ),
+    );
+    _selection.clear();
+  }
+
+  Future<void> _fileSelection() async {
+    final selected = _selectedAdditionsInTimeOrder();
+    if (selected.isEmpty) {
+      return;
+    }
+    await _fileAdditions(selected);
   }
 
   Future<void> _confirmDeleteSelection() async {
-    final selectedCount = _selectedAdditionIds.length;
+    final selectedCount = _selection.count;
     if (selectedCount == 0) {
       return;
     }
 
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final title = selectedCount == 1
-            ? 'Delete selected addition?'
-            : 'Delete additions?';
-        final body = selectedCount == 1
-            ? 'This addition will be removed from random additions.'
-            : '$selectedCount additions will be removed from random additions.';
-
-        return AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
+    final shouldDelete = await showSelectionDeleteConfirmationDialog(
+      context,
+      title: selectedCount == 1
+          ? ViewConstants.selectionDeleteNoteTitleOne.tr()
+          : ViewConstants.selectionDeleteNotesTitleMany.tr(
+              namedArgs: {'count': '$selectedCount'},
             ),
-            FilledButton(
-              key: const Key('random-additions-delete-confirm'),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Delete'),
+      body: selectedCount == 1
+          ? ViewConstants.selectionDeleteNoteBodyOne.tr()
+          : ViewConstants.selectionDeleteNotesBodyMany.tr(
+              namedArgs: {'count': '$selectedCount'},
             ),
-          ],
-        );
-      },
+      confirmKey: const Key('random-additions-delete-confirm'),
     );
 
     if (shouldDelete != true || !mounted) {
       return;
     }
 
-    final selectedIds = _selectedAdditionIds.toList(growable: false);
+    final selectedIds = _selection.selectedIds.toList(growable: false);
     await context.read<RandomAdditionsProvider>().deleteAdditions(selectedIds);
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _selectedAdditionIds.clear();
-    });
+    _selection.clear();
   }
 
-  Future<void> _showFilingSheet(RandomAddition addition) async {
+  Future<void> _fileAdditions(List<RandomAddition> additions) async {
+    if (additions.isEmpty) {
+      return;
+    }
     final ideasProvider = context.read<IdeasProvider>();
     final additionsProvider = context.read<RandomAdditionsProvider>();
     final theme = context.read<ThemeProvider>().baseTheme;
@@ -260,6 +319,102 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
       return;
     }
 
+    final noteLockAuthService = sl.isRegistered<NoteLockAuthService>()
+        ? sl<NoteLockAuthService>()
+        : NoteLockAuthService();
+    if (selectedIdea.isLocked) {
+      final noteLockBiometricService =
+          sl.isRegistered<NoteLockBiometricService>()
+              ? sl<NoteLockBiometricService>()
+              : NoteLockBiometricService();
+      final didAuthenticate = await authenticateForNoteLock(
+        context,
+        noteLockAuthService,
+        noteLockBiometricService,
+        ideaId: selectedIdea.id,
+      );
+      if (!didAuthenticate || !mounted) {
+        return;
+      }
+    }
+
+    var pickerIdea = selectedIdea;
+    final vault = ideasProvider.vault;
+    if (selectedIdea.isEncrypted) {
+      vault?.openSession();
+      Idea? opened;
+      try {
+        opened = await ideasProvider.openLockedIdea(selectedIdea.id);
+      } catch (_) {
+        opened = null;
+      }
+      if (opened == null || opened.isEncrypted || !mounted) {
+        vault?.closeSession();
+        noteLockAuthService.markIdeaLocked(selectedIdea.id);
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(content: Text(ViewConstants.vaultOpenFailed.tr())),
+          );
+        }
+        return;
+      }
+      pickerIdea = opened;
+    }
+
+    try {
+      await _showSectionPicker(
+        additions: additions,
+        selectedIdea: pickerIdea,
+        ideasProvider: ideasProvider,
+        additionsProvider: additionsProvider,
+        theme: theme,
+        messenger: messenger,
+      );
+    } finally {
+      if (selectedIdea.isEncrypted) {
+        vault?.closeSession();
+      }
+      if (selectedIdea.isLocked) {
+        noteLockAuthService.markIdeaLocked(selectedIdea.id);
+      }
+    }
+  }
+
+  Future<int> _appendInTimeOrder({
+    required List<RandomAddition> additions,
+    required Idea idea,
+    required IdeaSection section,
+    required IdeasProvider ideasProvider,
+    required RandomAdditionsProvider additionsProvider,
+  }) async {
+    var filedCount = 0;
+    for (final addition in additions) {
+      try {
+        final savedIdea = await ideasProvider.appendContentToSection(
+          ideaId: idea.id,
+          sectionId: section.id,
+          content: addition.content,
+        );
+        if (savedIdea == null) {
+          break;
+        }
+        await additionsProvider.deleteAddition(addition.id);
+      } on Object {
+        break;
+      }
+      filedCount += 1;
+    }
+    return filedCount;
+  }
+
+  Future<void> _showSectionPicker({
+    required List<RandomAddition> additions,
+    required Idea selectedIdea,
+    required IdeasProvider ideasProvider,
+    required RandomAdditionsProvider additionsProvider,
+    required BaseTheme theme,
+    required ScaffoldMessengerState messenger,
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -268,31 +423,40 @@ class _RandomAdditionsScreenState extends State<RandomAdditionsScreen> {
         return _SectionPickerSheet(
           idea: selectedIdea,
           onSectionSelected: (section) async {
-            final savedIdea = await ideasProvider.appendContentToSection(
-              ideaId: selectedIdea.id,
-              sectionId: section.id,
-              content: addition.content,
+            final filedCount = await _appendInTimeOrder(
+              additions: additions,
+              idea: selectedIdea,
+              section: section,
+              ideasProvider: ideasProvider,
+              additionsProvider: additionsProvider,
             );
-            if (savedIdea == null) {
+            if (filedCount == 0 && additions.length == 1) {
               return;
             }
-            await additionsProvider.deleteAddition(addition.id);
             if (!sectionSheetContext.mounted) {
               return;
             }
             Navigator.of(sectionSheetContext).pop();
-            messenger.showSnackBar(
-              SnackBar(
-                content: Text(
-                  ViewConstants.randomAdditionsFiledSnackbar.tr(
-                    namedArgs: {
-                      'idea': selectedIdea.title,
-                      'section': section.name,
-                    },
-                  ),
-                ),
-              ),
-            );
+            final String message;
+            if (filedCount < additions.length) {
+              message = ViewConstants.selectionFilePartialFailure.tr();
+            } else if (filedCount == 1) {
+              message = ViewConstants.randomAdditionsFiledSnackbar.tr(
+                namedArgs: {
+                  'idea': selectedIdea.title,
+                  'section': section.name,
+                },
+              );
+            } else {
+              message = ViewConstants.selectionFiledManySnackbar.tr(
+                namedArgs: {
+                  'count': '$filedCount',
+                  'idea': selectedIdea.title,
+                  'section': section.name,
+                },
+              );
+            }
+            messenger.showSnackBar(SnackBar(content: Text(message)));
           },
         );
       },
@@ -355,89 +519,130 @@ class _RandomAdditionsEmptyState extends StatelessWidget {
   }
 }
 
-class _RandomAdditionBubble extends StatelessWidget {
-  const _RandomAdditionBubble({
+class _RandomAdditionRow extends StatelessWidget {
+  const _RandomAdditionRow({
+    super.key,
     required this.addition,
     required this.isSelected,
+    required this.isSelectionActive,
     required this.onTap,
     required this.onLongPress,
-    this.isLast = false,
   });
 
   final RandomAddition addition;
   final bool isSelected;
+  final bool isSelectionActive;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    const radius = BorderRadius.only(
-      topLeft: Radius.circular(18),
-      topRight: Radius.circular(18),
-      bottomLeft: Radius.circular(18),
-      bottomRight: Radius.circular(6),
-    );
-    final foregroundColor = isSelected ? theme.primary : theme.onPrimary;
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
-          child: Material(
-            color: isSelected ? theme.accentTint : theme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: radius,
-              side: BorderSide(
-                color: isSelected
-                    ? theme.primary.withValues(alpha: 0.32)
-                    : Colors.transparent,
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              key: Key('random-addition-bubble-${addition.id}'),
-              onTap: onTap,
-              onLongPress: onLongPress,
-              borderRadius: radius,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        addition.content,
-                        style: ideaVaultBody(
-                          context,
-                          size: 15,
-                          weight: FontWeight.w600,
-                          color: foregroundColor,
-                          height: 1.38,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      key: Key('random-addition-file-${addition.id}'),
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: foregroundColor.withValues(alpha: 0.16),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.add_rounded,
-                        size: 16,
-                        color: foregroundColor,
-                      ),
-                    ),
-                  ],
+    return Semantics(
+      selected: isSelectionActive ? isSelected : null,
+      child: GestureDetector(
+        key: Key('random-addition-row-${addition.id}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: isSelectionActive ? onTap : null,
+        onLongPress: onLongPress,
+        child: AnimatedContainer(
+          key: Key('random-addition-band-${addition.id}'),
+          duration: const Duration(milliseconds: 150),
+          color: isSelected ? selectionBandColor(theme) : Colors.transparent,
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 2, 16, 2),
+          child: Row(
+            children: [
+              if (isSelectionActive) ...[
+                SelectionCheckBadge(
+                  key: Key('random-addition-check-${addition.id}'),
+                  isSelected: isSelected,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: _RandomAdditionBubble(
+                    addition: addition,
+                    onTap: onTap,
+                    onLongPress: onLongPress,
+                  ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RandomAdditionBubble extends StatelessWidget {
+  const _RandomAdditionBubble({
+    required this.addition,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final RandomAddition addition;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    const radius = BorderRadiusDirectional.only(
+      topStart: Radius.circular(18),
+      topEnd: Radius.circular(18),
+      bottomStart: Radius.circular(18),
+      bottomEnd: Radius.circular(6),
+    );
+    final foregroundColor = theme.onPrimary;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Material(
+        color: theme.primary,
+        shape: const RoundedRectangleBorder(borderRadius: radius),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: Key('random-addition-bubble-${addition.id}'),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 8, 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    addition.content,
+                    style: ideaVaultBody(
+                      context,
+                      size: 15,
+                      weight: FontWeight.w600,
+                      color: foregroundColor,
+                      height: 1.38,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  key: Key('random-addition-file-${addition.id}'),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: foregroundColor.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 16,
+                    color: foregroundColor,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -519,15 +724,19 @@ class _IdeaPickerSheet extends StatelessWidget {
                     final idea = ideas[index];
                     return _FilingTile(
                       key: Key('random-addition-idea-${idea.id}'),
-                      title: idea.title,
-                      subtitle: idea.sections.length == 1
-                          ? ViewConstants.homepageIdeaCardOneSection.tr()
-                          : ViewConstants.homepageIdeaCardSectionsMany.tr(
-                              namedArgs: {
-                                'count': '${idea.sections.length}',
-                              },
-                            ),
-                      icon: Icons.lightbulb_outline_rounded,
+                      title: ideaDisplayTitle(idea),
+                      subtitle: idea.isLocked
+                          ? ViewConstants.noteLockPickerLockedSubtitle.tr()
+                          : idea.sections.length == 1
+                              ? ViewConstants.homepageIdeaCardOneSection.tr()
+                              : ViewConstants.homepageIdeaCardSectionsMany.tr(
+                                  namedArgs: {
+                                    'count': '${idea.sections.length}',
+                                  },
+                                ),
+                      icon: idea.isLocked
+                          ? Icons.lock_outline_rounded
+                          : Icons.lightbulb_outline_rounded,
                       onTap: () => onIdeaSelected(idea),
                     );
                   },

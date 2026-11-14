@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idea_vault/core/services/note_lock_biometric_service.dart';
+import 'package:idea_vault/core/services/note_lock_session_guard.dart';
 
 void main() {
   group('NoteLockBiometricService', () {
@@ -106,6 +107,30 @@ void main() {
         await service.authenticate('Unlock'),
         BiometricAuthResult.canceled,
       );
+    });
+
+    test('asks for biometrics only so the device passcode is not accepted',
+        () async {
+      bool? requestedBiometricOnly;
+      var suppressedDuringPrompt = false;
+      final service = NoteLockBiometricService(
+        readValue: (_) async => null,
+        writeValue: (_, __) async {},
+        authenticate: ({
+          required String localizedReason,
+          bool biometricOnly = false,
+          bool persistAcrossBackgrounding = false,
+        }) async {
+          requestedBiometricOnly = biometricOnly;
+          suppressedDuringPrompt = NoteLockSessionGuard.isRelockSuppressed;
+          return true;
+        },
+      );
+
+      expect(await service.authenticate('Unlock'), BiometricAuthResult.success);
+      expect(requestedBiometricOnly, isTrue);
+      expect(suppressedDuringPrompt, isTrue);
+      expect(NoteLockSessionGuard.isRelockSuppressed, isFalse);
     });
   });
 }

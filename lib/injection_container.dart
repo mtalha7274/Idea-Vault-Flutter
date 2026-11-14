@@ -18,6 +18,9 @@ import 'data/repositories/local/app_install_state.dart';
 import 'data/repositories/local/ideas.dart';
 import 'data/repositories/local/random_additions.dart';
 import 'data/repositories/local/cloud_backup_settings.dart';
+import 'data/repositories/local/backup_device_identity.dart';
+import 'data/repositories/local/local_vault.dart';
+import 'core/services/backup/restore_safety_copy_store.dart';
 import 'data/repositories/local/language.dart';
 import 'data/repositories/local/theme.dart';
 import 'core/services/backup/cloud_backup_scheduler.dart';
@@ -25,6 +28,8 @@ import 'core/services/backup/cloud_backup_service.dart';
 import 'core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'core/services/note_lock_auth_service.dart';
 import 'core/services/note_lock_biometric_service.dart';
+import 'core/services/vault/note_vault_service.dart';
+import 'data/repositories/local/note_vault_repo.dart';
 import 'data/repositories/remote/settings/country.dart';
 import 'models/settings.dart';
 import 'viewmodels/providers/language_provider.dart';
@@ -37,7 +42,6 @@ import 'viewmodels/providers/theme_provider.dart';
 final sl = GetIt.instance;
 
 Future<void> initializeDependencies() async {
-  // Initialize
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerSingleton<SharedPreferences>(sharedPreferences);
 
@@ -54,7 +58,6 @@ Future<void> initializeDependencies() async {
           : (await deviceInfo.iosInfo).systemVersion);
   sl.registerSingleton<DeviceData>(deviceName);
 
-  // Managers
   sl.registerSingleton<LocalStorageManager>(
       SharedPreferenceManager(sl<SharedPreferences>()));
   sl.registerSingleton<IdeasDatabaseManager>(IdeasDatabaseManager());
@@ -66,7 +69,6 @@ Future<void> initializeDependencies() async {
   sl.registerSingleton<ApiManager>(DioApiManager(AppConstants.countryUrl),
       instanceName: AppConstants.countryUrl);
 
-  // Repositories
   sl.registerSingleton<IdeaEditorStateRepo>(
       IdeaEditorStateRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<AppInstallStateRepo>(
@@ -75,19 +77,37 @@ Future<void> initializeDependencies() async {
       CloudBackupSettingsRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<InitialCloudAuthCoordinator>(
       InitialCloudAuthCoordinator(sl<AppInstallStateRepo>()));
+  sl.registerSingleton<BackupDeviceIdentityRepo>(
+      BackupDeviceIdentityRepo(sl<LocalStorageManager>()));
+  await sl<BackupDeviceIdentityRepo>().ensure(deviceName: deviceName.name);
+  sl.registerSingleton<RestoreSafetyCopyStore>(RestoreSafetyCopyStore());
   sl.registerSingleton<IdeaListPreferencesRepo>(
       IdeaListPreferencesRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<IdeasRepo>(IdeasRepo(sl<IdeasDatabaseManager>()));
+  sl.registerSingleton<NoteVaultRepo>(
+      NoteVaultRepo(sl<IdeasDatabaseManager>()));
+  sl.registerSingleton<NoteVaultService>(NoteVaultService(
+    vaultRepo: sl<NoteVaultRepo>(),
+    ideasRepo: sl<IdeasRepo>(),
+    preferences: () => sl<LocalStorageManager>(),
+  ));
   sl.registerSingleton<RandomAdditionsRepo>(
       RandomAdditionsRepo(sl<IdeasDatabaseManager>()));
+  sl.registerSingleton<LocalVaultRepo>(LocalVaultRepo(
+    sl<IdeasDatabaseManager>(),
+    ideasRepo: sl<IdeasRepo>(),
+    randomAdditionsRepo: sl<RandomAdditionsRepo>(),
+  ));
   sl.registerSingleton<ThemeRepo>(ThemeRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<LanguageRepo>(LanguageRepo(sl<LocalStorageManager>()));
   sl.registerSingleton<CountryRepo>(
       CountryRepo(sl<ApiManager>(instanceName: AppConstants.countryUrl)));
 
-  // Providers
-  sl.registerFactory<IdeasProvider>(
-      () => IdeasProvider(sl<IdeasRepo>(), sl<IdeaEditorStateRepo>()));
+  sl.registerFactory<IdeasProvider>(() => IdeasProvider(
+        sl<IdeasRepo>(),
+        sl<IdeaEditorStateRepo>(),
+        vault: sl<NoteVaultService>(),
+      ));
   sl.registerFactory<RandomAdditionsProvider>(
       () => RandomAdditionsProvider(sl<RandomAdditionsRepo>()));
   sl.registerFactory<CloudBackupProvider>(() => CloudBackupProvider(
@@ -95,6 +115,19 @@ Future<void> initializeDependencies() async {
         sl<CloudBackupService>(),
         sl<CloudBackupScheduler>(),
         sl<InitialCloudAuthCoordinator>(),
+        localVaultRepo: sl<LocalVaultRepo>(),
+        safetyCopyStore: sl<RestoreSafetyCopyStore>(),
+        deviceIdentityRepo: sl<BackupDeviceIdentityRepo>(),
+        editorStateRepo: sl<IdeaEditorStateRepo>(),
+        reloadStorage: () => sl<SharedPreferences>().reload(),
+        appVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
+        deviceName: deviceName.name,
+        vault: sl<NoteVaultService>(),
+        onVaultAdopted: () async {
+          await sl<NoteVaultService>().forgetCachedKey();
+          await sl<NoteLockAuthService>().clearPin();
+          await sl<NoteLockBiometricService>().clearBiometricUnlock();
+        },
       ));
   sl.registerFactory<ThemeProvider>(() => ThemeProvider(sl<ThemeRepo>()));
   sl.registerFactory<LanguageProvider>(
@@ -105,6 +138,7 @@ Future<void> initializeDependencies() async {
     sl<AppInstallStateRepo>(),
     sl<NoteLockAuthService>(),
     sl<NoteLockBiometricService>(),
+    clearVaultKeyMaterial: () => sl<NoteVaultService>().forgetCachedKey(),
     hasLocalAppData: () async {
       final ideas = await sl<IdeasRepo>().getIdeas();
       if (ideas.isNotEmpty) {

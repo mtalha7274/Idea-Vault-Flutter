@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/constants/view_constants.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -10,18 +10,23 @@ import 'package:provider/provider.dart';
 import '../config/router/app_router.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
+import '../core/utils/selection_controller.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
+import '../models/backup/cloud_backup_restore.dart';
 import '../models/idea.dart';
 import '../viewmodels/providers/backup/cloud_backup_provider.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/random_additions_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
+import '../widgets/backup/backup_status_indicator.dart';
 import '../widgets/backup_restore_prompt_banner.dart';
+import '../widgets/home/home_top_bar.dart';
+import '../widgets/home/quick_note_button.dart';
 import '../widgets/ideas/ideas_layout.dart';
 import '../widgets/note_lock_auth_dialog.dart';
-import '../widgets/random_addition_composer.dart';
+import '../widgets/selection/selection_bar.dart';
 import '../widgets/translated_text.dart';
 import 'backup_restore_screen.dart';
 import 'idea_editor.dart';
@@ -43,23 +48,21 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  static const double _dockScrollPaddingBase = 236;
-  static const double _dockMultilineExtraPadding = 15 * 1.35;
+  static const double _quickNoteDockGap = 24;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final Set<String> _selectedIdeaIds = <String>{};
-  late final TextEditingController _quickAdditionController;
-  late final FocusNode _quickAdditionFocusNode;
+  final SelectionController _selection = SelectionController();
   late final IdeaListPreferencesRepo _sortPreferencesRepo;
   late final NoteLockAuthService _noteLockAuthService;
   late final NoteLockBiometricService _noteLockBiometricService;
+  late final IdeasProvider _ideasProvider;
 
   bool _didHandleResume = false;
-  bool _isQuickAdditionMultiline = false;
+  bool _isOpeningEditor = false;
   late IdeaSortOption _sortOption;
   late IdeaLayoutOption _layoutOption;
 
-  bool get _isSelectionMode => _selectedIdeaIds.isNotEmpty;
+  bool get _isSelectionMode => _selection.isActive;
 
   @override
   void initState() {
@@ -75,8 +78,9 @@ class _HomepageState extends State<Homepage> {
     _sortOption = _sortPreferencesRepo.getSortOption();
     _layoutOption = IdeaLayoutOption.grid;
     unawaited(_sortPreferencesRepo.saveLayoutOption(IdeaLayoutOption.grid));
-    _quickAdditionController = TextEditingController();
-    _quickAdditionFocusNode = FocusNode();
+    _selection.addListener(_onSelectionChanged);
+    _ideasProvider = context.read<IdeasProvider>();
+    _ideasProvider.addListener(_pruneSelection);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleInitialHomeEffects();
     });
@@ -84,9 +88,20 @@ class _HomepageState extends State<Homepage> {
 
   @override
   void dispose() {
-    _quickAdditionController.dispose();
-    _quickAdditionFocusNode.dispose();
+    _ideasProvider.removeListener(_pruneSelection);
+    _selection.removeListener(_onSelectionChanged);
+    _selection.dispose();
     super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _pruneSelection() {
+    _selection.retainExisting(_ideasProvider.ideas.map((idea) => idea.id));
   }
 
   @override
@@ -95,198 +110,216 @@ class _HomepageState extends State<Homepage> {
     final ideasProvider = context.watch<IdeasProvider>();
     final ideas = ideasProvider.ideas;
     final visibleIdeas = _visibleIdeas(ideas);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final listBottomPadding =
+        QuickNoteButton.height + _quickNoteDockGap + bottomInset;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: theme.background,
-      drawer: _HomeDrawer(
-        hostContext: context,
-        onBackupPressed: _openBackupRestore,
-      ),
-      body: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: NestedScrollView(
-                  floatHeaderSlivers: true,
-                  headerSliverBuilder: (context, innerBoxIsScrolled) {
-                    final handle =
-                        NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    );
-                    return [
-                      SliverOverlapAbsorber(
-                        handle: handle,
-                        sliver: SliverToBoxAdapter(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Gap(8.h),
-                              _Header(
-                                ideaCount: ideas.length,
-                                selectedCount: _selectedIdeaIds.length,
-                                onMenuPressed: () =>
-                                    _scaffoldKey.currentState?.openDrawer(),
-                                onDeletePressed: _isSelectionMode
-                                    ? _confirmDeleteSelection
-                                    : null,
-                                onSearchPressed:
-                                    _isSelectionMode ? null : _openSearchScreen,
-                                onSortPressed:
-                                    _isSelectionMode ? null : _showSortSheet,
-                              ),
-                              SizedBox(height: 18.h),
-                              if (_hasCloudBackupProvider(context)) ...[
-                                _BackupOffIndicator(
-                                  onTap: _openBackupRestore,
+    return PopScope(
+      canPop: !_isSelectionMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _isSelectionMode) {
+          _selection.clear();
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: theme.background,
+        drawerEnableOpenDragGesture: !_isSelectionMode,
+        drawer: _HomeDrawer(
+          hostContext: context,
+          onBackupPressed: _openBackupRestore,
+        ),
+        body: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: NestedScrollView(
+                    floatHeaderSlivers: true,
+                    headerSliverBuilder: (context, innerBoxIsScrolled) {
+                      final handle =
+                          NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      );
+                      return [
+                        SliverOverlapAbsorber(
+                          handle: handle,
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Gap(4.h),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  child: _buildTopBar(visibleIdeas),
                                 ),
-                                const BackupRestorePromptBanner(),
+                                SizedBox(height: 12.h),
+                                if (_hasCloudBackupProvider(context)) ...[
+                                  BackupStatusIndicator(
+                                    onTap: _openBackupRestore,
+                                  ),
+                                  const BackupRestorePromptBanner(),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ];
-                  },
-                  body: Builder(
-                    builder: (context) {
-                      return CustomScrollView(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverOverlapInjector(
-                            handle:
-                                NestedScrollView.sliverOverlapAbsorberHandleFor(
-                                    context),
-                          ),
-                          if (ideas.isEmpty)
-                            SliverPadding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              sliver: SliverFillRemaining(
-                                hasScrollBody: false,
-                                child: const _EmptyIdeasState(),
-                              ),
-                            )
-                          else
-                            SliverPadding(
-                              padding: EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                _dockScrollPaddingBase +
-                                    (_isQuickAdditionMultiline
-                                        ? _dockMultilineExtraPadding
-                                        : 0),
-                              ),
-                              sliver: SliverToBoxAdapter(
-                                child: IdeasLayout(
-                                  ideas: visibleIdeas,
-                                  layoutOption: _layoutOption,
-                                  selectedIdeaIds: _selectedIdeaIds,
-                                  onTap: (idea) =>
-                                      unawaited(_handleIdeaTap(idea)),
-                                  onLongPress: _handleIdeaLongPress,
+                      ];
+                    },
+                    body: Builder(
+                      builder: (context) {
+                        return CustomScrollView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverOverlapInjector(
+                              handle: NestedScrollView
+                                  .sliverOverlapAbsorberHandleFor(context),
+                            ),
+                            if (ideas.isEmpty)
+                              SliverPadding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                sliver: SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: _EmptyIdeasState(
+                                    bottomPadding: listBottomPadding,
+                                    onCreatePressed: _openNewIdea,
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  16,
+                                  listBottomPadding,
+                                ),
+                                sliver: SliverToBoxAdapter(
+                                  child: IdeasLayout(
+                                    ideas: visibleIdeas,
+                                    layoutOption: _layoutOption,
+                                    selectedIdeaIds: _selection.selectedIds,
+                                    isSelectionActive: _isSelectionMode,
+                                    onTap: (idea) =>
+                                        unawaited(_handleIdeaTap(idea)),
+                                    onLongPress: _handleIdeaLongPress,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (!_isSelectionMode) _buildQuickAdditionDock(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickAdditionDock(BuildContext context) {
-    final theme = context.read<ThemeProvider>().baseTheme;
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 860),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: _HomepageFab(
-                  isExtended: _layoutOption == IdeaLayoutOption.list,
-                  onPressed: () => AppRouter.push(
-                    context,
-                    const IdeaEditorScreen(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const Gap(24),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              ColoredBox(
-                color: theme.background,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    0,
-                    16,
-                    MediaQuery.of(context).padding.bottom + 8,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 860),
-                    child: RandomAdditionComposer(
-                      controller: _quickAdditionController,
-                      focusNode: _quickAdditionFocusNode,
-                      fieldKey: const Key('homepage-random-addition-field'),
-                      sendButtonKey: const Key('homepage-random-addition-send'),
-                      onSubmit: _submitQuickAddition,
-                      onMultilineChanged: (isMultiline) {
-                        if (_isQuickAdditionMultiline == isMultiline) {
-                          return;
-                        }
-                        setState(() {
-                          _isQuickAdditionMultiline = isMultiline;
-                        });
+                          ],
+                        );
                       },
                     ),
                   ),
                 ),
               ),
-              Positioned(
-                top: -32,
-                left: 0,
-                right: 0,
-                height: 32,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          theme.background.withValues(alpha: 0),
-                          theme.background,
-                        ],
-                      ),
-                    ),
+            ),
+            if (!_isSelectionMode) _buildQuickNoteDock(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(List<Idea> visibleIdeas) {
+    final Widget bar;
+    if (_isSelectionMode) {
+      final visibleIds = visibleIdeas.map((idea) => idea.id);
+      final allSelected = _selection.containsAll(visibleIds);
+      bar = SelectionToolbar(
+        key: const ValueKey('ideas-selection-bar'),
+        count: _selection.count,
+        onClose: _selection.clear,
+        closeButtonKey: const Key('ideas-selection-close'),
+        countKey: const Key('ideas-selection-count'),
+        actions: [
+          SelectionActionButton(
+            key: const Key('ideas-select-all-button'),
+            icon: Icons.select_all_rounded,
+            tooltipKey: ViewConstants.selectionSelectAllTooltip,
+            onPressed:
+                allSelected ? null : () => _selection.selectAll(visibleIds),
+          ),
+          SelectionActionButton(
+            key: const Key('ideas-delete-button'),
+            icon: Icons.delete_outline_rounded,
+            tooltipKey: ViewConstants.selectionDeleteTooltip,
+            onPressed: _confirmDeleteSelection,
+          ),
+        ],
+      );
+    } else {
+      bar = HomeTopBar(
+        key: const ValueKey('ideas-top-bar'),
+        onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        onSearchPressed: _openSearchScreen,
+        onSortPressed: _showSortSheet,
+        onNewIdeaPressed: _openNewIdea,
+      );
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: bar,
+    );
+  }
+
+  Widget _buildQuickNoteDock(BuildContext context) {
+    final theme = context.read<ThemeProvider>().baseTheme;
+    final unfiledCount =
+        context.watch<RandomAdditionsProvider>().additions.length;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ColoredBox(
+            color: theme.background,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                MediaQuery.of(context).padding.bottom + 8,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: QuickNoteButton(
+                  unfiledCount: unfiledCount,
+                  onPressed: _openRandomNotesComposer,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -32,
+            left: 0,
+            right: 0,
+            height: 32,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.background.withValues(alpha: 0),
+                      theme.background,
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -331,6 +364,12 @@ class _HomepageState extends State<Homepage> {
       ideasProvider.ideas,
       randomAdditions: randomAdditionsProvider.additions,
     );
+    if (backupProvider.plaintextCleanupPending) {
+      await backupProvider.runPlaintextCleanup(
+        ideasProvider.ideas,
+        randomAdditions: randomAdditionsProvider.additions,
+      );
+    }
   }
 
   Future<void> _resumeEditorIfNeeded() async {
@@ -366,8 +405,6 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    // Don't auto-resume locked notes on cold start — auth on every open is
-    // disruptive on Android where the process is frequently killed.
     await ideasProvider.clearEditorState();
   }
 
@@ -376,7 +413,9 @@ class _HomepageState extends State<Homepage> {
       return;
     }
     final ideasProvider = context.read<IdeasProvider>();
+    final additionsProvider = context.read<RandomAdditionsProvider>();
     await ideasProvider.ensureLoaded();
+    await additionsProvider.ensureLoaded();
     if (!mounted) {
       return;
     }
@@ -385,7 +424,14 @@ class _HomepageState extends State<Homepage> {
       return;
     }
     await backupProvider.checkForFreshInstallBackup(
-      hasLocalIdeas: ideasProvider.ideas.isNotEmpty,
+      hasLocalContent: ideasProvider.ideas.isNotEmpty ||
+          additionsProvider.additions.isNotEmpty,
+    );
+    await backupProvider.resolvePendingRemoteState(
+      local: LocalVaultContent(
+        ideas: ideasProvider.ideas,
+        randomAdditions: additionsProvider.additions,
+      ),
     );
   }
 
@@ -403,7 +449,7 @@ class _HomepageState extends State<Homepage> {
 
   Future<void> _handleIdeaTap(Idea idea) async {
     if (_isSelectionMode) {
-      _toggleIdeaSelection(idea.id);
+      _selection.toggle(idea.id);
       return;
     }
 
@@ -425,22 +471,16 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  Future<void> _submitQuickAddition() async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    final addition = await context
-        .read<RandomAdditionsProvider>()
-        .addAddition(_quickAdditionController.text);
-    if (addition == null || !mounted) {
+  Future<void> _openNewIdea() async {
+    if (_isOpeningEditor || _isSelectionMode) {
       return;
     }
-
-    _quickAdditionController.clear();
-    if (_isQuickAdditionMultiline) {
-      setState(() {
-        _isQuickAdditionMultiline = false;
-      });
+    _isOpeningEditor = true;
+    try {
+      await AppRouter.push(context, const IdeaEditorScreen());
+    } finally {
+      _isOpeningEditor = false;
     }
-    await _openRandomAdditions();
   }
 
   Future<void> _openSearchScreen() async {
@@ -450,10 +490,10 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  Future<void> _openRandomAdditions() async {
+  Future<void> _openRandomNotesComposer() async {
     await AppRouter.push(
       context,
-      const RandomAdditionsScreen(),
+      const RandomAdditionsScreen(autofocusComposer: true),
     );
   }
 
@@ -469,23 +509,16 @@ class _HomepageState extends State<Homepage> {
   }
 
   void _handleIdeaLongPress(Idea idea) {
-    setState(() {
-      _selectedIdeaIds.add(idea.id);
-    });
-  }
-
-  void _toggleIdeaSelection(String ideaId) {
-    setState(() {
-      if (_selectedIdeaIds.contains(ideaId)) {
-        _selectedIdeaIds.remove(ideaId);
-      } else {
-        _selectedIdeaIds.add(ideaId);
-      }
-    });
+    if (_isSelectionMode) {
+      _selection.toggle(idea.id);
+      return;
+    }
+    unawaited(HapticFeedback.selectionClick());
+    _selection.select(idea.id);
   }
 
   Future<void> _confirmDeleteSelection() async {
-    final selectedCount = _selectedIdeaIds.length;
+    final selectedCount = _selection.count;
     if (selectedCount == 0) {
       return;
     }
@@ -499,7 +532,7 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    final selectedIds = _selectedIdeaIds.toList(growable: false);
+    final selectedIds = _selection.selectedIds.toList(growable: false);
     final ideasProvider = context.read<IdeasProvider>();
     final selectedIdeas = ideasProvider.ideas
         .where((idea) => selectedIds.contains(idea.id))
@@ -528,9 +561,7 @@ class _HomepageState extends State<Homepage> {
       return;
     }
 
-    setState(() {
-      _selectedIdeaIds.clear();
-    });
+    _selection.clear();
   }
 
   List<Idea> _visibleIdeas(List<Idea> ideas) {
@@ -626,192 +657,6 @@ class _HomepageState extends State<Homepage> {
       _sortOption = selectedSortOption;
     });
     await _sortPreferencesRepo.saveSortOption(selectedSortOption);
-  }
-}
-
-class _BackupOffIndicator extends StatelessWidget {
-  const _BackupOffIndicator({
-    required this.onTap,
-  });
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    final backupState = context.watch<CloudBackupProvider>().state;
-    if (backupState.enabled) {
-      return const SizedBox.shrink();
-    }
-
-    final isDarkMode = theme.themeData.brightness == Brightness.dark;
-    final indicatorColor = theme.warning.withValues(
-      alpha: isDarkMode ? 0.18 : 0.14,
-    );
-    final borderColor = theme.warning.withValues(
-      alpha: isDarkMode ? 0.38 : 0.32,
-    );
-    final foregroundColor = isDarkMode ? theme.warning : theme.primaryText;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 12.h),
-      child: Material(
-        key: const Key('homepage-backup-off-indicator'),
-        color: indicatorColor,
-        borderRadius: BorderRadius.circular(99),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(99),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: borderColor),
-            ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(14.w, 10.h, 12.w, 10.h),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.cloud_off_rounded,
-                    color: foregroundColor,
-                    size: 20.d,
-                  ),
-                  Gap(10.w),
-                  Expanded(
-                    child: TranslatedText(
-                      ViewConstants.homepageBackupOffIndicator,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ideaVaultBody(
-                        context,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: theme.primaryText,
-                      ),
-                    ),
-                  ),
-                  Gap(10.w),
-                  TranslatedText(
-                    ViewConstants.homepageBackupOffAction,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ideaVaultLabel(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w800,
-                      color: foregroundColor,
-                    ),
-                  ),
-                  Gap(2.w),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: foregroundColor,
-                    size: 20.d,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomepageFab extends StatelessWidget {
-  const _HomepageFab({
-    required this.isExtended,
-    required this.onPressed,
-  });
-
-  static const double _height = 56;
-  static const double _collapsedWidth = 56;
-  static const double _extendedWidth = 144;
-  static const BorderRadius _borderRadius = BorderRadius.all(
-    Radius.circular(99),
-  );
-  static const Duration _duration = Duration(milliseconds: 240);
-
-  final bool isExtended;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    final labelStyle = ideaVaultLabel(
-      context,
-      size: 14,
-      weight: FontWeight.w700,
-      color: theme.onPrimary,
-    );
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(
-        end: isExtended ? _extendedWidth : _collapsedWidth,
-      ),
-      duration: _duration,
-      curve: Curves.easeOutCubic,
-      builder: (context, width, child) {
-        return Semantics(
-          button: true,
-          label: ViewConstants.homepageFabNewIdea.tr(),
-          child: Material(
-            key: const Key('ideas-fab'),
-            color: theme.primary,
-            elevation: 6,
-            shadowColor: Colors.black.withValues(alpha: 0.24),
-            shape: const RoundedRectangleBorder(
-              borderRadius: _borderRadius,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              customBorder: const RoundedRectangleBorder(
-                borderRadius: _borderRadius,
-              ),
-              onTap: onPressed,
-              child: SizedBox(
-                width: width,
-                height: _height,
-                child: ClipRect(
-                  child: OverflowBox(
-                    alignment: Alignment.centerLeft,
-                    maxWidth: _extendedWidth,
-                    minWidth: _extendedWidth,
-                    child: SizedBox(
-                      width: _extendedWidth,
-                      height: _height,
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Icon(
-                            Icons.add_rounded,
-                            color: theme.onPrimary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: AnimatedOpacity(
-                              opacity: isExtended ? 1 : 0,
-                              duration: const Duration(milliseconds: 120),
-                              curve: Curves.easeOut,
-                              child: Text(
-                                ViewConstants.homepageFabNewIdea.tr(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: labelStyle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 }
 
@@ -934,168 +779,20 @@ class _HomeDrawer extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.ideaCount,
-    required this.selectedCount,
-    required this.onMenuPressed,
-    required this.onDeletePressed,
-    required this.onSearchPressed,
-    required this.onSortPressed,
+class _EmptyIdeasState extends StatelessWidget {
+  const _EmptyIdeasState({
+    required this.bottomPadding,
+    required this.onCreatePressed,
   });
 
-  final int ideaCount;
-  final int selectedCount;
-  final VoidCallback onMenuPressed;
-  final VoidCallback? onDeletePressed;
-  final VoidCallback? onSearchPressed;
-  final VoidCallback? onSortPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().baseTheme;
-    final iconBackgroundColor = theme.themeData.brightness == Brightness.light
-        ? theme.surfaceHigh
-        : theme.surfaceLow;
-    final menuItemBodyStyle = ideaVaultBody(
-      context,
-      size: 15,
-      weight: FontWeight.w600,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Gap(16.w),
-            IconButton(
-              key: const Key('ideas-menu-button'),
-              onPressed: onMenuPressed,
-              icon: const Icon(Icons.menu_rounded),
-              padding: EdgeInsets.all(10.d),
-            ),
-            Gap(10.w),
-            Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: TranslatedText(
-                      ViewConstants.homepageTitle,
-                      style: ideaVaultHeadline(
-                        context,
-                        size: 34.f,
-                        weight: FontWeight.w800,
-                        height: 1.06,
-                        letterSpacing: -0.9,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (selectedCount > 0) ...[
-              IconButton(
-                key: const Key('ideas-delete-button'),
-                onPressed: onDeletePressed,
-                style: IconButton.styleFrom(
-                  backgroundColor: iconBackgroundColor,
-                  foregroundColor: theme.primary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-                icon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$selectedCount',
-                      style: ideaVaultLabel(
-                        context,
-                        size: 14,
-                        weight: FontWeight.w800,
-                        color: theme.primary,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.delete_outline_rounded, size: 22),
-                  ],
-                ),
-              ),
-            ] else ...[
-              IconButton(
-                key: const Key('ideas-search-button'),
-                onPressed: onSearchPressed,
-                style: IconButton.styleFrom(
-                  backgroundColor: iconBackgroundColor,
-                  foregroundColor: theme.primary,
-                  padding: const EdgeInsets.all(12),
-                ),
-                icon: const Icon(Icons.search_rounded),
-              ),
-              Gap(8.w),
-              PopupMenuButton<_HomepageMenuAction>(
-                key: const Key('ideas-more-menu'),
-                icon: const Icon(Icons.more_vert),
-                color: theme.surface,
-                padding: EdgeInsets.zero,
-                style: IconButton.styleFrom(
-                  backgroundColor: iconBackgroundColor,
-                  foregroundColor: theme.primary,
-                  padding: const EdgeInsets.all(12),
-                ),
-                onSelected: (action) {
-                  onSortPressed?.call();
-                },
-                itemBuilder: (menuContext) {
-                  return [
-                    PopupMenuItem<_HomepageMenuAction>(
-                      key: const Key('ideas-menu-filter'),
-                      value: _HomepageMenuAction.filter,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.swap_vert_rounded,
-                            color: theme.primary,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TranslatedText(
-                              ViewConstants.homepageMenuFilter,
-                              style: menuItemBodyStyle,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ];
-                },
-              ),
-            ],
-            Gap(16.w),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-enum _HomepageMenuAction {
-  filter,
-}
-
-class _EmptyIdeasState extends StatelessWidget {
-  const _EmptyIdeasState();
+  final double bottomPadding;
+  final VoidCallback onCreatePressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 120),
+      padding: EdgeInsets.only(bottom: bottomPadding),
       child: Center(
         child: Container(
           key: const Key('ideas-empty-state'),
@@ -1143,6 +840,30 @@ class _EmptyIdeasState extends StatelessWidget {
                   weight: FontWeight.w500,
                   color: theme.textMuted,
                   height: 1.55,
+                ),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                key: const Key('ideas-empty-create-button'),
+                onPressed: onCreatePressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.primary,
+                  foregroundColor: theme.onPrimary,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                icon: const Icon(Icons.add_rounded),
+                label: TranslatedText(
+                  ViewConstants.homepageEmptyCreateFirstIdea,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: ideaVaultLabel(
+                    context,
+                    size: 15,
+                    weight: FontWeight.w700,
+                    color: theme.onPrimary,
+                  ),
                 ),
               ),
             ],

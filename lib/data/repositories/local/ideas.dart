@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../models/idea.dart';
@@ -37,6 +38,7 @@ class IdeasRepo {
 
     return ideaRows.map((row) {
       final ideaId = row['id'] as String;
+      final payload = row['encrypted_payload'] as String?;
       return Idea(
         id: ideaId,
         title: row['title'] as String,
@@ -44,48 +46,17 @@ class IdeasRepo {
         updatedAt: DateTime.parse(row['updated_at'] as String),
         lastOpenedSectionId: row['last_opened_section_id'] as String?,
         isLocked: row['is_locked'] == 1,
-        sections: sectionsByIdeaId[ideaId] ?? const [],
+        encryptedPayload: payload,
+        titleHidden: row['title_hidden'] == 1,
+        sections:
+            payload != null ? const [] : sectionsByIdeaId[ideaId] ?? const [],
       );
     }).toList();
   }
 
   Future<void> upsertIdea(Idea idea) async {
     final db = await _databaseManager.database;
-    await db.transaction((txn) async {
-      await txn.insert(
-        IdeasDatabaseManager.ideasTable,
-        {
-          'id': idea.id,
-          'title': idea.title,
-          'created_at': idea.createdAt.toIso8601String(),
-          'updated_at': idea.updatedAt.toIso8601String(),
-          'last_opened_section_id': idea.lastOpenedSectionId,
-          'is_locked': idea.isLocked ? 1 : 0,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      await txn.delete(
-        IdeasDatabaseManager.sectionsTable,
-        where: 'idea_id = ?',
-        whereArgs: [idea.id],
-      );
-
-      final batch = txn.batch();
-      for (final (index, section) in idea.sections.indexed) {
-        batch.insert(
-          IdeasDatabaseManager.sectionsTable,
-          {
-            'id': section.id,
-            'idea_id': idea.id,
-            'name': section.name,
-            'content': section.content,
-            'sort_order': index,
-          },
-        );
-      }
-      await batch.commit(noResult: true);
-    });
+    await db.transaction((txn) => writeIdeaRows(txn, idea));
   }
 
   Future<void> updateLastOpenedSectionId({
@@ -132,35 +103,100 @@ class IdeasRepo {
   Future<void> saveIdeas(List<Idea> ideas) async {
     final db = await _databaseManager.database;
     await db.transaction((txn) async {
-      await txn.delete(IdeasDatabaseManager.sectionsTable);
-      await txn.delete(IdeasDatabaseManager.ideasTable);
+      await deleteAllIdeaRows(txn);
       for (final idea in ideas) {
-        await txn.insert(
-          IdeasDatabaseManager.ideasTable,
-          {
-            'id': idea.id,
-            'title': idea.title,
-            'created_at': idea.createdAt.toIso8601String(),
-            'updated_at': idea.updatedAt.toIso8601String(),
-            'last_opened_section_id': idea.lastOpenedSectionId,
-            'is_locked': idea.isLocked ? 1 : 0,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-
-        for (final (index, section) in idea.sections.indexed) {
-          await txn.insert(
-            IdeasDatabaseManager.sectionsTable,
-            {
-              'id': section.id,
-              'idea_id': idea.id,
-              'name': section.name,
-              'content': section.content,
-              'sort_order': index,
-            },
-          );
-        }
+        await writeIdeaRows(txn, idea);
       }
     });
+  }
+
+  Future<void> writeIdeasAtomically(List<Idea> ideas) async {
+    if (ideas.isEmpty) {
+      return;
+    }
+    final db = await _databaseManager.database;
+    await db.transaction((txn) async {
+      for (final idea in ideas) {
+        await writeIdeaInTransaction(txn, idea);
+      }
+    });
+  }
+
+  @protected
+  Future<void> writeIdeaInTransaction(DatabaseExecutor executor, Idea idea) {
+    return writeIdeaRows(executor, idea);
+  }
+
+  Future<bool> hasEncryptedIdeas() async {
+    final db = await _databaseManager.database;
+    final rows = await db.query(
+      IdeasDatabaseManager.ideasTable,
+      columns: ['id'],
+      where: 'encrypted_payload IS NOT NULL',
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<Set<String>> sectionIdsNotOwnedBy(String ideaId) async {
+    final db = await _databaseManager.database;
+    final rows = await db.query(
+      IdeasDatabaseManager.sectionsTable,
+      columns: ['id'],
+      where: 'idea_id != ?',
+      whereArgs: [ideaId],
+    );
+    return {for (final row in rows) row['id'] as String};
+  }
+
+  Future<void> compact() => _databaseManager.compact();
+
+  static Map<String, Object?> ideaRow(Idea idea) {
+    return {
+      'id': idea.id,
+      'title': idea.title,
+      'created_at': idea.createdAt.toIso8601String(),
+      'updated_at': idea.updatedAt.toIso8601String(),
+      'last_opened_section_id': idea.lastOpenedSectionId,
+      'is_locked': idea.isLocked ? 1 : 0,
+      'encrypted_payload': idea.encryptedPayload,
+      'title_hidden': idea.titleHidden ? 1 : 0,
+    };
+  }
+
+  static Future<void> writeIdeaRows(
+    DatabaseExecutor executor,
+    Idea idea,
+  ) async {
+    await executor.insert(
+      IdeasDatabaseManager.ideasTable,
+      ideaRow(idea),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    await executor.delete(
+      IdeasDatabaseManager.sectionsTable,
+      where: 'idea_id = ?',
+      whereArgs: [idea.id],
+    );
+    if (idea.isEncrypted) {
+      return;
+    }
+    for (final (index, section) in idea.sections.indexed) {
+      await executor.insert(
+        IdeasDatabaseManager.sectionsTable,
+        {
+          'id': section.id,
+          'idea_id': idea.id,
+          'name': section.name,
+          'content': section.content,
+          'sort_order': index,
+        },
+      );
+    }
+  }
+
+  static Future<void> deleteAllIdeaRows(DatabaseExecutor executor) async {
+    await executor.delete(IdeasDatabaseManager.sectionsTable);
+    await executor.delete(IdeasDatabaseManager.ideasTable);
   }
 }

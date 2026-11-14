@@ -9,8 +9,10 @@ import '../../views/ideas/idea_vault_theme.dart';
 import '../translated_text.dart';
 
 Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
-  BuildContext context,
-) {
+  BuildContext context, {
+  bool isUnsavedDraft = false,
+  bool? isNoteLocked,
+}) {
   return showModalBottomSheet<IdeaEditorOptionsSheetAction>(
     context: context,
     isScrollControlled: true,
@@ -19,22 +21,32 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
     builder: (sheetContext) {
       final sheetTheme = sheetContext.watch<ThemeProvider>().baseTheme;
       final errorColor = Theme.of(sheetContext).colorScheme.error;
-      final groupBorder = sheetTheme.outline.withValues(alpha: 0.12);
-      final dividerColor = sheetTheme.outline.withValues(alpha: 0.1);
+      _SheetOptionRow row({
+        required Key key,
+        required IconData icon,
+        required String labelKey,
+        required IdeaEditorOptionsSheetAction action,
+        bool isDestructive = false,
+      }) {
+        return _SheetOptionRow(
+          key: key,
+          icon: icon,
+          labelKey: labelKey,
+          color: isDestructive ? errorColor : sheetTheme.primaryText,
+          iconColor: isDestructive ? errorColor : sheetTheme.primary,
+          onTap: () => Navigator.of(sheetContext).pop(action),
+        );
+      }
+
       return DecoratedBox(
         decoration: BoxDecoration(
           color: sheetTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border(
-            top: BorderSide(
-              color: sheetTheme.outline.withValues(alpha: 0.12),
-            ),
-          ),
         ),
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            padding: const EdgeInsets.only(top: 12, bottom: 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -49,71 +61,63 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                TranslatedText(
-                  ViewConstants.ideaEditorOptionsSheetTitle,
-                  style: ideaVaultHeadline(
-                    sheetContext,
-                    size: 22,
-                    weight: FontWeight.w800,
-                    height: 1.2,
-                    color: sheetTheme.primaryText,
-                  ),
-                ),
-                const Gap(20),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: sheetTheme.surfaceLow,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: groupBorder),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _SheetOptionRow(
-                          key: const Key('idea-editor-option-export-ai'),
-                          icon: Icons.auto_awesome_rounded,
-                          labelKey: ViewConstants.exportForAiScreenTitle,
-                          iconBackgroundColor:
-                              sheetTheme.primary.withValues(alpha: 0.12),
-                          iconColor: sheetTheme.primary,
-                          labelColor: sheetTheme.primaryText,
-                          onTap: () => Navigator.of(sheetContext).pop(
-                            IdeaEditorOptionsSheetAction.exportForAI,
-                          ),
-                        ),
-                        Divider(height: 1, thickness: 1, color: dividerColor),
-                        _SheetOptionRow(
-                          key: const Key('idea-editor-option-export-pdf'),
-                          icon: Icons.picture_as_pdf_rounded,
-                          labelKey: ViewConstants.exportToPdfButton,
-                          iconBackgroundColor:
-                              sheetTheme.primary.withValues(alpha: 0.12),
-                          iconColor: sheetTheme.primary,
-                          labelColor: sheetTheme.primaryText,
-                          onTap: () => Navigator.of(sheetContext).pop(
-                            IdeaEditorOptionsSheetAction.exportToPDF,
-                          ),
-                        ),
-                        Divider(height: 1, thickness: 1, color: dividerColor),
-                        _SheetOptionRow(
-                          key: const Key('idea-editor-option-delete-idea'),
-                          icon: Icons.delete_outline_rounded,
-                          labelKey: ViewConstants.ideaEditorOptionsDeleteIdea,
-                          iconBackgroundColor:
-                              errorColor.withValues(alpha: 0.12),
-                          iconColor: errorColor,
-                          labelColor: errorColor,
-                          onTap: () => Navigator.of(sheetContext).pop(
-                            IdeaEditorOptionsSheetAction.deleteIdea,
-                          ),
-                        ),
-                      ],
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: TranslatedText(
+                    ViewConstants.ideaEditorOptionsSheetTitle,
+                    style: ideaVaultHeadline(
+                      sheetContext,
+                      size: 20,
+                      weight: FontWeight.w800,
+                      height: 1.2,
+                      color: sheetTheme.primaryText,
                     ),
                   ),
                 ),
+                const Gap(8),
+                if (isUnsavedDraft)
+                  row(
+                    key: const Key('idea-editor-option-discard'),
+                    icon: Icons.delete_sweep_outlined,
+                    labelKey: ViewConstants.editorDraftDiscard,
+                    action: IdeaEditorOptionsSheetAction.discardDraft,
+                    isDestructive: true,
+                  )
+                else ...[
+                  if (isNoteLocked != null)
+                    row(
+                      key: const Key('idea-editor-option-lock'),
+                      icon: isNoteLocked
+                          ? Icons.lock_open_rounded
+                          : Icons.lock_outline_rounded,
+                      labelKey: isNoteLocked
+                          ? ViewConstants.ideaEditorOptionsUnlockNote
+                          : ViewConstants.ideaEditorOptionsLockNote,
+                      action: isNoteLocked
+                          ? IdeaEditorOptionsSheetAction.unlockNote
+                          : IdeaEditorOptionsSheetAction.lockNote,
+                    ),
+                  row(
+                    key: const Key('idea-editor-option-export-ai'),
+                    icon: Icons.auto_awesome_rounded,
+                    labelKey: ViewConstants.exportForAiScreenTitle,
+                    action: IdeaEditorOptionsSheetAction.exportForAI,
+                  ),
+                  row(
+                    key: const Key('idea-editor-option-export-pdf'),
+                    icon: Icons.picture_as_pdf_rounded,
+                    labelKey: ViewConstants.exportToPdfButton,
+                    action: IdeaEditorOptionsSheetAction.exportToPDF,
+                  ),
+                  row(
+                    key: const Key('idea-editor-option-delete-idea'),
+                    icon: Icons.delete_outline_rounded,
+                    labelKey: ViewConstants.ideaEditorOptionsDeleteIdea,
+                    action: IdeaEditorOptionsSheetAction.deleteIdea,
+                    isDestructive: true,
+                  ),
+                ],
               ],
             ),
           ),
@@ -124,33 +128,28 @@ Future<IdeaEditorOptionsSheetAction?> showIdeaEditorOptionsSheet(
 }
 
 enum IdeaEditorOptionsSheetAction {
+  lockNote,
+  unlockNote,
   exportForAI,
   exportToPDF,
   deleteIdea,
+  discardDraft,
 }
 
 class _SheetOptionRow extends StatelessWidget {
   const _SheetOptionRow({
     super.key,
-    this.icon,
-    this.leading,
+    required this.icon,
     required this.labelKey,
-    required this.iconBackgroundColor,
+    required this.color,
     required this.iconColor,
-    required this.labelColor,
     required this.onTap,
-  }) : assert(
-          (icon != null && leading == null) ||
-              (icon == null && leading != null),
-          'Exactly one of icon or leading must be set',
-        );
+  });
 
-  final IconData? icon;
-  final Widget? leading;
+  final IconData icon;
   final String labelKey;
-  final Color iconBackgroundColor;
+  final Color color;
   final Color iconColor;
-  final Color labelColor;
   final VoidCallback onTap;
 
   @override
@@ -160,26 +159,20 @@ class _SheetOptionRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           child: Row(
             children: [
-              SizedBox(
-                width: 38.d,
-                height: 38.d,
-                child: Center(
-                  child: leading ?? Icon(icon, size: 20.d, color: iconColor),
-                ),
-              ),
-              Gap(2.d),
+              Icon(icon, size: 22.d, color: iconColor),
+              Gap(16.d),
               Expanded(
                 child: TranslatedText(
                   labelKey,
                   style: ideaVaultBody(
                     context,
-                    size: 15.f,
+                    size: 16.f,
                     weight: FontWeight.w600,
                     height: 1.3,
-                    color: labelColor,
+                    color: color,
                   ),
                 ),
               ),

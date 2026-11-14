@@ -109,14 +109,21 @@ class _BaseAppState extends State<BaseApp> with WidgetsBindingObserver {
     try {
       final backupProvider = context.read<CloudBackupProvider>();
       final ideasProvider = context.read<IdeasProvider>();
-      await ideasProvider.ensureLoaded();
       final randomAdditionsProvider = context.read<RandomAdditionsProvider>();
+      await backupProvider.refreshFromStorage();
+      await ideasProvider.ensureLoaded();
       await randomAdditionsProvider.ensureLoaded();
       await backupProvider.initializeAutoBackup();
       await backupProvider.runAutoBackupIfDue(
         ideasProvider.ideas,
         randomAdditions: randomAdditionsProvider.additions,
       );
+      if (backupProvider.plaintextCleanupPending) {
+        await backupProvider.runPlaintextCleanup(
+          ideasProvider.ideas,
+          randomAdditions: randomAdditionsProvider.additions,
+        );
+      }
     } on ProviderNotFoundException {
       return;
     }

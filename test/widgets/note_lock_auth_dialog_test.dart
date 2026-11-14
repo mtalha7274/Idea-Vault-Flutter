@@ -89,9 +89,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(ViewConstants.noteLockCreatePinTitle), findsWidgets);
 
-      await tester.enterText(find.byType(TextField), '1234');
+      await tester.enterText(find.byType(TextField), '123456');
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '1234');
+      await tester.enterText(find.byType(TextField), '123456');
       await tester.pumpAndSettle();
       await tester.tap(find.text(ViewConstants.noteLockEnableBiometricSkip));
       await tester.pumpAndSettle();

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:idea_vault/core/extensions/int.dart';
@@ -12,14 +12,18 @@ import 'package:keyboard_actions/keyboard_actions.dart';
 import 'package:provider/provider.dart';
 
 import '../config/router/app_router.dart';
+import '../core/editor/note_editor_preferences.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
+import '../core/services/note_lock_session_guard.dart';
+import '../core/services/vault/vault_crypto.dart';
 import '../core/utils/helpers.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
 import '../models/idea_editor_state.dart';
 import '../viewmodels/providers/ideas_provider.dart';
 import '../viewmodels/providers/theme_provider.dart';
+import '../widgets/editor/note_editing_controller.dart';
 import '../widgets/idea_markdown_editor.dart';
 import '../widgets/note_lock_auth_dialog.dart';
 import '../widgets/popups/delete_ideas_confirmation_dialog.dart';
@@ -31,14 +35,17 @@ import 'export_for_ai_screen.dart';
 import 'ideas/idea_vault_theme.dart';
 
 const String _untitledSectionName = 'Untitled';
+const String _lockedPlaceholderSectionId = 'locked-placeholder-section';
 
 class IdeaEditorScreen extends StatefulWidget {
   const IdeaEditorScreen({
     super.key,
     this.ideaId,
+    this.initialSectionId,
   });
 
   final String? ideaId;
+  final String? initialSectionId;
 
   @override
   State<IdeaEditorScreen> createState() => _IdeaEditorScreenState();
@@ -48,7 +55,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     with WidgetsBindingObserver {
   static const _autosaveDelay = Duration(milliseconds: 700);
   late final TextEditingController _titleController;
-  late final TextEditingController _contentController;
+  final Map<String, TextEditingController> _sectionControllers = {};
+  final Set<String> _dirtySectionIds = {};
   late final FocusNode _titleFocusNode;
   late final FocusNode _contentFocusNode;
   late List<IdeaSection> _sections;
@@ -63,9 +71,18 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   Future<void>? _saveInFlight;
   String? _savedIdeaId;
   bool _allowPop = false;
-  bool _isPreviewMode = false;
   bool _isAutosaving = false;
   bool _hasSaveFailed = false;
+  late final bool _createdInSession;
+  late final String _initialStructureSignature;
+  bool _isDiscarding = false;
+  bool _showPrivacyCover = false;
+  bool _holdsSecureWindow = false;
+  bool _didApplyInitialSection = false;
+  bool _lockedContentReady = true;
+  bool _lockedContentFailed = false;
+  bool _isLoadingLockedContent = false;
+  bool _holdsVaultSession = false;
 
   @override
   void initState() {
@@ -85,24 +102,26 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final resumeState =
         existingIdea == null ? null : _matchingResumeState(ideasProvider);
 
-    _sections =
-        existingIdea?.sections.map((section) => section.copyWith()).toList() ??
+    _lockedContentReady = !(existingIdea?.isEncrypted ?? false);
+    _sections = !_lockedContentReady
+        ? [_lockedPlaceholderSection()]
+        : existingIdea?.sections
+                .map((section) => section.copyWith())
+                .toList() ??
             ideasProvider.createDefaultSections();
     _sectionContentById = {
       for (final section in _sections) section.id: section.content,
     };
     _activeSectionId = _resolveInitialSectionId(resumeState, existingIdea);
-    _isPreviewMode = resumeState?.isPreviewMode ?? false;
     _savedIdeaId = existingIdea?.id;
+    _createdInSession = existingIdea == null;
+    _initialStructureSignature = _structureSignature();
 
     _titleController = TextEditingController(text: existingIdea?.title ?? '');
-    _contentController = TextEditingController(
-      text: _sectionContentById[_activeSectionId] ?? '',
-    );
     _titleFocusNode = FocusNode();
     _contentFocusNode = FocusNode();
     _titleController.addListener(_handleDraftChanged);
-    _contentController.addListener(_handleEditorContentChanged);
+    _controllerFor(_activeSectionId);
     _lastSavedSnapshot = _snapshot();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -112,10 +131,18 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       if (widget.ideaId == null && _titleController.text.trim().isEmpty) {
         _titleFocusNode.requestFocus();
       }
-      if (_savedIdeaId == null) {
-        unawaited(_flushAutosave(force: true));
-      } else {
+      if (!_lockedContentReady) {
+        final ideaId = _savedIdeaId;
+        if (ideaId != null && _noteLockAuthService.isIdeaUnlocked(ideaId)) {
+          unawaited(_loadLockedContent());
+        }
+        return;
+      }
+      if (_savedIdeaId != null) {
         _persistEditorState();
+        if (_didApplyInitialSection) {
+          unawaited(_persistLastOpenedSectionId());
+        }
       }
     });
   }
@@ -126,13 +153,32 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.primaryFocus?.unfocus();
     _autosaveTimer?.cancel();
-    unawaited(_flushAutosave(updateUi: false));
+    if (_holdsSecureWindow) {
+      _holdsSecureWindow = false;
+      NoteLockSecureWindow.release();
+    }
+    if (!_isDiscarding) {
+      _materializeDirtySections();
+      final emptySessionIdeaId = _emptySessionIdeaId;
+      if (emptySessionIdeaId != null) {
+        _savedIdeaId = null;
+        unawaited(_ideasProvider.deleteIdeas([emptySessionIdeaId]));
+        _releaseVaultSession();
+      } else {
+        unawaited(
+          _flushAutosave(updateUi: false).whenComplete(_releaseVaultSession),
+        );
+      }
+    } else {
+      _releaseVaultSession();
+    }
     _titleController
       ..removeListener(_handleDraftChanged)
       ..dispose();
-    _contentController
-      ..removeListener(_handleEditorContentChanged)
-      ..dispose();
+    for (final controller in _sectionControllers.values) {
+      controller.dispose();
+    }
+    _sectionControllers.clear();
     _titleFocusNode.dispose();
     _contentFocusNode.dispose();
     super.dispose();
@@ -140,12 +186,217 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      unawaited(_flushAutosave());
+    switch (state) {
+      case AppLifecycleState.paused:
+        unawaited(_flushAutosave());
+        _relockOnBackground();
+        _setPrivacyCover(true);
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        _setPrivacyCover(true);
+      case AppLifecycleState.resumed:
+        _setPrivacyCover(false);
+      case AppLifecycleState.detached:
+        break;
     }
   }
 
-  bool get _hasUnsavedChanges => _snapshot() != _lastSavedSnapshot;
+  bool get _hasUnsavedChanges =>
+      _dirtySectionIds.isNotEmpty || _snapshot() != _lastSavedSnapshot;
+
+  bool get _isDraftMeaningful {
+    if (_titleController.text.trim().isNotEmpty) {
+      return true;
+    }
+    for (final section in _sections) {
+      final controller = _sectionControllers[section.id];
+      final content = controller?.text ??
+          _sectionContentById[section.id] ??
+          section.content;
+      if (content.trim().isNotEmpty) {
+        return true;
+      }
+    }
+    return _structureSignature() != _initialStructureSignature;
+  }
+
+  bool get _hasNothingToSave => _createdInSession && !_isDraftMeaningful;
+
+  String? get _emptySessionIdeaId {
+    final ideaId = _savedIdeaId;
+    if (ideaId == null || !_hasNothingToSave) {
+      return null;
+    }
+    return ideaId;
+  }
+
+  String _structureSignature() {
+    return jsonEncode([for (final section in _sections) section.name]);
+  }
+
+  bool get _isCurrentIdeaLocked =>
+      _currentIdea(_ideasProvider)?.isLocked ?? false;
+
+  IdeaSection _lockedPlaceholderSection() {
+    return const IdeaSection(
+      id: _lockedPlaceholderSectionId,
+      name: '',
+      content: '',
+    );
+  }
+
+  void _acquireVaultSession() {
+    final vault = _ideasProvider.vault;
+    if (_holdsVaultSession || vault == null) {
+      return;
+    }
+    _holdsVaultSession = true;
+    vault.openSession();
+  }
+
+  void _releaseVaultSession() {
+    if (!_holdsVaultSession) {
+      return;
+    }
+    _holdsVaultSession = false;
+    _ideasProvider.vault?.closeSession();
+  }
+
+  Future<void> _loadLockedContent() async {
+    final ideaId = _savedIdeaId;
+    if (ideaId == null || _isLoadingLockedContent) {
+      return;
+    }
+    _isLoadingLockedContent = true;
+    if (mounted) {
+      setState(() {
+        _lockedContentFailed = false;
+      });
+    }
+    Idea? plain;
+    try {
+      _acquireVaultSession();
+      plain = await _ideasProvider.openLockedIdea(ideaId);
+    } on VaultCryptoException {
+      plain = null;
+    } catch (_) {
+      plain = null;
+    } finally {
+      _isLoadingLockedContent = false;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (plain == null || plain.isEncrypted) {
+      _releaseVaultSession();
+      setState(() {
+        _lockedContentFailed = true;
+      });
+      return;
+    }
+    final loaded = plain;
+    for (final controller in _sectionControllers.values) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    }
+    _sectionControllers.clear();
+    _dirtySectionIds.clear();
+    final sections = loaded.sections.isEmpty
+        ? _ideasProvider.createDefaultSections()
+        : loaded.sections.map((section) => section.copyWith()).toList();
+    setState(() {
+      _sections = sections;
+      _sectionContentById = {
+        for (final section in sections) section.id: section.content,
+      };
+      _activeSectionId = _resolveInitialSectionId(
+        _matchingResumeState(_ideasProvider),
+        loaded,
+      );
+      _lockedContentReady = true;
+      _lockedContentFailed = false;
+    });
+    _titleController.removeListener(_handleDraftChanged);
+    _titleController.text = loaded.title;
+    _titleController.addListener(_handleDraftChanged);
+    _controllerFor(_activeSectionId);
+    _lastSavedSnapshot = _snapshot();
+    _persistEditorState();
+    if (_didApplyInitialSection) {
+      unawaited(_persistLastOpenedSectionId());
+    }
+  }
+
+  void _dropLockedContent() {
+    final currentIdea = _currentIdea(_ideasProvider);
+    if (!mounted ||
+        currentIdea == null ||
+        !currentIdea.isEncrypted ||
+        _noteLockAuthService.isIdeaUnlocked(currentIdea.id)) {
+      return;
+    }
+    for (final controller in _sectionControllers.values) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    }
+    _sectionControllers.clear();
+    _dirtySectionIds.clear();
+    final placeholder = _lockedPlaceholderSection();
+    setState(() {
+      _sections = [placeholder];
+      _sectionContentById = {placeholder.id: ''};
+      _activeSectionId = placeholder.id;
+      _lockedContentReady = false;
+    });
+    _titleController.removeListener(_handleDraftChanged);
+    _titleController.text = currentIdea.title;
+    _titleController.addListener(_handleDraftChanged);
+    _controllerFor(placeholder.id);
+    _lastSavedSnapshot = _snapshot();
+    _releaseVaultSession();
+  }
+
+  void _relockOnBackground() {
+    if (NoteLockSessionGuard.isRelockSuppressed) {
+      return;
+    }
+    final currentIdea = _currentIdea(_ideasProvider);
+    final wasUnlocked = currentIdea != null &&
+        currentIdea.isLocked &&
+        _noteLockAuthService.isIdeaUnlocked(currentIdea.id);
+    _noteLockAuthService.clearSessionUnlocks();
+    if (!wasUnlocked || !mounted) {
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {});
+    if (currentIdea.isEncrypted || _ideasProvider.vault != null) {
+      unawaited(_flushAutosave().whenComplete(_dropLockedContent));
+    }
+  }
+
+  void _setPrivacyCover(bool visible) {
+    final shouldShow = visible &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        !NoteLockSessionGuard.isRelockSuppressed &&
+        _isCurrentIdeaLocked;
+    if (!mounted || shouldShow == _showPrivacyCover) {
+      return;
+    }
+    setState(() {
+      _showPrivacyCover = shouldShow;
+    });
+  }
+
+  void _syncSecureWindow(bool wantsSecure) {
+    if (wantsSecure == _holdsSecureWindow) {
+      return;
+    }
+    _holdsSecureWindow = wantsSecure;
+    if (wantsSecure) {
+      NoteLockSecureWindow.acquire();
+    } else {
+      NoteLockSecureWindow.release();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +404,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     final currentIdea = _currentIdea(context.watch<IdeasProvider>());
     final isEditorLocked = currentIdea != null &&
         currentIdea.isLocked &&
-        !_noteLockAuthService.isIdeaUnlocked(currentIdea.id);
+        (!_noteLockAuthService.isIdeaUnlocked(currentIdea.id) ||
+            !_lockedContentReady);
+    final isIdeaLocked = currentIdea?.isLocked ?? false;
+    _syncSecureWindow(isIdeaLocked);
     return PopScope<Object?>(
       canPop: _allowPop || !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) async {
@@ -192,20 +446,20 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                       delegate: _PinnedHeaderDelegate(
                         extent: _PinnedHeaderDelegate.toolbarExtent,
                         child: IdeaEditorToolbarContainer(
-                          controller: _contentController,
+                          controller: _activeController,
                           focusNode: _contentFocusNode,
-                          isPreviewMode: _isPreviewMode,
-                          onPreviewToggle: _togglePreviewMode,
+                          enabled: !isEditorLocked,
                         ),
                       ),
                     ),
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: IdeaMarkdownEditor(
-                        controller: _contentController,
+                        controller: _activeController,
                         focusNode: _contentFocusNode,
                         placeholder: _sectionPlaceholder(),
-                        isPreviewMode: _isPreviewMode,
+                        enablePersonalizedLearning: !isIdeaLocked,
+                        readOnly: isEditorLocked,
                       ),
                     ),
                   ],
@@ -214,6 +468,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
             ),
           ),
           if (isEditorLocked) _buildLockedEditorOverlay(context, currentIdea),
+          if (_showPrivacyCover) _buildPrivacyCover(context),
         ],
       ),
     );
@@ -229,6 +484,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Widget _buildLockedEditorOverlay(BuildContext context, Idea idea) {
     final theme = context.watch<ThemeProvider>().baseTheme;
+    final isOpening = _noteLockAuthService.isIdeaUnlocked(idea.id) &&
+        !_lockedContentReady &&
+        !_lockedContentFailed;
+    final bodyKey = _lockedContentFailed
+        ? ViewConstants.vaultOpenFailed
+        : isOpening
+            ? ViewConstants.vaultLoadingNote
+            : ViewConstants.noteLockEditorBody;
     return Positioned.fill(
       child: Material(
         type: MaterialType.transparency,
@@ -284,7 +547,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                             ),
                             const SizedBox(height: 10),
                             TranslatedText(
-                              ViewConstants.noteLockEditorBody,
+                              bodyKey,
+                              key: const Key('idea-editor-locked-body'),
                               textAlign: TextAlign.center,
                               style: ideaVaultBody(
                                 context,
@@ -295,13 +559,17 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                               ),
                             ),
                             const SizedBox(height: 22),
-                            FilledButton.icon(
-                              onPressed: () =>
-                                  unawaited(_unlockEditorContent(idea)),
-                              icon: const Icon(Icons.lock_open_rounded),
-                              label:
-                                  Text(ViewConstants.noteLockEditorAction.tr()),
-                            ),
+                            if (isOpening)
+                              const CircularProgressIndicator()
+                            else
+                              FilledButton.icon(
+                                onPressed: () =>
+                                    unawaited(_unlockEditorContent(idea)),
+                                icon: const Icon(Icons.lock_open_rounded),
+                                label: Text(
+                                  ViewConstants.noteLockEditorAction.tr(),
+                                ),
+                              ),
                             const SizedBox(height: 8),
                             TextButton(
                               onPressed: _leaveLockedEditor,
@@ -323,6 +591,28 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     );
   }
 
+  Widget _buildPrivacyCover(BuildContext context) {
+    final theme = context.watch<ThemeProvider>().baseTheme;
+    return Positioned.fill(
+      key: const Key('idea-editor-privacy-cover'),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: ColoredBox(
+            color: theme.background.withValues(alpha: 0.96),
+            child: Center(
+              child: Icon(
+                Icons.lock_outline_rounded,
+                size: 44,
+                color: theme.primary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _leaveLockedEditor() async {
     await _ideasProvider.clearEditorState();
     if (!mounted) {
@@ -335,16 +625,22 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _unlockEditorContent(Idea idea) async {
-    final didAuthenticate = await authenticateForNoteLock(
-      context,
-      _noteLockAuthService,
-      _noteLockBiometricService,
-      ideaId: idea.id,
-    );
+    final alreadyUnlocked = _noteLockAuthService.isIdeaUnlocked(idea.id);
+    final didAuthenticate = alreadyUnlocked ||
+        await authenticateForNoteLock(
+          context,
+          _noteLockAuthService,
+          _noteLockBiometricService,
+          ideaId: idea.id,
+        );
     if (!mounted || !didAuthenticate) {
       return;
     }
     setState(() {});
+    final current = _currentIdea(_ideasProvider);
+    if (!_lockedContentReady && (current?.isEncrypted ?? false)) {
+      await _loadLockedContent();
+    }
   }
 
   Widget _wrapEditorBodyWithKeyboardActions(
@@ -376,18 +672,14 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           _Header(
             onClose: _onClosePressed,
             onMenuPressed: _showMoreOptionsSheet,
-            isAutosaving: _isAutosaving,
             hasSaveFailed: _hasSaveFailed,
             isEditingExisting: widget.ideaId != null,
-            showLockButton: _savedIdeaId != null,
-            isNoteLocked: currentIdea?.isLocked ?? false,
-            onLockPressed: () {
-              if (currentIdea?.isLocked == true) {
-                unawaited(_unlockCurrentIdea());
-              } else {
-                unawaited(_lockCurrentIdea());
-              }
-            },
+            controller: _activeController,
+            historyEnabled: _lockedContentReady &&
+                !(currentIdea != null &&
+                    currentIdea.isLocked &&
+                    !_noteLockAuthService.isIdeaUnlocked(currentIdea.id)),
+            onHistoryAction: _runHistoryAction,
           ),
           Align(
             alignment: Alignment.topCenter,
@@ -435,6 +727,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
           controller: _titleController,
           focusNode: _titleFocusNode,
           autofocus: widget.ideaId == null,
+          enableIMEPersonalizedLearning: !_isCurrentIdeaLocked,
           textCapitalization: TextCapitalization.sentences,
           minLines: 1,
           maxLines: 3,
@@ -527,6 +820,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     IdeaEditorState? resumeState,
     Idea? existingIdea,
   ) {
+    final requestedSectionId = widget.initialSectionId;
+    if (requestedSectionId != null &&
+        _sections.any((section) => section.id == requestedSectionId)) {
+      _didApplyInitialSection = true;
+      return requestedSectionId;
+    }
+
     final restoredSectionId = resumeState?.activeSectionId;
     if (restoredSectionId != null &&
         _sections.any((section) => section.id == restoredSectionId)) {
@@ -560,11 +860,10 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
-    final nextContent = _sectionContentById[sectionId] ?? '';
+    _controllerFor(sectionId);
     setState(() {
       _activeSectionId = sectionId;
     });
-    _replaceEditorContent(nextContent);
     _persistEditorState();
     unawaited(_persistLastOpenedSectionId());
   }
@@ -578,77 +877,93 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     await _showEditSectionSheet(section);
   }
 
-  void _updateSectionContent(String sectionId, String content) {
-    if (_sectionContentById[sectionId] == content) {
+  TextEditingController get _activeController =>
+      _controllerFor(_activeSectionId);
+
+  TextEditingController _controllerFor(String sectionId) {
+    final existing = _sectionControllers[sectionId];
+    if (existing != null) {
+      return existing;
+    }
+    final content = _sectionContentById[sectionId] ?? '';
+    final useClassic = NoteEditorPreferences.shouldUseClassicEditor(
+      ideaId: _savedIdeaId,
+      sectionId: sectionId,
+      content: content,
+    );
+    final TextEditingController controller;
+    if (useClassic) {
+      final classic = TextEditingController(text: content);
+      var lastText = content;
+      classic.addListener(() {
+        if (classic.text != lastText) {
+          lastText = classic.text;
+          _markSectionDirty(sectionId);
+        }
+      });
+      controller = classic;
+    } else {
+      final rich = NoteEditingController(markup: content);
+      rich.contentRevision.addListener(() => _markSectionDirty(sectionId));
+      controller = rich;
+    }
+    _sectionControllers[sectionId] = controller;
+    return controller;
+  }
+
+  void _markSectionDirty(String sectionId) {
+    if (!_sectionControllers.containsKey(sectionId)) {
       return;
     }
-
-    setState(() {
-      _sectionContentById = {
-        ..._sectionContentById,
-        sectionId: content,
-      };
-    });
+    final wasClean = _dirtySectionIds.isEmpty;
+    _dirtySectionIds.add(sectionId);
+    if (wasClean && mounted) {
+      setState(() {});
+    }
     _scheduleAutosave();
   }
 
-  void _updateActiveSectionContent(String content) {
-    _updateSectionContent(_activeSectionId, content);
-  }
-
-  void _handleEditorContentChanged() {
-    _updateActiveSectionContent(_contentController.text);
-  }
-
-  void _replaceEditorContent(String content) {
-    final selection = _contentController.selection;
-    final cursorOffset = math.min(
-      content.length,
-      math.max(0, selection.extentOffset),
-    );
-    _contentController
-      ..removeListener(_handleEditorContentChanged)
-      ..value = TextEditingValue(
-        text: content,
-        selection: TextSelection.collapsed(offset: cursorOffset),
-      )
-      ..addListener(_handleEditorContentChanged);
-  }
-
-  void _handlePreviewModeChanged(bool isPreviewMode) {
-    if (_isPreviewMode == isPreviewMode) {
+  void _materializeDirtySections() {
+    if (_dirtySectionIds.isEmpty) {
       return;
     }
-
-    if (isPreviewMode) {
-      _contentFocusNode.unfocus();
+    final next = {..._sectionContentById};
+    for (final sectionId in _dirtySectionIds) {
+      final controller = _sectionControllers[sectionId];
+      if (controller == null) {
+        continue;
+      }
+      next[sectionId] = controller is NoteEditingController
+          ? controller.markup
+          : controller.text;
     }
-    setState(() {
-      _isPreviewMode = isPreviewMode;
-    });
-    _persistEditorState();
+    _dirtySectionIds.clear();
+    _sectionContentById = next;
   }
 
-  void _togglePreviewMode() {
-    final nextMode = !_isPreviewMode;
-    _handlePreviewModeChanged(nextMode);
-
-    if (!nextMode) {
-      _contentFocusNode.requestFocus();
+  void _disposeSectionController(String sectionId) {
+    final controller = _sectionControllers.remove(sectionId);
+    _dirtySectionIds.remove(sectionId);
+    if (controller == null) {
+      return;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
   }
 
   Future<void> _persistEditorState() async {
+    if (!_lockedContentReady) {
+      return;
+    }
     await _ideasProvider.saveEditorState(
       ideaId: _savedIdeaId,
       activeSectionId: _activeSectionId,
-      isPreviewMode: _isPreviewMode,
+      isPreviewMode: false,
     );
   }
 
   Future<void> _persistLastOpenedSectionId() async {
     final ideaId = _savedIdeaId;
-    if (ideaId == null) {
+    if (ideaId == null || !_lockedContentReady) {
       return;
     }
 
@@ -668,7 +983,7 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       };
       _activeSectionId = newSection.id;
     });
-    _replaceEditorContent(newSection.content);
+    _controllerFor(newSection.id);
     _scheduleAutosave();
     _persistEditorState();
     unawaited(_persistLastOpenedSectionId());
@@ -739,7 +1054,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
                 (currentIndex - 1).clamp(0, remainingSections.length - 1)]
             .id
         : _activeSectionId;
-    final nextContent = _sectionContentById[nextActiveSectionId] ?? '';
+    _controllerFor(nextActiveSectionId);
+    _disposeSectionController(sectionId);
 
     setState(() {
       _sections = remainingSections;
@@ -749,7 +1065,6 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       };
       _activeSectionId = nextActiveSectionId;
     });
-    _replaceEditorContent(nextContent);
     _scheduleAutosave();
     _persistEditorState();
     unawaited(_persistLastOpenedSectionId());
@@ -777,13 +1092,29 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
   }
 
   Future<void> _showMoreOptionsSheet() async {
-    final action = await showIdeaEditorOptionsSheet(context);
+    await _flushAutosave();
+    if (!mounted) {
+      return;
+    }
+    final currentIdea = _currentIdea(context.read<IdeasProvider>());
+    final action = await showIdeaEditorOptionsSheet(
+      context,
+      isUnsavedDraft: _savedIdeaId == null,
+      isNoteLocked:
+          _savedIdeaId == null ? null : currentIdea?.isLocked ?? false,
+    );
 
     if (!mounted || action == null) {
       return;
     }
 
     switch (action) {
+      case IdeaEditorOptionsSheetAction.lockNote:
+        await _lockCurrentIdea();
+        break;
+      case IdeaEditorOptionsSheetAction.unlockNote:
+        await _unlockCurrentIdea();
+        break;
       case IdeaEditorOptionsSheetAction.exportForAI:
         await _openExportScreen(ExportMode.aiExport);
         break;
@@ -793,7 +1124,41 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       case IdeaEditorOptionsSheetAction.deleteIdea:
         await _confirmDeleteIdea();
         break;
+      case IdeaEditorOptionsSheetAction.discardDraft:
+        await _discardDraft();
+        break;
     }
+  }
+
+  void _runHistoryAction(VoidCallback action) {
+    action();
+    if (!_contentFocusNode.hasFocus) {
+      _contentFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _discardDraft() async {
+    _isDiscarding = true;
+    _autosaveTimer?.cancel();
+    _autosaveTimer = null;
+    final inFlightSave = _saveInFlight;
+    if (inFlightSave != null) {
+      await inFlightSave;
+    }
+    final ideaId = _savedIdeaId;
+    _savedIdeaId = null;
+    if (ideaId != null && _createdInSession) {
+      await _ideasProvider.deleteIdeas([ideaId]);
+    }
+    await _ideasProvider.clearEditorState();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _allowPop = true;
+      _hasSaveFailed = false;
+    });
+    AppRouter.pop(context);
   }
 
   Future<void> _lockCurrentIdea() async {
@@ -816,8 +1181,19 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
-    await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: true);
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: true);
+    } catch (_) {
+      if (mounted) {
+        _showNoteLockSnackBar(ViewConstants.vaultNeedsUnlockFirst);
+      }
+      return;
+    }
     _noteLockAuthService.markIdeaUnlocked(ideaId);
+    if (_currentIdea(_ideasProvider)?.isEncrypted ?? false) {
+      _acquireVaultSession();
+    }
     if (!mounted) {
       return;
     }
@@ -845,8 +1221,16 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       return;
     }
 
-    await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: false);
+    try {
+      await _ideasProvider.setIdeaLocked(ideaId: ideaId, isLocked: false);
+    } catch (_) {
+      if (mounted) {
+        _showNoteLockSnackBar(ViewConstants.vaultOpenFailed);
+      }
+      return;
+    }
     _noteLockAuthService.markIdeaLocked(ideaId);
+    _releaseVaultSession();
     if (!mounted) {
       return;
     }
@@ -889,14 +1273,13 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
       }
     }
 
-    await AppRouter.push(
-      context,
-      ExportForAIScreen(
-        ideaTitle: _autosaveTitle,
-        sections: _sectionsToSave(),
-        mode: mode,
-      ),
+    final exportScreen = ExportForAIScreen(
+      ideaTitle: _autosaveTitle,
+      sections: _sectionsToSave(),
+      mode: mode,
+      isLocked: currentIdea?.isLocked == true,
     );
+    await AppRouter.push(context, exportScreen);
   }
 
   Future<void> _confirmDeleteIdea() async {
@@ -952,19 +1335,38 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
 
   Future<void> _flushAutosave({
     bool updateUi = true,
-    bool force = false,
   }) {
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
+    _materializeDirtySections();
+
+    if (_isDiscarding || !_lockedContentReady) {
+      return Future<void>.value();
+    }
 
     final inFlightSave = _saveInFlight;
     if (inFlightSave != null) {
       return inFlightSave.then(
-        (_) => _flushAutosave(updateUi: updateUi, force: force),
+        (_) => _flushAutosave(updateUi: updateUi),
       );
     }
 
-    if (!force && !_hasUnsavedChanges && !_hasSaveFailed) {
+    if (_hasNothingToSave) {
+      if (_hasSaveFailed || _isAutosaving) {
+        if (updateUi && mounted) {
+          setState(() {
+            _hasSaveFailed = false;
+            _isAutosaving = false;
+          });
+        } else {
+          _hasSaveFailed = false;
+          _isAutosaving = false;
+        }
+      }
+      return Future<void>.value();
+    }
+
+    if (!_hasUnsavedChanges && !_hasSaveFailed) {
       return Future<void>.value();
     }
 
@@ -1054,6 +1456,15 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     if (!mounted) {
       return;
     }
+    final emptySessionIdeaId = _emptySessionIdeaId;
+    if (emptySessionIdeaId != null) {
+      _savedIdeaId = null;
+      _lastSavedSnapshot = _snapshot();
+      await _ideasProvider.deleteIdeas([emptySessionIdeaId]);
+      if (!mounted) {
+        return;
+      }
+    }
     _clearLockedEditorSessionUnlock();
     await _ideasProvider.clearEditorState();
     if (!mounted) {
@@ -1136,86 +1547,128 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
     required this.onMenuPressed,
-    required this.isAutosaving,
     required this.hasSaveFailed,
     required this.isEditingExisting,
-    required this.showLockButton,
-    required this.isNoteLocked,
-    required this.onLockPressed,
+    required this.controller,
+    required this.historyEnabled,
+    required this.onHistoryAction,
   });
+
+  static const double _iconSize = 20;
 
   final VoidCallback onClose;
   final VoidCallback onMenuPressed;
-  final bool isAutosaving;
   final bool hasSaveFailed;
   final bool isEditingExisting;
-  final bool showLockButton;
-  final bool isNoteLocked;
-  final VoidCallback onLockPressed;
+  final TextEditingController controller;
+  final bool historyEnabled;
+  final ValueChanged<VoidCallback> onHistoryAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final rich = controller;
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          Gap(8.w),
+          _HeaderIconButton(
+            buttonKey: const Key('idea-editor-close'),
+            icon: Icons.close_rounded,
+            onPressed: onClose,
+          ),
+          Gap(6.w),
+          Expanded(
+            child: TranslatedText(
+              isEditingExisting
+                  ? ViewConstants.ideaEditorTitleEdit
+                  : ViewConstants.ideaEditorTitleNew,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ideaVaultHeadline(
+                context,
+                size: 17.f,
+                weight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+          ),
+          if (hasSaveFailed) ...[
+            const Icon(
+              Icons.cloud_off_rounded,
+              key: Key('idea-editor-save-failed'),
+              size: 18,
+            ),
+            Gap(6.w),
+          ],
+          if (rich is NoteEditingController)
+            ListenableBuilder(
+              listenable: rich,
+              builder: (context, _) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _HeaderIconButton(
+                      buttonKey: const Key('idea-editor-toolbar-undo'),
+                      icon: Icons.undo_rounded,
+                      tooltip: ViewConstants.editorToolbarUndo,
+                      onPressed: historyEnabled && rich.canUndo
+                          ? () => onHistoryAction(rich.undo)
+                          : null,
+                    ),
+                    _HeaderIconButton(
+                      buttonKey: const Key('idea-editor-toolbar-redo'),
+                      icon: Icons.redo_rounded,
+                      tooltip: ViewConstants.editorToolbarRedo,
+                      onPressed: historyEnabled && rich.canRedo
+                          ? () => onHistoryAction(rich.redo)
+                          : null,
+                    ),
+                  ],
+                );
+              },
+            ),
+          _HeaderIconButton(
+            buttonKey: const Key('idea-editor-menu'),
+            icon: Icons.more_vert,
+            onPressed: onMenuPressed,
+          ),
+          Gap(8.w),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.buttonKey,
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
-    return Row(
-      children: [
-        Gap(10.w),
-        IconButton(
-          key: const Key('idea-editor-close'),
-          onPressed: onClose,
-          icon: const Icon(Icons.close_rounded),
-          padding: EdgeInsets.all(10.d),
-        ),
-        Gap(10.w),
-        Expanded(
-          child: TranslatedText(
-            isEditingExisting
-                ? ViewConstants.ideaEditorTitleEdit
-                : ViewConstants.ideaEditorTitleNew,
-            style: ideaVaultHeadline(
-              context,
-              size: 22.f,
-              weight: FontWeight.w800,
-              height: 1.2,
-            ),
-          ),
-        ),
-        if (hasSaveFailed) ...[
-          const Icon(
-            Icons.cloud_off_rounded,
-            key: Key('idea-editor-save-failed'),
-            size: 20,
-          ),
-          Gap(8.w),
-        ],
-        if (showLockButton) ...[
-          Tooltip(
-            message: (isNoteLocked
-                    ? ViewConstants.ideaEditorOptionsUnlockNote
-                    : ViewConstants.ideaEditorOptionsLockNote)
-                .tr(),
-            child: IconButton(
-              key: const Key('idea-editor-lock-toggle'),
-              onPressed: onLockPressed,
-              style: isNoteLocked
-                  ? IconButton.styleFrom(foregroundColor: theme.primary)
-                  : null,
-              icon: Icon(
-                isNoteLocked
-                    ? Icons.lock_outline_rounded
-                    : Icons.lock_open_rounded,
-              ),
-              padding: EdgeInsets.all(10.d),
-            ),
-          ),
-        ],
-        IconButton(
-          key: const Key('idea-editor-menu'),
-          onPressed: onMenuPressed,
-          icon: const Icon(Icons.more_vert),
-          padding: EdgeInsets.all(10.d),
-        ),
-        Gap(10.w),
-      ],
+    return IconButton(
+      key: buttonKey,
+      onPressed: onPressed,
+      tooltip: tooltip?.tr(),
+      icon: Icon(icon, size: _Header._iconSize),
+      color: theme.primaryText,
+      disabledColor: theme.textMuted.withValues(alpha: 0.4),
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
     );
   }
 }
