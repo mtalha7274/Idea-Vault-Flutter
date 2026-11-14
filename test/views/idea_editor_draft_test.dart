@@ -517,6 +517,37 @@ void main() {
       await closeEditor(tester);
     });
 
+    testWidgets('undo and redo do not open the keyboard', (tester) async {
+      late Idea idea;
+      await tester.runAsync(() async {
+        idea = await saveExistingIdea(
+          sections: const [IdeaSection(id: 'h1', name: 'Idea', content: 'one')],
+        );
+      });
+      await pumpHost(tester, () => IdeaEditorScreen(ideaId: idea.id));
+      await openEditor(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('idea-markdown-text-field')),
+        'one edited',
+      );
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      expect(editorField(tester).focusNode!.hasFocus, isFalse);
+
+      await tester.tap(find.byKey(const Key('idea-editor-toolbar-undo')));
+      await tester.pump();
+      expect(editorField(tester).controller!.text, 'one');
+      expect(editorField(tester).focusNode!.hasFocus, isFalse);
+
+      await tester.tap(find.byKey(const Key('idea-editor-toolbar-redo')));
+      await tester.pump();
+      expect(editorField(tester).controller!.text, 'one edited');
+      expect(editorField(tester).focusNode!.hasFocus, isFalse);
+      await closeEditor(tester);
+    });
+
     testWidgets('lock and unlock are offered in the options sheet',
         (tester) async {
       late Idea idea;

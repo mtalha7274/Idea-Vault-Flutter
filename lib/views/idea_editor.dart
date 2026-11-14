@@ -1130,12 +1130,8 @@ class _IdeaEditorScreenState extends State<IdeaEditorScreen>
     }
   }
 
-  void _runHistoryAction(VoidCallback action) {
-    action();
-    if (!_contentFocusNode.hasFocus) {
-      _contentFocusNode.requestFocus();
-    }
-  }
+  // Undo/redo only change the text; they must not open the keyboard.
+  void _runHistoryAction(VoidCallback action) => action();
 
   Future<void> _discardDraft() async {
     _isDiscarding = true;
