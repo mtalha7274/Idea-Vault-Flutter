@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:idea_vault/core/editor/note_document.dart';
+import 'package:idea_vault/core/editor/note_markup.dart';
 import 'package:idea_vault/data/managers/local/ideas_database.dart';
 import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/ideas.dart';
@@ -113,6 +115,39 @@ void main() {
       expect(
         provider.ideas.single.sections.single.content,
         'Existing content\n\nFirst dictated line\nSecond dictated line',
+      );
+    });
+
+    test('appends random notes as literal text', () async {
+      final provider = IdeasProvider(repo, editorStateRepo);
+      await provider.ensureLoaded();
+      final savedIdea = await provider.saveIdea(
+        title: 'Literal',
+        sections: const [
+          IdeaSection(id: 'section-1', name: 'Idea', content: 'Old'),
+        ],
+      );
+
+      await provider.appendContentToSection(
+        ideaId: savedIdea!.id,
+        sectionId: 'section-1',
+        content: '2*3*4 and *not italic*\n- not a list',
+      );
+
+      final stored = provider.ideas.single.sections.single.content;
+      expect(stored, 'Old\n\n2*3*4 and \\*not italic*\n\\- not a list');
+      final document = NoteMarkup.parse(stored);
+      expect(
+        document.plainText,
+        'Old\n\n2*3*4 and *not italic*\n- not a list',
+      );
+      expect(
+        document.lines.every(
+          (line) =>
+              line.type == NoteBlockType.paragraph &&
+              line.spans.every((span) => span.style.isPlain),
+        ),
+        isTrue,
       );
     });
 

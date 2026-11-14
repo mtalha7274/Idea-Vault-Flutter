@@ -48,14 +48,14 @@ ideaEditorOptionsDeleteIdea,Delete Idea
 ideaEditorOptionsLockNote,Lock Note
 ideaEditorOptionsUnlockNote,Unlock Note
 noteLockCreatePinTitle,Create note PIN
-noteLockCreatePinBody,Set a 4-digit PIN before locking notes.
+noteLockCreatePinBody,Choose a 6-digit PIN. Locked notes are encrypted on this device and in backups.
 noteLockConfirmPinTitle,Confirm PIN
-noteLockConfirmPinBody,Enter the same 4-digit PIN again.
+noteLockConfirmPinBody,Enter the same PIN again.
 noteLockEnterPinTitle,Enter PIN
 noteLockPinLabel,PIN
 noteLockConfirmPinLabel,Confirm PIN
 noteLockCreatePinAction,Create PIN
-noteLockPinTooShort,Use exactly 4 digits.
+noteLockPinTooShort,Use exactly 6 digits.
 noteLockPinMismatch,PINs do not match.
 noteLockUnlockTitle,Unlock note
 noteLockUnlockBody,Enter your PIN to unlock this note.
@@ -78,7 +78,7 @@ noteLockUnlockedSnackbar,Note unlocked.
 noteLockVerifyCurrentPinTitle,Verify PIN
 noteLockVerifyCurrentPinBody,Enter your current PIN to change it.
 noteLockNewPinTitle,New PIN
-noteLockNewPinBody,Enter a new 4-digit PIN.
+noteLockNewPinBody,Enter a new 6-digit PIN.
 noteLockChangePinSuccess,PIN changed.
 settingsChangePin,Change PIN
 homepageSavedIdeasTooltipOne,1 saved idea
@@ -89,13 +89,13 @@ backupRestoreCloudBackup,Cloud Backup
 backupRestoreGoogleAccount,Google Account
 backupRestoreChangeAccount,Change
 backupRestoreAutoBackup,Auto Backup
-backupRestoreAutoBackupDescription,We back up your ideas every 24 hours.
+backupRestoreAutoBackupDescription,"We try to back up once a day, when you open the app or in the background."
 backupRestoreLastBackup,Last Backup
 backupRestoreBackupSize,Backup Size
 backupRestoreBackUpNow,Back Up Now
 backupRestoreSectionRestore,RESTORE
 backupRestoreRestoreFromBackup,Restore from Backup
-backupRestoreRestoreWarning,This will replace all current data.
+backupRestoreRestoreWarning,"Pick a backup, then merge it with this device or replace what's here. Works even with Cloud Backup off."
 homepageFabNewIdea,New Idea
 homepageSortSheetTitle,Sort ideas
 homepageSortSheetSubtitle,Choose how your vault is arranged.
@@ -121,19 +121,19 @@ searchIdeasScreenTitle,Search ideas
 searchIdeasEmptyTitle,Find an idea fast
 searchIdeasEmptyPrompt,Search by idea title or section content
 homepageIdeaCardPreviewPlaceholder,Tap to keep building this idea.
-randomAdditionsTitle,Random Additions
-randomAdditionsCountOne,1 unfiled addition
-randomAdditionsCountMany,{count} unfiled additions
-randomAdditionsComposerHint,Add a random note...
+randomAdditionsTitle,Random Notes
+randomAdditionsCountOne,1 unfiled note
+randomAdditionsCountMany,{count} unfiled notes
+randomAdditionsComposerHint,Add a random note…
 randomAdditionsSendTooltip,Add random note
 randomAdditionsFileTooltip,File into an idea
-randomAdditionsEmptyTitle,No random additions yet
+randomAdditionsEmptyTitle,No random notes yet
 randomAdditionsEmptySubtitle,Drop quick thoughts here and file them into ideas later.
 randomAdditionsChooseIdeaTitle,Add note to idea
 randomAdditionsChooseSectionTitle,Choose section
 randomAdditionsAppendToSection,Append to this section
 randomAdditionsNoIdeasTitle,No ideas yet
-randomAdditionsNoIdeasSubtitle,"Create an idea first, then you can file this addition into a section."
+randomAdditionsNoIdeasSubtitle,"Create an idea first, then you can file this note into a section."
 randomAdditionsFiledSnackbar,Added to {idea} / {section}
 ideaEditorUntitledIdea,Untitled Idea
 ideaEditorTitleHint,Enter idea title...
@@ -158,3 +158,209 @@ backupRestorePromptFound,Cloud backup found
 backupRestoreFormatBytesB,{bytes} B
 backupRestoreFormatBytesKb,{kb} KB
 backupRestoreFormatBytesMb,{mb} MB
+searchResultInSection,in {section}
+searchIdeasEmptyPromptAll,"Search titles, section names and notes. Locked notes match by title only."
+editorDraftDiscard,Discard draft
+noteLockTooManyAttempts,Too many wrong attempts. Try again in {time}.
+noteLockWrongPinAttemptsLeft,Wrong PIN. {count} tries left before a wait.
+noteLockUseBiometricAndroid,Use fingerprint / biometrics
+noteLockEnableBiometricUnlockActionAndroid,Turn on fingerprint / biometrics
+noteLockEnableBiometricNeedsPin,Enter your PIN to turn on biometric unlock.
+noteLockSettingsBiometric,Biometric unlock
+noteLockBiometricEnabledSnackbar,Biometric unlock turned on.
+noteLockBiometricDisabledSnackbar,Biometric unlock turned off.
+noteLockPickerLockedSubtitle,Locked · unlock to choose a section
+backupFoundTitle,Backup found
+backupFoundSummary,"{ideas} ideas, {notes} notes · {date} · {device}"
+backupFoundBodyEmptyDevice,Restore it to this device or start fresh. Starting fresh deletes nothing in the cloud.
+backupFoundBodyOtherDevice,This account already has a backup from another device. Choose what happens to the ideas and notes on this device.
+backupFoundUnreadable,This backup could not be read. You can still keep this device's data or start fresh.
+backupChoiceRestore,Restore
+backupChoiceStartFresh,Start fresh
+backupChoiceMerge,Merge
+backupChoiceMergeHint,Keep everything from both. Changed ideas are kept as copies.
+backupChoiceReplaceDevice,Replace this device
+backupChoiceReplaceHint,Use the backup instead. A safety copy of this device is saved first.
+backupChoiceKeepDevice,Keep this device's data
+backupChoiceKeepHint,Back up this device separately. The other backup stays in the cloud.
+backupChoiceReplace,Replace
+backupUnknownDevice,Unknown device
+backupThisDevice,This device
+backupLegacyLabel,Older backup (before update)
+backupRestoreConfirmTitle,Restore this backup?
+backupRestoreConfirmBodyHasData,This device already has ideas or notes. Merge keeps both. Replace swaps them for the backup. A safety copy is saved first either way.
+backupRestoreConfirmBodyEmpty,The ideas and notes in this backup will be added to this device.
+backupMergeResult,"Added {added}, kept {copies} copies, skipped {skipped} identical"
+backupMergeCopyFromBackup,{title} (from backup)
+backupMergeCopyFromDevice,{title} (from this device)
+backupUndoRestore,Undo restore
+backupUndoRestoreHint,Go back to the ideas and notes this device had before the last restore. Available for 7 days.
+backupUndoRestoreConfirmTitle,Undo the last restore?
+backupUndoRestoreConfirmBody,Your ideas and notes will go back to how they were before the restore. Anything on this device now is saved in a safety copy first.
+backupUndoRestoreDone,Restore undone.
+backupPickerTitle,Choose a backup
+backupPickerCounts,{ideas} ideas · {notes} notes
+backupPickerUnknownCounts,Contents shown after download
+backupPickerContinue,Continue
+backupErrorOffline,No internet connection. Check your connection and try again.
+backupErrorTimeout,The cloud took too long to respond. Please try again.
+backupErrorSignInRequired,Sign in to your Google account again to keep backing up.
+backupErrorSignInCancelled,Sign-in was cancelled.
+backupErrorICloudUnavailable,iCloud Drive is not available. Sign in to iCloud and turn on iCloud Drive for Idea Vault.
+backupErrorEmptyBackup,"This backup is empty, so nothing was restored."
+backupErrorInvalidBackup,This backup file is damaged and can't be restored.
+backupErrorNewerVersion,Update the app to restore this backup.
+backupErrorIntegrity,This backup failed its integrity check and can't be restored.
+backupErrorUnknown,Something went wrong with cloud backup. Please try again.
+backupStatusHealthy,Backed up recently
+backupStatusStale,Last backup {days} days ago
+backupStatusNever,Not backed up yet
+backupStatusPending,Uploading to iCloud…
+backupStatusNeedsSetup,Finish setting up backup so this device can start backing up.
+backupStatusFinishSetup,Finish setup
+backupActionSignInAgain,Sign in again
+backupActionTryAgain,Try again
+backupAlsoBackedUpFrom,Also backed up from {device}
+backupIcloudAccountTitle,iCloud
+backupIcloudAccountValue,Backups are saved to your iCloud Drive.
+backupUpToDate,Your backup is already up to date.
+backupUploadPending,Uploading to iCloud… We'll confirm it the next time you open the app.
+backupEmptyConfirmTitle,Back up an empty vault?
+backupEmptyConfirmBody,"This device has no ideas or notes. Your existing cloud backups are kept, but this empty backup will become the newest one."
+backupEmptyConfirmButton,Back up anyway
+backupBusyMessage,Another backup is already running. Try again in a moment.
+backupTurnOffTitle,Turn off Cloud Backup?
+backupTurnOffBody,"Automatic backups will stop. Your existing cloud backups are kept, and you can still restore from them."
+backupTurnOffButton,Turn off
+backupDeleteCloud,Delete cloud backups
+backupDeleteCloudTitle,Delete cloud backups?
+backupDeleteCloudBody,All Idea Vault backups in your cloud account will be deleted. Ideas on this device are not affected.
+backupDeleteCloudConfirmTitle,Are you sure?
+backupDeleteCloudConfirmBody,This can't be undone. You won't be able to restore from these backups.
+backupDeleteCloudButton,Delete
+backupDeleteCloudDone,Cloud backups deleted.
+backupNeedsAttention,Backup needs attention
+backupNeedsAttentionAction,Fix
+backupHavePrompt,Have a backup?
+backupDismiss,Dismiss
+homepageEmptyCreateFirstIdea,Create your first idea
+homeQuickNoteCountOverflow,99+
+selectionCount,{count} selected
+selectionClearTooltip,Clear selection
+selectionSelectAllTooltip,Select all
+selectionDeleteTooltip,Delete
+selectionCopyTooltip,Copy
+selectionCopiedOne,Note copied
+selectionCopiedMany,{count} notes copied
+selectionFiledManySnackbar,{count} notes added to {idea} / {section}
+selectionFilePartialFailure,Some notes couldn't be added. They're still selected.
+selectionDeleteConfirm,Delete
+selectionDeleteIdeaTitleOne,Delete this idea?
+selectionDeleteIdeasTitleMany,Delete {count} ideas?
+selectionDeleteIdeaBodyOne,This idea will be removed from your vault.
+selectionDeleteIdeasBodyMany,{count} ideas will be removed from your vault.
+selectionDeleteNoteTitleOne,Delete this note?
+selectionDeleteNotesTitleMany,Delete {count} notes?
+selectionDeleteNoteBodyOne,This note will be removed from Random Notes.
+selectionDeleteNotesBodyMany,{count} notes will be removed from Random Notes.
+editorToolbarHeading,Heading
+editorToolbarBold,Bold
+editorToolbarItalic,Italic
+editorToolbarBulletList,Bullet List
+editorToolbarNumberedList,Numbered List
+editorToolbarChecklist,Checklist
+editorToolbarCodeBlock,Code Block
+editorToolbarInlineCode,Inline Code
+editorToolbarLink,Link
+editorToolbarUndo,Undo
+editorToolbarRedo,Redo
+editorPlainTextMarker,Plain text
+editorLinkDialogTitle,Link
+editorLinkDialogUrlHint,Paste or type a link
+editorLinkDialogTextHint,Text to show
+editorLinkDialogSave,Save
+editorLinkDialogRemove,Remove link
+editorLinkDialogOpen,Open link
+editorLinkDialogCancel,Cancel
+editorLinkOpenFailed,Couldn't open this link
+editorSectionSheetEditTitle,Edit section
+editorSectionSheetAddTitle,Add section
+editorSectionSheetEditBody,Rename this section or remove it from this idea.
+editorSectionSheetAddBody,Create another space for this idea.
+editorSectionSheetNameHint,Section name
+editorSectionSheetCancel,Cancel
+editorSectionSheetDelete,Delete
+editorSectionSheetSave,Save
+editorSectionSheetAdd,Add
+editorClassicEditorOn,Classic editor is on for all notes
+editorClassicEditorOff,Classic editor is off
+vaultCreatePassphraseBody,Choose a passphrase of at least 8 characters. Locked notes are encrypted on this device and in backups.
+vaultNewPassphraseBody,Enter a new passphrase of at least 8 characters.
+vaultPassphraseTooShort,Use at least {count} characters.
+vaultPinWrongLength,Use exactly {count} digits.
+vaultSetupFailed,Couldn't save your PIN. Try again.
+vaultUseSixDigitPin,Use a 6-digit PIN instead
+vaultUsePassphrase,Use a passphrase instead
+vaultForgotPin,Forgot PIN?
+vaultPassphraseHint,Passphrase
+vaultContinue,Continue
+vaultUnwrapTitle,Enter the PIN for your locked notes
+vaultUnwrapBody,Your locked notes are encrypted. Enter the PIN you used when you locked them.
+vaultMigrationBody,Enter your PIN once to finish securing your locked notes.
+vaultUseRecoveryCode,Use recovery code
+vaultRecoveryCodeTitle,Your recovery code
+vaultRecoveryCodeBody,"If you forget your PIN, this code is the only way to open your locked notes, also on a new phone. Write it down or keep it somewhere safe outside this app."
+vaultRecoveryCodeCopy,Copy
+vaultRecoveryCodeCopied,Recovery code copied.
+vaultRecoveryCodeSaved,I saved it
+vaultRecoveryEntryTitle,Enter recovery code
+vaultRecoveryEntryBody,Enter the 32-character recovery code you saved when you set up your PIN.
+vaultRecoveryEntryHint,XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+vaultRecoveryCodeWrong,That recovery code doesn't match.
+vaultForgotTitle,Forgot your PIN?
+vaultForgotBody,Choose how to get back into your locked notes.
+vaultForgotUseBiometric,Use biometrics to set a new PIN
+vaultForgotReset,Delete all locked notes and reset
+vaultResetConfirmTitle,Delete all locked notes?
+vaultResetConfirmBody,"Without your PIN or recovery code, locked notes can't be opened. This deletes every locked note on this device and removes your PIN. It can't be undone."
+vaultResetConfirmAction,Delete locked notes
+vaultResetFinalTitle,Are you sure?
+vaultResetFinalBody,All locked notes will be permanently deleted from this device.
+vaultResetFinalAction,Delete and reset
+vaultResetDone,Locked notes deleted. You can set a new PIN.
+vaultNewPinTitle,Set a new PIN
+vaultUpgradeTitle,Switch to a 6-digit PIN?
+vaultUpgradeBody,A 6-digit PIN or a passphrase is much harder to guess if someone gets a copy of your backup.
+vaultUpgradeAction,Switch
+vaultUpgradeSkip,Keep current PIN
+vaultMigrationDone,Your locked notes are now encrypted on this device and in backups.
+vaultOpenFailed,This note can't be opened. It may be damaged or locked with a different key.
+vaultLoadingNote,Opening locked note…
+vaultLockedNoteTitle,Locked note
+vaultBackupUnwrapTitle,Enter the backup's PIN
+vaultBackupUnwrapBody,"Locked notes in this backup use a different PIN. Enter the PIN you used when it was made, or its recovery code."
+vaultBackupUnwrapSkip,Skip locked notes
+vaultRestoreNotImported,{count} locked notes were not imported.
+vaultRestoreNeedsPin,Restored. Enter the PIN you used before to open locked notes.
+vaultCleanupPendingTitle,Old backups still contain your locked notes
+vaultCleanupPendingBody,Backups made before your locked notes were encrypted are still in your cloud storage.
+vaultCleanupRetry,Retry
+vaultCleanupDone,Old backups removed.
+vaultCleanupFailed,Couldn't remove old backups. Try again later.
+vaultSettingsHideTitles,Hide locked note titles
+vaultSettingsHideTitlesBody,"Cards show ""Locked note"" and search can't find them."
+vaultSettingsRecoveryCode,New recovery code
+vaultRecoveryRegenerateTitle,Create a new recovery code?
+vaultRecoveryRegenerateBody,Your old recovery code stops working for new backups. Backups made before now still open with the old code.
+vaultRecoveryRegenerateAction,Create
+vaultCancel,Cancel
+vaultNeedsUnlockFirst,Unlock your locked notes first.
+vaultLockedNoteHiddenHint,Unlock to see the title
+vaultVerifyPinBody,Enter your PIN to continue.
+editorLinkSheetAddTitle,Add link
+editorLinkSheetEditTitle,Edit link
+editorLinkPreviewOpen,Open
+editorLinkPreviewCopy,Copy link
+editorLinkCopied,Link copied
+editorToolbarMore,More tools
+editorToolbarBack,Back to the first tool

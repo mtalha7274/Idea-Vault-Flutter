@@ -31,6 +31,9 @@ void main() {
         writeValue: (key, value) async {
           storage[key] = value;
         },
+        deleteValue: (key) async {
+          storage.remove(key);
+        },
       );
       biometricService = NoteLockBiometricService(
         readValue: (key) async => storage[key],
@@ -90,15 +93,15 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('sets up a 4 digit PIN with confirmation', (tester) async {
+    testWidgets('sets up a 6 digit PIN with confirmation', (tester) async {
       await pumpPinScreen(tester, NoteLockPinMode.setup);
 
-      await tester.enterText(find.byType(TextField), '1234');
+      await tester.enterText(find.byType(TextField), '123456');
       await tester.pumpAndSettle();
 
       expect(find.text(ViewConstants.noteLockConfirmPinTitle), findsWidgets);
 
-      await tester.enterText(find.byType(TextField), '1234');
+      await tester.enterText(find.byType(TextField), '123456');
       await tester.pumpAndSettle();
 
       expect(find.text(ViewConstants.noteLockEnableBiometricTitle),
@@ -106,7 +109,7 @@ void main() {
       await tester.tap(find.text(ViewConstants.noteLockEnableBiometricSkip));
       await tester.pumpAndSettle();
 
-      expect(await authService.verifyPin('1234'), isTrue);
+      expect(await authService.verifyPin('123456'), isTrue);
       expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
     });
 
@@ -130,10 +133,122 @@ void main() {
       await authService.createPin('2468');
       await pumpPinScreen(tester, NoteLockPinMode.unlock);
 
+      expect(find.text(noteLockEnableBiometricLabelKey()), findsOneWidget);
       expect(
-        find.text(ViewConstants.noteLockEnableBiometricUnlockAction),
+        find.text(ViewConstants.noteLockEnableBiometricUnlockActionAndroid),
         findsOneWidget,
       );
+    });
+
+    testWidgets('turning on biometrics from the unlock screen needs the PIN',
+        (tester) async {
+      await authService.createPin('2468');
+      var biometricPrompts = 0;
+      final enrollingService = NoteLockBiometricService(
+        readValue: (key) async => storage[key],
+        writeValue: (key, value) async {
+          storage[key] = value;
+        },
+        isDeviceSupported: () async => true,
+        canCheckBiometrics: () async => true,
+        authenticate: ({
+          required String localizedReason,
+          bool biometricOnly = false,
+          bool persistAcrossBackgrounding = false,
+        }) async {
+          biometricPrompts += 1;
+          return true;
+        },
+      );
+      await pumpPinScreen(
+        tester,
+        NoteLockPinMode.unlock,
+        overrideBiometricService: enrollingService,
+      );
+
+      await tester.tap(find.byKey(const Key('note-lock-enable-biometric')));
+      await tester.pumpAndSettle();
+
+      expect(biometricPrompts, 0);
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
+      expect(
+        find.text(ViewConstants.noteLockEnableBiometricNeedsPin),
+        findsOneWidget,
+      );
+
+      await tester.enterText(find.byType(TextField), '2468');
+      await tester.pumpAndSettle();
+
+      expect(biometricPrompts, 1);
+      expect(await enrollingService.isBiometricUnlockEnabled(), isTrue);
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
+    });
+
+    testWidgets('locks PIN entry after five wrong attempts with a countdown',
+        (tester) async {
+      var now = DateTime.utc(2026, 11, 13, 9);
+      authService = NoteLockAuthService(
+        random: Random(1),
+        clock: () => now,
+        readValue: (key) async => storage[key],
+        writeValue: (key, value) async {
+          storage[key] = value;
+        },
+        deleteValue: (key) async {
+          storage.remove(key);
+        },
+      );
+      await authService.createPin('2468');
+      await pumpPinScreen(tester, NoteLockPinMode.unlock);
+
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await tester.enterText(find.byType(TextField), '1111');
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+
+      expect(
+          find.byKey(const Key('note-lock-lockout-message')), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+
+      await tester.enterText(find.byType(TextField), '2468');
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
+
+      now = now.add(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pump();
+
+      expect(find.byKey(const Key('note-lock-lockout-message')), findsNothing);
+      expect(
+          tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
+
+      await tester.enterText(find.byType(TextField), '2468');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
+    });
+
+    testWidgets('change PIN also enforces the attempt limit', (tester) async {
+      await authService.createPin('2468');
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await authService.attemptPin('0000');
+      }
+
+      await pumpPinScreen(tester, NoteLockPinMode.changePin);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+          find.byKey(const Key('note-lock-lockout-message')), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    });
+
+    test('formats waits as a countdown', () {
+      expect(formatNoteLockWait(const Duration(seconds: 30)), '0:30');
+      expect(formatNoteLockWait(const Duration(seconds: 61)), '1:01');
+      expect(formatNoteLockWait(const Duration(hours: 1)), '1:00:00');
+      expect(formatNoteLockWait(const Duration(milliseconds: 1500)), '0:02');
     });
 
     testWidgets('does not auto-focus keyboard when biometric auth is canceled',

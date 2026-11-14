@@ -1,30 +1,49 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+
+import '../../core/constants/view_constants.dart';
 
 Future<bool?> showDeleteIdeasConfirmationDialog(
   BuildContext context, {
   required int selectedCount,
 }) {
+  return showSelectionDeleteConfirmationDialog(
+    context,
+    title: selectedCount == 1
+        ? ViewConstants.selectionDeleteIdeaTitleOne.tr()
+        : ViewConstants.selectionDeleteIdeasTitleMany.tr(
+            namedArgs: {'count': '$selectedCount'},
+          ),
+    body: selectedCount == 1
+        ? ViewConstants.selectionDeleteIdeaBodyOne.tr()
+        : ViewConstants.selectionDeleteIdeasBodyMany.tr(
+            namedArgs: {'count': '$selectedCount'},
+          ),
+    confirmKey: const Key('ideas-delete-confirm'),
+  );
+}
+
+Future<bool?> showSelectionDeleteConfirmationDialog(
+  BuildContext context, {
+  required String title,
+  required String body,
+  required Key confirmKey,
+}) {
   return showDialog<bool>(
     context: context,
     builder: (dialogContext) {
-      final title =
-          selectedCount == 1 ? 'Delete selected idea?' : 'Delete ideas?';
-      final body = selectedCount == 1
-          ? 'This idea will be removed from your vault.'
-          : '$selectedCount ideas will be removed from your vault.';
-
       return AlertDialog(
         title: Text(title),
         content: Text(body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(ViewConstants.cancel.tr()),
           ),
           FilledButton(
-            key: const Key('ideas-delete-confirm'),
+            key: confirmKey,
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(ViewConstants.selectionDeleteConfirm.tr()),
           ),
         ],
       );

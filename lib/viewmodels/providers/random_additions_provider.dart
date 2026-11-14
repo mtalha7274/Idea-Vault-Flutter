@@ -20,6 +20,12 @@ class RandomAdditionsProvider with ChangeNotifier {
     return _loadFuture ??= _loadAdditions();
   }
 
+  Future<void> reloadFromStorage() {
+    final future = _loadAdditions();
+    _loadFuture = future;
+    return future;
+  }
+
   Future<RandomAddition?> addAddition(String content) async {
     await ensureLoaded();
 

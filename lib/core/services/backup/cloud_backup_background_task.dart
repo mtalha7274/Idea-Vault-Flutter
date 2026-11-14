@@ -1,15 +1,20 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
-import '../../../data/repositories/local/cloud_backup_settings.dart';
-import '../../../data/repositories/local/ideas.dart';
-import '../../../data/repositories/local/random_additions.dart';
 import '../../../data/managers/local/ideas_database.dart';
+import '../../../data/managers/local/local_storage.dart';
 import '../../../data/managers/local/shared_preference.dart';
+import '../../../data/repositories/local/backup_device_identity.dart';
+import '../../../data/repositories/local/cloud_backup_settings.dart';
+import '../../../data/repositories/local/local_vault.dart';
+import '../../../models/backup/cloud_backup_restore.dart';
+import 'cloud_backup_coordinator.dart';
 import 'cloud_backup_scheduler.dart';
 import 'cloud_backup_service.dart';
+import 'cloud_backup_upload_lock.dart';
 
 class CloudBackupBackgroundTask {
   const CloudBackupBackgroundTask._();
@@ -19,6 +24,47 @@ class CloudBackupBackgroundTask {
       cloudBackupCallbackDispatcher,
     );
   }
+
+  static CloudBackupCoordinator buildCoordinator({
+    required LocalStorageManager storage,
+    required CloudBackupService service,
+    Future<void> Function()? reloadStorage,
+    String appVersion = '',
+    DateTime Function()? clock,
+  }) {
+    return CloudBackupCoordinator(
+      settingsRepo: CloudBackupSettingsRepo(storage),
+      service: service,
+      deviceIdentityRepo: BackupDeviceIdentityRepo(storage),
+      lock: CloudBackupUploadLock(
+        storage,
+        owner: CloudBackupUploadLock.backgroundOwner,
+        reloadStorage: reloadStorage,
+        clock: clock,
+      ),
+      appVersion: appVersion,
+      reloadStorage: reloadStorage,
+      clock: clock,
+    );
+  }
+
+  static Future<CloudBackupRunResult> run({
+    required LocalStorageManager storage,
+    required CloudBackupService service,
+    required LocalVaultLoader loadContent,
+    Future<void> Function()? reloadStorage,
+    String appVersion = '',
+    DateTime Function()? clock,
+  }) {
+    final coordinator = buildCoordinator(
+      storage: storage,
+      service: service,
+      reloadStorage: reloadStorage,
+      appVersion: appVersion,
+      clock: clock,
+    );
+    return coordinator.runAutoBackupIfDue(loadContent);
+  }
 }
 
 Future<void> _loadBackgroundEnv() async {
@@ -27,12 +73,13 @@ Future<void> _loadBackgroundEnv() async {
   } catch (_) {}
 }
 
-bool _isBackupDue(DateTime? lastBackupAt) {
-  if (lastBackupAt == null) {
-    return true;
+Future<String> _appVersion() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    return '${info.version}+${info.buildNumber}';
+  } catch (_) {
+    return '';
   }
-  return DateTime.now().difference(lastBackupAt) >=
-      CloudBackupScheduler.backupInterval;
 }
 
 @pragma('vm:entry-point')
@@ -46,32 +93,15 @@ void cloudBackupCallbackDispatcher() {
       WidgetsFlutterBinding.ensureInitialized();
       await _loadBackgroundEnv();
 
-      final localStorage =
-          SharedPreferenceManager(await SharedPreferences.getInstance());
-      final settingsRepo = CloudBackupSettingsRepo(localStorage);
-      final state = settingsRepo.getState();
-      if (!state.enabled || !state.autoBackupEnabled) {
-        return true;
-      }
-      if (!_isBackupDue(state.lastBackupAt)) {
-        return true;
-      }
-
-      final databaseManager = IdeasDatabaseManager();
-      final ideasRepo = IdeasRepo(databaseManager);
-      final randomAdditionsRepo = RandomAdditionsRepo(databaseManager);
-      final ideas = await ideasRepo.getIdeas();
-      final randomAdditions = await randomAdditionsRepo.getAdditions();
-      final sizeBytes = await CloudBackupService().backUpIdeas(
-        ideas,
-        randomAdditions: randomAdditions,
-        silentAuth: true,
-      );
-      await settingsRepo.saveState(
-        state.copyWith(
-          lastBackupAt: DateTime.now(),
-          lastBackupSizeBytes: sizeBytes,
-        ),
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.reload();
+      final localVault = LocalVaultRepo(IdeasDatabaseManager());
+      await CloudBackupBackgroundTask.run(
+        storage: SharedPreferenceManager(preferences),
+        service: CloudBackupService(),
+        loadContent: localVault.read,
+        reloadStorage: preferences.reload,
+        appVersion: await _appVersion(),
       );
       return true;
     } catch (_) {

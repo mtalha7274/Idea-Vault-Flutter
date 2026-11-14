@@ -15,6 +15,7 @@ class RandomAdditionComposer extends StatelessWidget {
     this.focusNode,
     this.sendButtonKey,
     this.onMultilineChanged,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -23,6 +24,7 @@ class RandomAdditionComposer extends StatelessWidget {
   final FocusNode? focusNode;
   final Key? sendButtonKey;
   final ValueChanged<bool>? onMultilineChanged;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +39,7 @@ class RandomAdditionComposer extends StatelessWidget {
       textCapitalization: TextCapitalization.sentences,
       textInputAction: TextInputAction.newline,
       useShadow: true,
+      autofocus: autofocus,
       onMultilineChanged: onMultilineChanged,
       trailing: IconButton.filled(
         key: sendButtonKey,

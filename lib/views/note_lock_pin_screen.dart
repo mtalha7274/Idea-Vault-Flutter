@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
@@ -9,18 +12,80 @@ import 'package:provider/provider.dart';
 import '../config/router/app_router.dart';
 import '../core/constants/view_constants.dart';
 import '../core/services/note_lock_auth_service.dart';
+import '../core/services/note_lock_attempt_limiter.dart';
 import '../core/services/note_lock_biometric_service.dart';
+import '../core/services/note_lock_session_guard.dart';
 import '../core/utils/helpers.dart';
+import '../models/vault/vault_lock_block.dart';
 import '../viewmodels/providers/theme_provider.dart';
 import '../widgets/idea_vault_subpage_app_bar.dart';
 import '../widgets/translated_text.dart';
 import 'ideas/idea_vault_theme.dart';
 
+bool get _usesAndroidBiometricLabels =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+String noteLockUseBiometricLabelKey() => _usesAndroidBiometricLabels
+    ? ViewConstants.noteLockUseBiometricAndroid
+    : ViewConstants.noteLockUseBiometric;
+
+String noteLockEnableBiometricLabelKey() => _usesAndroidBiometricLabels
+    ? ViewConstants.noteLockEnableBiometricUnlockActionAndroid
+    : ViewConstants.noteLockEnableBiometricUnlockAction;
+
+String formatNoteLockWait(Duration wait) {
+  final totalSeconds = (wait.inMilliseconds / 1000).ceil();
+  final hours = totalSeconds ~/ 3600;
+  final minutes = (totalSeconds % 3600) ~/ 60;
+  final seconds = totalSeconds % 60;
+  final paddedSeconds = seconds.toString().padLeft(2, '0');
+  if (hours > 0) {
+    final paddedMinutes = minutes.toString().padLeft(2, '0');
+    return '$hours:$paddedMinutes:$paddedSeconds';
+  }
+  return '$minutes:$paddedSeconds';
+}
+
 enum NoteLockPinMode {
   setup,
   unlock,
   changePin,
+  verify,
 }
+
+class NoteLockRecoveryOutcome {
+  const NoteLockRecoveryOutcome.unlocked({this.newSecret})
+      : unlocked = true,
+        reset = false;
+
+  const NoteLockRecoveryOutcome.reset()
+      : unlocked = false,
+        reset = true,
+        newSecret = null;
+
+  final bool unlocked;
+  final bool reset;
+  final String? newSecret;
+}
+
+typedef NoteLockSecretVerifier = Future<NoteLockPinAttemptResult> Function(
+  String secret,
+);
+
+typedef NoteLockPinCreated = Future<void> Function(
+  String pin,
+  NoteLockPinKind kind,
+  String? previousPin,
+);
+
+typedef NoteLockUnlockedCallback = Future<bool> Function(
+  BuildContext context,
+  String? secret,
+);
+
+typedef NoteLockForgotPinHandler = Future<NoteLockRecoveryOutcome?> Function(
+  BuildContext context,
+);
 
 class NoteLockPinScreen extends StatefulWidget {
   const NoteLockPinScreen({
@@ -30,6 +95,17 @@ class NoteLockPinScreen extends StatefulWidget {
     required this.biometricService,
     this.ideaId,
     this.nextRoute,
+    this.pinKind,
+    this.titleKey,
+    this.bodyKey,
+    this.allowBiometric = true,
+    this.verifySecret,
+    this.onPinCreated,
+    this.onUnlocked,
+    this.onForgotPin,
+    this.offerBiometricAfterSetup = true,
+    this.alternativeActionKey,
+    this.onAlternativeAction,
   });
 
   final NoteLockPinMode mode;
@@ -37,6 +113,17 @@ class NoteLockPinScreen extends StatefulWidget {
   final NoteLockBiometricService biometricService;
   final String? ideaId;
   final Widget Function()? nextRoute;
+  final NoteLockPinKind? pinKind;
+  final String? titleKey;
+  final String? bodyKey;
+  final bool allowBiometric;
+  final NoteLockSecretVerifier? verifySecret;
+  final NoteLockPinCreated? onPinCreated;
+  final NoteLockUnlockedCallback? onUnlocked;
+  final NoteLockForgotPinHandler? onForgotPin;
+  final bool offerBiometricAfterSetup;
+  final String? alternativeActionKey;
+  final NoteLockForgotPinHandler? onAlternativeAction;
 
   @override
   State<NoteLockPinScreen> createState() => _NoteLockPinScreenState();
@@ -48,6 +135,10 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   final FocusNode _pinFocusNode = FocusNode();
   String _pin = '';
   String? _firstPin;
+  String? _verifiedCurrentPin;
+  NoteLockPinKind _entryKind = NoteLockPinKind.digits4;
+  NoteLockPinKind _newPinKind = NoteLockPinKind.newPinDefault;
+  bool _isSubmitting = false;
   String? _errorKey;
   bool _canUseBiometricUnlock = false;
   bool _canOfferBiometricEnrollment = false;
@@ -57,16 +148,34 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   bool _isError = false;
   bool _suppressKeyboard = false;
   bool _showBiometricSuccessDots = false;
+  bool _pendingBiometricEnrollment = false;
+  Map<String, String>? _errorArgs;
+  Duration _lockoutRemaining = Duration.zero;
+  Timer? _lockoutTimer;
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
 
   bool get _isSetup => widget.mode == NoteLockPinMode.setup;
   bool get _isChangePin => widget.mode == NoteLockPinMode.changePin;
+  bool get _isVerify => widget.mode == NoteLockPinMode.verify;
   bool get _isConfirming => _isSetup && _firstPin != null;
+  bool get _isLockedOut => _lockoutRemaining > Duration.zero;
+  bool get _checksExistingPin =>
+      !_isSetup && !(_isChangePin && _currentPinVerified);
+  bool get _isCreatingPin => _isSetup || (_isChangePin && _currentPinVerified);
 
-  int get _pinDotsFilledCount => _showBiometricSuccessDots ? 4 : _pin.length;
+  NoteLockPinKind get _activeKind => _isCreatingPin ? _newPinKind : _entryKind;
+
+  int get _dotCount => _activeKind.digitCount ?? 0;
+
+  int get _pinDotsFilledCount =>
+      _showBiometricSuccessDots ? _dotCount : _pin.length;
 
   String get _titleKey {
+    final override = widget.titleKey;
+    if (override != null && !_isChangePin) {
+      return _isConfirming ? ViewConstants.noteLockConfirmPinTitle : override;
+    }
     if (_isChangePin) {
       if (!_currentPinVerified) {
         return ViewConstants.noteLockVerifyCurrentPinTitle;
@@ -74,6 +183,9 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
       return _firstPin == null
           ? ViewConstants.noteLockNewPinTitle
           : ViewConstants.noteLockConfirmPinTitle;
+    }
+    if (_isVerify) {
+      return ViewConstants.noteLockVerifyCurrentPinTitle;
     }
     if (!_isSetup) {
       return ViewConstants.noteLockEnterPinTitle;
@@ -84,19 +196,34 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   String get _bodyKey {
+    final override = widget.bodyKey;
+    if (override != null && !_isConfirming && !_pendingBiometricEnrollment) {
+      return override;
+    }
     if (_isChangePin) {
       if (!_currentPinVerified) {
         return ViewConstants.noteLockVerifyCurrentPinBody;
       }
-      return _firstPin == null
-          ? ViewConstants.noteLockNewPinBody
-          : ViewConstants.noteLockConfirmPinBody;
+      if (_firstPin != null) {
+        return ViewConstants.noteLockConfirmPinBody;
+      }
+      return _newPinKind == NoteLockPinKind.passphrase
+          ? ViewConstants.vaultNewPassphraseBody
+          : ViewConstants.noteLockNewPinBody;
+    }
+    if (_isVerify) {
+      return ViewConstants.noteLockEnableBiometricNeedsPin;
     }
     if (!_isSetup) {
-      return ViewConstants.noteLockUnlockBody;
+      return _pendingBiometricEnrollment
+          ? ViewConstants.noteLockEnableBiometricNeedsPin
+          : ViewConstants.noteLockUnlockBody;
     }
-    return _isConfirming
-        ? ViewConstants.noteLockConfirmPinBody
+    if (_isConfirming) {
+      return ViewConstants.noteLockConfirmPinBody;
+    }
+    return _newPinKind == NoteLockPinKind.passphrase
+        ? ViewConstants.vaultCreatePassphraseBody
         : ViewConstants.noteLockCreatePinBody;
   }
 
@@ -134,8 +261,73 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
         weight: 1,
       ),
     ]).animate(_shakeController);
+    _entryKind = widget.pinKind ?? NoteLockPinKind.digits4;
+    NoteLockSecureWindow.acquire();
     _pinController.addListener(_handlePinChanged);
-    _loadBiometrics();
+    unawaited(_loadInitialState());
+  }
+
+  Future<void> _loadInitialState() async {
+    if (!_isSetup) {
+      final kind = widget.pinKind ?? await widget.authService.pinKind();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _entryKind = kind;
+      });
+      final status = await widget.authService.attemptStatus();
+      if (!mounted) {
+        return;
+      }
+      if (status.isLockedOut) {
+        _startLockoutCountdown(status.remainingWait);
+      }
+    }
+    await _loadBiometrics();
+  }
+
+  void _startLockoutCountdown(Duration remaining) {
+    _lockoutTimer?.cancel();
+    setState(() {
+      _lockoutRemaining = remaining;
+      _errorKey = null;
+      _errorArgs = null;
+    });
+    _pinController.clear();
+    _dismissKeyboard();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      unawaited(_tickLockout());
+    });
+  }
+
+  Future<void> _tickLockout() async {
+    if (!mounted) {
+      return;
+    }
+    final next = _lockoutRemaining - const Duration(seconds: 1);
+    if (next > Duration.zero) {
+      setState(() {
+        _lockoutRemaining = next;
+      });
+      return;
+    }
+    final status = await widget.authService.attemptStatus();
+    if (!mounted) {
+      return;
+    }
+    if (status.isLockedOut) {
+      setState(() {
+        _lockoutRemaining = status.remainingWait;
+      });
+      return;
+    }
+    _lockoutTimer?.cancel();
+    _lockoutTimer = null;
+    setState(() {
+      _lockoutRemaining = Duration.zero;
+    });
+    _openKeyboard();
   }
 
   void _scheduleInitialKeyboard() {
@@ -151,7 +343,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   void _openKeyboard() {
-    if (!mounted || _suppressKeyboard) {
+    if (!mounted || _suppressKeyboard || _isLockedOut) {
       return;
     }
     _pinFocusNode.requestFocus();
@@ -163,6 +355,8 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
 
   @override
   void dispose() {
+    _lockoutTimer?.cancel();
+    NoteLockSecureWindow.release();
     _shakeController.dispose();
     _pinController
       ..removeListener(_handlePinChanged)
@@ -172,7 +366,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   Future<void> _loadBiometrics() async {
-    if (_isSetup || _isChangePin) {
+    if (_isSetup || _isChangePin || _isVerify || !widget.allowBiometric) {
       if (!mounted) {
         return;
       }
@@ -210,21 +404,65 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
       return;
     }
 
+    if (_isLockedOut && _checksExistingPin && nextPin.isNotEmpty) {
+      _pinController.clear();
+      return;
+    }
+
     setState(() {
       _pin = nextPin;
       _errorKey = null;
+      _errorArgs = null;
     });
 
-    if (nextPin.length == 4) {
+    final digitCount = _activeKind.digitCount;
+    if (digitCount != null && nextPin.length == digitCount) {
       Future<void>.delayed(const Duration(milliseconds: 150), () {
-        if (mounted) {
+        if (mounted && _pinController.text == nextPin) {
           _submitPin(nextPin);
         }
       });
     }
   }
 
+  void _submitPassphrase() {
+    final value = _pinController.text;
+    if (value.isEmpty) {
+      return;
+    }
+    if (_isCreatingPin && !_activeKind.accepts(value)) {
+      _showError(ViewConstants.vaultPassphraseTooShort, args: {
+        'count': '${NoteLockPinKind.minPassphraseLength}',
+      });
+      return;
+    }
+    _submitPin(value);
+  }
+
+  void _toggleNewPinKind() {
+    setState(() {
+      _newPinKind = _newPinKind == NoteLockPinKind.passphrase
+          ? NoteLockPinKind.newPinDefault
+          : NoteLockPinKind.passphrase;
+      _errorKey = null;
+      _errorArgs = null;
+    });
+    _clearPin();
+  }
+
   Future<void> _submitPin(String pin) async {
+    if (_isSubmitting) {
+      return;
+    }
+    _isSubmitting = true;
+    try {
+      await _submitPinUnguarded(pin);
+    } finally {
+      _isSubmitting = false;
+    }
+  }
+
+  Future<void> _submitPinUnguarded(String pin) async {
     if (_isSetup) {
       await _submitSetupPin(pin);
       return;
@@ -235,29 +473,69 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
       return;
     }
 
-    final isValid = await widget.authService.verifyPin(pin);
+    final isValid = await _checkExistingPin(pin);
+    if (!mounted || !isValid) {
+      return;
+    }
+    _verifiedCurrentPin = pin;
+    if (_pendingBiometricEnrollment) {
+      _suppressKeyboard = true;
+      _dismissKeyboard();
+      _pinFocusNode.unfocus();
+      await _authenticateWithBiometrics(
+        enrollOnSuccess: true,
+        completeOnSuccess: false,
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    await _onPinSuccess(secret: pin);
+  }
+
+  Future<bool> _checkExistingPin(String pin) async {
+    final verify = widget.verifySecret;
+    final result = verify != null
+        ? await verify(pin)
+        : await widget.authService.attemptPin(pin);
     if (!mounted) {
-      return;
+      return false;
     }
-    if (isValid) {
-      await _onPinSuccess();
-      return;
+    switch (result.check) {
+      case NoteLockPinCheck.success:
+        return true;
+      case NoteLockPinCheck.lockedOut:
+        HapticFeedback.heavyImpact();
+        _shakeController.forward(from: 0);
+        _startLockoutCountdown(result.status.remainingWait);
+        setState(() {
+          _pin = '';
+        });
+        return false;
+      case NoteLockPinCheck.wrongPin:
+        final attemptsLeft = result.status.freeAttemptsLeft;
+        if (attemptsLeft > 0 &&
+            attemptsLeft < NoteLockAttemptLimiter.freeAttempts - 1) {
+          _showError(
+            ViewConstants.noteLockWrongPinAttemptsLeft,
+            args: {'count': '$attemptsLeft'},
+          );
+        } else {
+          _showError(ViewConstants.noteLockWrongPin);
+        }
+        return false;
     }
-    _showError(ViewConstants.noteLockWrongPin);
   }
 
   Future<void> _submitChangePinStep(String pin) async {
     if (!_currentPinVerified) {
-      final isValid = await widget.authService.verifyPin(pin);
-      if (!mounted) {
-        return;
-      }
-      if (!isValid) {
-        _showError(ViewConstants.noteLockWrongPin);
+      final isValid = await _checkExistingPin(pin);
+      if (!mounted || !isValid) {
         return;
       }
       setState(() {
         _currentPinVerified = true;
+        _verifiedCurrentPin = pin;
       });
       _clearPin();
       return;
@@ -269,6 +547,18 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   Future<void> _submitSetupPin(String pin) async {
     final firstPin = _firstPin;
     if (firstPin == null) {
+      if (!_newPinKind.accepts(pin)) {
+        _showError(
+          _newPinKind == NoteLockPinKind.passphrase
+              ? ViewConstants.vaultPassphraseTooShort
+              : ViewConstants.vaultPinWrongLength,
+          args: {
+            'count':
+                '${_newPinKind.digitCount ?? NoteLockPinKind.minPassphraseLength}',
+          },
+        );
+        return;
+      }
       setState(() {
         _firstPin = pin;
       });
@@ -281,12 +571,27 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
       return;
     }
 
-    await widget.authService.createPin(pin);
+    final onPinCreated = widget.onPinCreated;
+    try {
+      if (onPinCreated != null) {
+        await onPinCreated(pin, _newPinKind, _verifiedCurrentPin);
+      } else {
+        await widget.authService.createPin(pin, kind: _newPinKind);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _firstPin = null;
+        });
+        _showError(ViewConstants.vaultSetupFailed);
+      }
+      return;
+    }
     if (!mounted) {
       return;
     }
 
-    if (_isSetup) {
+    if (_isSetup && widget.offerBiometricAfterSetup) {
       _suppressKeyboard = true;
       _dismissKeyboard();
       _pinFocusNode.unfocus();
@@ -336,10 +641,11 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     );
   }
 
-  void _showError(String errorKey) {
+  void _showError(String errorKey, {Map<String, String>? args}) {
     HapticFeedback.heavyImpact();
     setState(() {
       _errorKey = errorKey;
+      _errorArgs = args;
       _isError = true;
     });
     _shakeController.forward(from: 0).then((_) {
@@ -353,6 +659,7 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 
   void _clearPin({bool requestFocus = true}) {
+    _pin = '';
     _pinController.clear();
     setState(() {
       _pin = '';
@@ -406,7 +713,47 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
     }
   }
 
-  Future<void> _onPinSuccess() async {
+  void _requestBiometricEnrollment() {
+    setState(() {
+      _pendingBiometricEnrollment = true;
+      _errorKey = null;
+      _errorArgs = null;
+    });
+    _openKeyboard();
+  }
+
+  Future<void> _openForgotPin(NoteLockForgotPinHandler handler) async {
+    _dismissKeyboard();
+    _pinFocusNode.unfocus();
+    final outcome = await handler(context);
+    if (!mounted || outcome == null) {
+      _openKeyboard();
+      return;
+    }
+    if (outcome.reset) {
+      AppRouter.pop(context, false);
+      return;
+    }
+    if (outcome.unlocked) {
+      await _onPinSuccess(secret: outcome.newSecret);
+    }
+  }
+
+  Future<void> _onPinSuccess({String? secret}) async {
+    final onUnlocked = widget.onUnlocked;
+    if (onUnlocked != null) {
+      _suppressKeyboard = true;
+      _dismissKeyboard();
+      _pinFocusNode.unfocus();
+      final proceed = await onUnlocked(context, secret);
+      if (!mounted) {
+        return;
+      }
+      if (!proceed) {
+        AppRouter.pop(context, false);
+        return;
+      }
+    }
     final ideaId = widget.ideaId;
     final nextRoute = widget.nextRoute;
     if (nextRoute != null) {
@@ -497,16 +844,36 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                           offset: Offset(_shakeAnimation.value, 0),
                           child: child,
                         ),
-                        child: _PinDots(
-                          filledCount: _pinDotsFilledCount,
-                          isError: _isError,
-                          onTap: _openKeyboard,
-                        ),
+                        child: _activeKind.isDigits
+                            ? _PinDots(
+                                count: _dotCount,
+                                filledCount: _pinDotsFilledCount,
+                                isError: _isError,
+                                onTap: _openKeyboard,
+                              )
+                            : _buildPassphraseField(context),
                       ),
-                      if (_errorKey != null) ...[
+                      if (_isLockedOut && _checksExistingPin) ...[
                         Gap(18.h),
                         Text(
-                          _errorKey!.tr(),
+                          ViewConstants.noteLockTooManyAttempts.tr(
+                            namedArgs: {
+                              'time': formatNoteLockWait(_lockoutRemaining),
+                            },
+                          ),
+                          key: const Key('note-lock-lockout-message'),
+                          textAlign: TextAlign.center,
+                          style: ideaVaultBody(
+                            context,
+                            size: 14.f,
+                            weight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ] else if (_errorKey != null) ...[
+                        Gap(18.h),
+                        Text(
+                          _errorKey!.tr(namedArgs: _errorArgs),
                           textAlign: TextAlign.center,
                           style: ideaVaultBody(
                             context,
@@ -516,57 +883,91 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
                           ),
                         ),
                       ],
+                      if (_isCreatingPin && _firstPin == null) ...[
+                        Gap(18.h),
+                        TextButton(
+                          key: const Key('note-lock-toggle-passphrase'),
+                          onPressed: _toggleNewPinKind,
+                          child: Text(
+                            (_newPinKind == NoteLockPinKind.passphrase
+                                    ? ViewConstants.vaultUseSixDigitPin
+                                    : ViewConstants.vaultUsePassphrase)
+                                .tr(),
+                          ),
+                        ),
+                      ],
                       if (widget.mode == NoteLockPinMode.unlock &&
+                          widget.allowBiometric &&
                           !_isCheckingBiometrics &&
                           _canUseBiometricUnlock) ...[
                         Gap(28.h),
                         TextButton.icon(
                           onPressed: _authenticateWithBiometrics,
                           icon: const Icon(Icons.fingerprint_rounded),
-                          label: Text(ViewConstants.noteLockUseBiometric.tr()),
+                          label: Text(noteLockUseBiometricLabelKey().tr()),
                         ),
                       ],
                       if (widget.mode == NoteLockPinMode.unlock &&
+                          widget.allowBiometric &&
                           !_isCheckingBiometrics &&
                           !_canUseBiometricUnlock &&
+                          !_pendingBiometricEnrollment &&
                           _canOfferBiometricEnrollment) ...[
                         Gap(28.h),
                         TextButton.icon(
-                          onPressed: () => _authenticateWithBiometrics(
-                            enrollOnSuccess: true,
-                          ),
+                          key: const Key('note-lock-enable-biometric'),
+                          onPressed: _requestBiometricEnrollment,
                           icon: const Icon(Icons.fingerprint_rounded),
-                          label: Text(ViewConstants
-                              .noteLockEnableBiometricUnlockAction
-                              .tr()),
+                          label: Text(noteLockEnableBiometricLabelKey().tr()),
                         ),
                       ],
-                      SizedBox(
-                        width: 1,
-                        height: 1,
-                        child: TextField(
-                          controller: _pinController,
-                          focusNode: _pinFocusNode,
-                          autofocus: !_suppressKeyboard,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(4),
-                          ],
-                          enableSuggestions: false,
-                          autocorrect: false,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            counterText: '',
-                          ),
-                          style: const TextStyle(
-                            color: Colors.transparent,
-                            height: 0.01,
-                          ),
-                          cursorColor: Colors.transparent,
+                      if (widget.onAlternativeAction != null &&
+                          widget.alternativeActionKey != null) ...[
+                        Gap(12.h),
+                        TextButton(
+                          key: const Key('note-lock-alternative-action'),
+                          onPressed: () =>
+                              _openForgotPin(widget.onAlternativeAction!),
+                          child: Text(widget.alternativeActionKey!.tr()),
                         ),
-                      ),
+                      ],
+                      if (widget.onForgotPin != null && _checksExistingPin) ...[
+                        Gap(12.h),
+                        TextButton(
+                          key: const Key('note-lock-forgot-pin'),
+                          onPressed: () => _openForgotPin(widget.onForgotPin!),
+                          child: Text(ViewConstants.vaultForgotPin.tr()),
+                        ),
+                      ],
+                      if (_activeKind.isDigits)
+                        SizedBox(
+                          width: 1,
+                          height: 1,
+                          child: TextField(
+                            controller: _pinController,
+                            focusNode: _pinFocusNode,
+                            autofocus: !_suppressKeyboard,
+                            readOnly: _isLockedOut && _checksExistingPin,
+                            enableIMEPersonalizedLearning: false,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(_dotCount),
+                            ],
+                            enableSuggestions: false,
+                            autocorrect: false,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              counterText: '',
+                            ),
+                            style: const TextStyle(
+                              color: Colors.transparent,
+                              height: 0.01,
+                            ),
+                            cursorColor: Colors.transparent,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -579,13 +980,50 @@ class _NoteLockPinScreenState extends State<NoteLockPinScreen>
   }
 }
 
+extension on _NoteLockPinScreenState {
+  Widget _buildPassphraseField(BuildContext context) {
+    final readOnly = _isLockedOut && _checksExistingPin;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          key: const Key('note-lock-passphrase-field'),
+          controller: _pinController,
+          focusNode: _pinFocusNode,
+          autofocus: !_suppressKeyboard,
+          readOnly: readOnly,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          enableIMEPersonalizedLearning: false,
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _submitPassphrase(),
+          decoration: InputDecoration(
+            hintText: ViewConstants.vaultPassphraseHint.tr(),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        Gap(12.h),
+        FilledButton(
+          key: const Key('note-lock-passphrase-submit'),
+          onPressed: readOnly ? null : _submitPassphrase,
+          child: Text(ViewConstants.vaultContinue.tr()),
+        ),
+      ],
+    );
+  }
+}
+
 class _PinDots extends StatelessWidget {
   const _PinDots({
+    required this.count,
     required this.filledCount,
     required this.isError,
     required this.onTap,
   });
 
+  final int count;
   final int filledCount;
   final bool isError;
   final VoidCallback onTap;
@@ -604,7 +1042,7 @@ class _PinDots extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (var index = 0; index < 4; index++) ...[
+            for (var index = 0; index < count; index++) ...[
               AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
                 curve: Curves.easeOut,
@@ -621,7 +1059,7 @@ class _PinDots extends StatelessWidget {
                   ),
                 ),
               ),
-              if (index != 3) Gap(14.w),
+              if (index != count - 1) Gap(count > 4 ? 10.w : 14.w),
             ],
           ],
         ),

@@ -66,6 +66,34 @@ class InMemoryIdeasRepo extends IdeasRepo {
     _ideas = ideas.map(_cloneIdea).toList();
   }
 
+  @override
+  Future<void> writeIdeasAtomically(List<Idea> ideas) async {
+    for (final idea in ideas) {
+      await upsertIdea(idea);
+    }
+  }
+
+  @override
+  Future<bool> hasEncryptedIdeas() async {
+    return _ideas.any((idea) => idea.isEncrypted);
+  }
+
+  @override
+  Future<Set<String>> sectionIdsNotOwnedBy(String ideaId) async {
+    return {
+      for (final idea in _ideas)
+        if (idea.id != ideaId)
+          for (final section in idea.sections) section.id,
+    };
+  }
+
+  int compactCount = 0;
+
+  @override
+  Future<void> compact() async {
+    compactCount += 1;
+  }
+
   Idea _cloneIdea(Idea idea) {
     return idea.copyWith(
       sections: idea.sections.map((section) => section.copyWith()).toList(),

@@ -6,7 +6,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:idea_vault/core/constants/view_constants.dart';
-import 'package:idea_vault/core/services/backup/cloud_backup_scheduler.dart';
 import 'package:idea_vault/core/services/backup/cloud_backup_service.dart';
 import 'package:idea_vault/core/services/backup/initial_cloud_auth_coordinator.dart';
 import 'package:idea_vault/data/repositories/local/app_install_state.dart';
@@ -17,7 +16,7 @@ import 'package:idea_vault/data/repositories/local/idea_editor_state.dart';
 import 'package:idea_vault/data/repositories/local/idea_list_preferences.dart';
 import 'package:idea_vault/data/repositories/local/theme.dart';
 import 'package:idea_vault/injection_container.dart';
-import 'package:idea_vault/models/backup/cloud_backup_account.dart';
+import 'package:idea_vault/models/backup/cloud_backup_error.dart';
 import 'package:idea_vault/models/backup/cloud_backup_state.dart';
 import 'package:idea_vault/main.dart' show navigatorKey;
 import 'package:idea_vault/models/idea.dart';
@@ -26,9 +25,12 @@ import 'package:idea_vault/viewmodels/providers/ideas_provider.dart';
 import 'package:idea_vault/viewmodels/providers/random_additions_provider.dart';
 import 'package:idea_vault/viewmodels/providers/theme_provider.dart';
 import 'package:idea_vault/views/homepage.dart';
+import 'package:idea_vault/widgets/selection/selection_check_badge.dart';
 import 'package:provider/provider.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+import '../helpers/backup_test_harness.dart';
+import '../helpers/fake_cloud_backup_store.dart';
 import '../helpers/in_memory_ideas_repo.dart';
 import '../helpers/in_memory_random_additions_repo.dart';
 import '../helpers/memory_local_storage.dart';
@@ -121,13 +123,20 @@ void main() {
     }
 
     CloudBackupProvider buildCloudBackupProvider({
-      _FakeCloudBackupService? backupService,
+      FakeCloudBackupStore? store,
+      bool isIOS = false,
     }) {
+      final cloudStore = store ?? FakeCloudBackupStore();
       return CloudBackupProvider(
         CloudBackupSettingsRepo(storage),
-        backupService ?? _FakeCloudBackupService(),
-        _FakeCloudBackupScheduler(),
+        CloudBackupService(
+          androidStore: cloudStore,
+          iosStore: cloudStore,
+          useICloud: isIOS,
+        ),
+        FakeCloudBackupScheduler(),
         InitialCloudAuthCoordinator(AppInstallStateRepo(storage)),
+        isIOS: isIOS,
       );
     }
 
@@ -178,6 +187,15 @@ void main() {
       return authService;
     }
 
+    bool appearsBefore(WidgetTester tester, String firstId, String secondId) {
+      final first = tester.getTopLeft(find.byKey(Key('idea-card-$firstId')));
+      final second = tester.getTopLeft(find.byKey(Key('idea-card-$secondId')));
+      if ((first.dy - second.dy).abs() > 1) {
+        return first.dy < second.dy;
+      }
+      return first.dx < second.dx;
+    }
+
     Finder sectionTab(IdeaSection section) {
       return find.byKey(Key('idea-editor-section-tab-${section.id}'));
     }
@@ -189,11 +207,90 @@ void main() {
       await settleUi(tester);
     }
 
-    testWidgets('shows the empty state and fab', (tester) async {
+    testWidgets('shows the empty state, its create button and the top bar',
+        (tester) async {
       await pumpIdeasApp(tester);
 
       expect(find.byKey(const Key('ideas-empty-state')), findsOneWidget);
-      expect(find.byKey(const Key('ideas-fab')), findsOneWidget);
+      expect(
+          find.byKey(const Key('ideas-empty-create-button')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-search-button')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-sort-button')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-more-menu')), findsNothing);
+      expect(find.byKey(const Key('ideas-fab')), findsNothing);
+      expect(find.byKey(const Key('home-quick-note-button')), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+
+      final title = tester.widget<Text>(
+        find.byKey(const Key('ideas-home-title')),
+      );
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+      expect(title.style?.fontSize, 22);
+
+      final plusSize =
+          tester.getSize(find.byKey(const Key('ideas-new-idea-button')));
+      expect(plusSize.width, greaterThanOrEqualTo(48));
+      expect(plusSize.height, greaterThanOrEqualTo(48));
+      expect(find.byTooltip(ViewConstants.homepageFabNewIdea), findsOneWidget);
+    });
+
+    testWidgets('empty state create button opens the editor', (tester) async {
+      await pumpIdeasApp(tester);
+
+      await tester.tap(find.byKey(const Key('ideas-empty-create-button')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
+
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+    });
+
+    testWidgets('double tapping the plus opens only one editor',
+        (tester) async {
+      await pumpIdeasApp(tester);
+
+      final plus = tester.widget<IconButton>(
+        find.byKey(const Key('ideas-new-idea-button')),
+      );
+      plus.onPressed!.call();
+      plus.onPressed!.call();
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
+      final closeButton = tester.widget<IconButton>(
+        find.byKey(const Key('idea-editor-close')),
+      );
+      closeButton.onPressed!.call();
+      await settlePersistenceAction(tester);
+
+      expect(find.byKey(const Key('idea-editor-title')), findsNothing);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsOneWidget);
+    });
+
+    testWidgets('top bar fits a narrow phone with large text', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await pumpIdeasApp(tester);
+
+      expect(tester.takeException(), isNull);
+      final plus =
+          tester.getRect(find.byKey(const Key('ideas-new-idea-button')));
+      final sort = tester.getRect(find.byKey(const Key('ideas-sort-button')));
+      final search =
+          tester.getRect(find.byKey(const Key('ideas-search-button')));
+      expect(plus.right, lessThanOrEqualTo(320));
+      expect((plus.center.dy - sort.center.dy).abs(), lessThan(1));
+      expect((plus.center.dy - search.center.dy).abs(), lessThan(1));
     });
 
     testWidgets('hides backup-off indicator without backup provider',
@@ -220,7 +317,10 @@ void main() {
 
     testWidgets('hides restore prompt when no backup is available',
         (tester) async {
-      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+      await pumpIdeasApp(
+        tester,
+        backupProvider: buildCloudBackupProvider(isIOS: true),
+      );
 
       expect(find.text(ViewConstants.backupRestorePromptFound), findsNothing);
       expect(
@@ -232,12 +332,12 @@ void main() {
     testWidgets(
         'shows restore prompt with backup-off indicator when backup exists',
         (tester) async {
-      final backupService = _FakeCloudBackupService()
-        ..backupExistsResult = true;
+      final store = FakeCloudBackupStore();
+      putBackupFile(store, ideas: [backupTestIdea('cloud')]);
 
       await pumpIdeasApp(
         tester,
-        backupProvider: buildCloudBackupProvider(backupService: backupService),
+        backupProvider: buildCloudBackupProvider(store: store, isIOS: true),
       );
 
       expect(find.text(ViewConstants.backupRestorePromptFound), findsOneWidget);
@@ -247,12 +347,59 @@ void main() {
       );
     });
 
+    testWidgets('shows the neutral restore card on an empty Android vault',
+        (tester) async {
+      final store = FakeCloudBackupStore();
+
+      await pumpIdeasApp(
+        tester,
+        backupProvider: buildCloudBackupProvider(store: store),
+      );
+
+      expect(find.text(ViewConstants.backupHavePrompt), findsOneWidget);
+      expect(find.text(ViewConstants.backupRestorePromptFound), findsNothing);
+      expect(store.listCount, 0);
+    });
+
+    testWidgets('shows backup needs attention when sign-in is required',
+        (tester) async {
+      await CloudBackupSettingsRepo(storage).saveState(
+        const CloudBackupState.initial().copyWith(
+          enabled: true,
+          remoteStateResolved: true,
+          email: 'writer@example.com',
+          lastBackupAt: DateTime.now(),
+          status: CloudBackupStatus(
+            lastBackupAt: DateTime.now().subtract(const Duration(hours: 2)),
+            lastAttemptAt: DateTime.now(),
+            lastErrorType: CloudBackupErrorType.signInRequired,
+            consecutiveFailures: 1,
+            firstFailureAt: DateTime.now(),
+          ),
+        ),
+      );
+
+      await pumpIdeasApp(tester, backupProvider: buildCloudBackupProvider());
+
+      expect(
+        find.byKey(const Key('homepage-backup-attention-indicator')),
+        findsOneWidget,
+      );
+      expect(find.text(ViewConstants.backupNeedsAttention), findsOneWidget);
+      expect(
+        find.byKey(const Key('homepage-backup-off-indicator')),
+        findsNothing,
+      );
+    });
+
     testWidgets('hides backup-off indicator when backup is enabled',
         (tester) async {
       await CloudBackupSettingsRepo(storage).saveState(
         const CloudBackupState.initial().copyWith(
           enabled: true,
+          remoteStateResolved: true,
           email: 'writer@example.com',
+          lastBackupAt: DateTime.now(),
         ),
       );
 
@@ -262,12 +409,16 @@ void main() {
         find.byKey(const Key('homepage-backup-off-indicator')),
         findsNothing,
       );
+      expect(
+        find.byKey(const Key('homepage-backup-attention-indicator')),
+        findsNothing,
+      );
     });
 
-    testWidgets('opens the editor from the fab', (tester) async {
+    testWidgets('opens the editor from the top bar plus', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
@@ -280,20 +431,20 @@ void main() {
       );
       expect(titleField.autofocus, isTrue);
       expect(titleField.controller?.text, isEmpty);
-      expect(provider.ideas, hasLength(1));
-      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
+      expect(provider.ideas, isEmpty);
 
       final closeButton = tester.widget<IconButton>(
         find.byKey(const Key('idea-editor-close')),
       );
       closeButton.onPressed!.call();
       await settlePersistenceAction(tester);
+      expect(provider.ideas, isEmpty);
     });
 
     testWidgets('autosaves a new idea and returns to the list', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -321,7 +472,7 @@ void main() {
         (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-markdown-text-field')),
@@ -368,7 +519,7 @@ void main() {
         (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -412,7 +563,7 @@ void main() {
     testWidgets('creates duplicate untitled sections quickly', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
@@ -438,7 +589,7 @@ void main() {
         (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
@@ -514,7 +665,7 @@ void main() {
     testWidgets('preserves tab edits while switching sections', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
@@ -565,7 +716,7 @@ void main() {
     testWidgets('shows tooltips for toolbar actions', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       Future<void> expectTooltip(IconData icon, String label) async {
@@ -576,15 +727,16 @@ void main() {
         await settleUi(tester);
       }
 
-      await expectTooltip(Icons.title, 'Heading');
-      await expectTooltip(Icons.format_bold, 'Bold');
-      await expectTooltip(Icons.format_italic, 'Italic');
-      await expectTooltip(Icons.format_list_bulleted, 'Bullet List');
-      await expectTooltip(Icons.code, 'Code Block');
+      await expectTooltip(Icons.title, ViewConstants.editorToolbarHeading);
+      await expectTooltip(Icons.format_bold, ViewConstants.editorToolbarBold);
+      await expectTooltip(
+          Icons.format_italic, ViewConstants.editorToolbarItalic);
+      await expectTooltip(
+          Icons.format_list_bulleted, ViewConstants.editorToolbarBulletList);
+      await expectTooltip(Icons.code, ViewConstants.editorToolbarCodeBlock);
     });
 
-    testWidgets('restores the open editor with preview mode on relaunch',
-        (tester) async {
+    testWidgets('restores the open editor on relaunch', (tester) async {
       late final String ideaId;
       late final String sectionId;
       await tester.runAsync(() async {
@@ -606,7 +758,7 @@ void main() {
       await settleUi(tester);
 
       expect(find.byKey(const Key('idea-editor-title')), findsOneWidget);
-      expect(find.byKey(const Key('idea-markdown-text-field')), findsNothing);
+      expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
       expect(find.text('ideaEditorTitleEdit'), findsOneWidget);
 
       final closeButton = tester.widget<IconButton>(
@@ -616,8 +768,7 @@ void main() {
       await settleUi(tester);
     });
 
-    testWidgets('restores locked editor through PIN setup on relaunch',
-        (tester) async {
+    testWidgets('does not reopen a locked note on relaunch', (tester) async {
       await registerNoteLockServices();
       late final String ideaId;
       late final String sectionId;
@@ -640,9 +791,11 @@ void main() {
       await pumpIdeasApp(tester);
       await settleUi(tester);
 
-      expect(find.byKey(const Key('note-lock-pin-screen')), findsOneWidget);
-      expect(find.text(ViewConstants.noteLockCreatePinTitle), findsWidgets);
-      expect(find.byKey(const Key('idea-editor-lock-toggle')), findsNothing);
+      expect(find.byKey(const Key('note-lock-pin-screen')), findsNothing);
+      expect(find.byKey(const Key('idea-editor-title')), findsNothing);
+      expect(find.byKey(Key('idea-card-$ideaId')), findsOneWidget);
+      expect(provider.resumeEditorState, isNull);
+      expect(IdeaEditorStateRepo(storage).getState(), isNull);
     });
 
     testWidgets(
@@ -671,7 +824,7 @@ void main() {
       final authService = await registerNoteLockServices(withPin: true);
 
       await pumpIdeasApp(tester);
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       await tester.enterText(
@@ -680,27 +833,28 @@ void main() {
       );
       await settlePersistenceAction(tester);
 
-      await tester.tap(find.byKey(const Key('idea-editor-lock-toggle')));
+      await tester.tap(find.byKey(const Key('idea-editor-menu')));
+      await settleUi(tester);
+      expect(
+        find.text(ViewConstants.ideaEditorOptionsLockNote),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('idea-editor-option-lock')));
       await settlePersistenceAction(tester);
 
       expect(find.text(ViewConstants.noteLockEditorTitle), findsNothing);
       expect(find.byKey(const Key('idea-markdown-text-field')), findsOneWidget);
       expect(provider.ideas.single.isLocked, isTrue);
+      expect(find.byKey(const Key('idea-editor-lock-toggle')), findsNothing);
 
-      final lockButton = tester.widget<IconButton>(
-        find.byKey(const Key('idea-editor-lock-toggle')),
-      );
+      await tester.tap(find.byKey(const Key('idea-editor-menu')));
+      await settleUi(tester);
       expect(
-        lockButton.style?.foregroundColor?.resolve({}),
-        themeProvider.baseTheme.primary,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('idea-editor-lock-toggle')),
-          matching: find.byIcon(Icons.lock_outline_rounded),
-        ),
+        find.text(ViewConstants.ideaEditorOptionsUnlockNote),
         findsOneWidget,
       );
+      await tester.tapAt(const Offset(20, 20));
+      await settleUi(tester);
 
       final ideaId = provider.ideas.single.id;
       final closeButton = tester.widget<IconButton>(
@@ -744,28 +898,177 @@ void main() {
       await settleUi(tester);
       final deleteButton = find.byKey(const Key('ideas-delete-button'));
       expect(deleteButton, findsOneWidget);
+      expect(find.byKey(const Key('ideas-selection-count')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsNothing);
+      expect(find.byKey(const Key('ideas-search-button')), findsNothing);
+      expect(find.byKey(const Key('ideas-sort-button')), findsNothing);
+      expect(find.byKey(const Key('home-quick-note-button')), findsNothing);
       expect(
-        find.descendant(of: deleteButton, matching: find.text('1')),
-        findsOneWidget,
+        tester
+            .widget<SelectionCheckBadge>(
+              find.byKey(Key('idea-card-badge-$firstIdeaId')),
+            )
+            .isSelected,
+        isTrue,
       );
 
       await tester.tap(find.text('Second delete target'));
       await settleUi(tester);
-      expect(
-        find.descendant(of: deleteButton, matching: find.text('2')),
-        findsOneWidget,
-      );
+      final selectedBadges = tester
+          .widgetList<SelectionCheckBadge>(find.byType(SelectionCheckBadge))
+          .where((badge) => badge.isSelected);
+      expect(selectedBadges, hasLength(2));
 
       await tester.tap(find.byKey(const Key('ideas-delete-button')));
       await settleUi(tester);
-      expect(find.text('Delete ideas?'), findsOneWidget);
+      expect(
+        find.text(ViewConstants.selectionDeleteIdeasTitleMany),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('ideas-delete-confirm')));
       await settlePersistenceAction(tester);
 
       expect(provider.ideas, isEmpty);
       expect(find.byKey(const Key('ideas-empty-state')), findsOneWidget);
-      expect(find.byKey(const Key('ideas-fab')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsOneWidget);
+      expect(find.byKey(const Key('home-quick-note-button')), findsOneWidget);
+    });
+
+    testWidgets('selection shows empty circles, select all and exits on last',
+        (tester) async {
+      late String firstId;
+      late String secondId;
+      await tester.runAsync(() async {
+        firstId = (await provider.saveIdea(
+          title: 'Alpha select',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+        secondId = (await provider.saveIdea(
+          title: 'Beta select',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+      });
+
+      await pumpIdeasApp(tester);
+      expect(find.byType(SelectionCheckBadge), findsNothing);
+
+      await tester.longPress(find.byKey(Key('idea-card-$firstId')));
+      await settleUi(tester);
+
+      SelectionCheckBadge badgeFor(String id) => tester
+          .widget<SelectionCheckBadge>(find.byKey(Key('idea-card-badge-$id')));
+      expect(badgeFor(firstId).isSelected, isTrue);
+      expect(badgeFor(secondId).isSelected, isFalse);
+
+      await tester.tap(find.byKey(const Key('ideas-select-all-button')));
+      await settleUi(tester);
+      expect(badgeFor(secondId).isSelected, isTrue);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.descendant(
+                of: find.byKey(const Key('ideas-select-all-button')),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.byKey(Key('idea-card-$firstId')));
+      await settleUi(tester);
+      await tester.tap(find.byKey(Key('idea-card-$secondId')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('ideas-selection-count')), findsNothing);
+      expect(find.byType(SelectionCheckBadge), findsNothing);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsOneWidget);
+    });
+
+    testWidgets('selected idea card is announced and not colour only',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      late String ideaId;
+      await tester.runAsync(() async {
+        ideaId = (await provider.saveIdea(
+          title: 'Announce me',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.longPress(find.byKey(Key('idea-card-$ideaId')));
+      await settleUi(tester);
+
+      final cardSemantics = tester.getSemantics(
+        find.byKey(Key('idea-card-$ideaId')),
+      );
+      expect(cardSemantics, containsSemantics(isSelected: true));
+      expect(
+        find.descendant(
+          of: find.byKey(Key('idea-card-badge-$ideaId')),
+          matching: find.byIcon(Icons.check_rounded),
+        ),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('back exits idea selection before leaving home',
+        (tester) async {
+      late String ideaId;
+      await tester.runAsync(() async {
+        ideaId = (await provider.saveIdea(
+          title: 'Back target',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.longPress(find.byKey(Key('idea-card-$ideaId')));
+      await settleUi(tester);
+      expect(find.byKey(const Key('ideas-selection-count')), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('ideas-selection-count')), findsNothing);
+      expect(find.byKey(Key('idea-card-$ideaId')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-new-idea-button')), findsOneWidget);
+    });
+
+    testWidgets('selection drops ideas that no longer exist', (tester) async {
+      late String ideaId;
+      late String keptId;
+      await tester.runAsync(() async {
+        ideaId = (await provider.saveIdea(
+          title: 'Vanishing idea',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+        keptId = (await provider.saveIdea(
+          title: 'Kept idea',
+          sections: provider.createDefaultSections(),
+        ))!
+            .id;
+      });
+
+      await pumpIdeasApp(tester);
+      await tester.longPress(find.byKey(Key('idea-card-$ideaId')));
+      await settleUi(tester);
+
+      await tester.runAsync(() async {
+        await provider.deleteIdeas([ideaId]);
+      });
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('ideas-selection-count')), findsNothing);
+      expect(find.byKey(Key('idea-card-$keptId')), findsOneWidget);
     });
 
     testWidgets('filters ideas with the search bar in real time',
@@ -903,32 +1206,18 @@ void main() {
 
       await pumpIdeasApp(tester);
 
-      expect(
-        tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy,
-        lessThan(
-            tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy),
-      );
+      expect(appearsBefore(tester, newerIdeaId, olderIdeaId), isTrue);
 
-      await tester.tap(find.byKey(const Key('ideas-more-menu')));
-      await settleUi(tester);
-      await tester.tap(find.byKey(const Key('ideas-menu-filter')));
+      await tester.tap(find.byKey(const Key('ideas-sort-button')));
       await settleUi(tester);
       await tester.tap(find.byKey(const Key('ideas-sort-most-sections')));
       await settlePersistenceAction(tester);
 
-      expect(
-        tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy,
-        lessThan(
-            tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy),
-      );
+      expect(appearsBefore(tester, olderIdeaId, newerIdeaId), isTrue);
 
       await pumpIdeasApp(tester);
 
-      expect(
-        tester.getTopLeft(find.byKey(Key('idea-card-$olderIdeaId'))).dy,
-        lessThan(
-            tester.getTopLeft(find.byKey(Key('idea-card-$newerIdeaId'))).dy),
-      );
+      expect(appearsBefore(tester, olderIdeaId, newerIdeaId), isTrue);
     });
 
     testWidgets('homepage renders grid layout and hides layout menu item',
@@ -977,26 +1266,44 @@ void main() {
         lessThan(1),
       );
 
-      await tester.tap(find.byKey(const Key('ideas-more-menu')));
-      await settleUi(tester);
-
+      expect(find.byKey(const Key('ideas-more-menu')), findsNothing);
       expect(find.byKey(const Key('ideas-menu-layout')), findsNothing);
-      expect(find.byKey(const Key('ideas-menu-filter')), findsOneWidget);
+      expect(find.byKey(const Key('ideas-sort-button')), findsOneWidget);
       expect(
         sortPreferencesRepo.getLayoutOption(),
         IdeaLayoutOption.grid,
       );
     });
 
-    testWidgets('homepage composer saves a note and opens random additions',
+    testWidgets('quick-note button opens random notes with the keyboard up',
         (tester) async {
       await pumpIdeasApp(tester);
 
+      final semantics = tester.ensureSemantics();
+      final buttonSemantics = tester.getSemantics(
+        find.byKey(const Key('home-quick-note-button')),
+      );
+      expect(
+        buttonSemantics,
+        containsSemantics(isButton: true, isTextField: false),
+      );
+      semantics.dispose();
+
+      await tester.tap(find.byKey(const Key('home-quick-note-button')));
+      await settleUi(tester);
+
+      expect(find.byKey(const Key('random-additions-screen')), findsOneWidget);
+      final composer = tester.widget<TextField>(
+        find.byKey(const Key('random-additions-composer')),
+      );
+      expect(composer.autofocus, isTrue);
+      expect(composer.focusNode?.hasFocus, isTrue);
+
       await tester.enterText(
-        find.byKey(const Key('homepage-random-addition-field')),
+        find.byKey(const Key('random-additions-composer')),
         'Loose capture\nwith two lines',
       );
-      await tester.tap(find.byKey(const Key('homepage-random-addition-send')));
+      await tester.tap(find.byKey(const Key('random-additions-send')));
       await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('random-additions-screen')), findsOneWidget);
@@ -1006,6 +1313,49 @@ void main() {
         'Loose capture\nwith two lines',
       );
       expect(find.text('Loose capture\nwith two lines'), findsOneWidget);
+    });
+
+    testWidgets('drawer entry opens random notes without the keyboard',
+        (tester) async {
+      await pumpIdeasApp(tester);
+      await openRandomAdditionsFromDrawer(tester);
+
+      final composer = tester.widget<TextField>(
+        find.byKey(const Key('random-additions-composer')),
+      );
+      expect(composer.autofocus, isFalse);
+    });
+
+    testWidgets('quick-note button shows the unfiled count capped at 99+',
+        (tester) async {
+      await pumpIdeasApp(tester);
+      expect(find.byKey(const Key('home-quick-note-count')), findsNothing);
+
+      await tester.runAsync(() async {
+        await randomAdditionsProvider.addAddition('One loose note');
+      });
+      await settleUi(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('home-quick-note-count')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.runAsync(() async {
+        for (var index = 0; index < 100; index++) {
+          await randomAdditionsProvider.addAddition('Note $index');
+        }
+      });
+      await settleUi(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('home-quick-note-count')),
+          matching: find.text(ViewConstants.homeQuickNoteCountOverflow),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('drawer random additions entry shows unfiled count badge',
@@ -1021,10 +1371,12 @@ void main() {
 
       expect(find.byKey(const Key('random-additions-drawer')), findsOneWidget);
       expect(
-        find.byKey(const Key('random-additions-drawer-count')),
+        find.descendant(
+          of: find.byKey(const Key('random-additions-drawer-count')),
+          matching: find.text('2'),
+        ),
         findsOneWidget,
       );
-      expect(find.text('2'), findsOneWidget);
     });
 
     testWidgets('random additions screen sends multiline notes',
@@ -1073,7 +1425,7 @@ void main() {
           find.byKey(const Key('random-additions-delete-button'));
       expect(deleteButton, findsOneWidget);
       expect(
-        find.descendant(of: deleteButton, matching: find.text('1')),
+        find.byKey(const Key('random-additions-selection-count')),
         findsOneWidget,
       );
 
@@ -1081,14 +1433,21 @@ void main() {
         find.byKey(Key('random-addition-bubble-$secondAdditionId')),
       );
       await settleUi(tester);
-      expect(
-        find.descendant(of: deleteButton, matching: find.text('2')),
-        findsOneWidget,
-      );
+      final selectedChecks = tester
+          .widgetList<SelectionCheckBadge>(find.byType(SelectionCheckBadge))
+          .where((badge) => badge.isSelected);
+      expect(selectedChecks, hasLength(2));
 
       await tester.tap(deleteButton);
       await settleUi(tester);
-      expect(find.text('Delete additions?'), findsOneWidget);
+      expect(
+        find.text(ViewConstants.selectionDeleteNotesTitleMany),
+        findsOneWidget,
+      );
+      expect(
+        find.text(ViewConstants.selectionDeleteNotesBodyMany),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.byKey(const Key('random-additions-delete-confirm')),
@@ -1120,7 +1479,11 @@ void main() {
         find.byKey(const Key('random-additions-delete-button')),
       );
       await settleUi(tester);
-      await tester.tap(find.text('Cancel'));
+      expect(
+        find.text(ViewConstants.selectionDeleteNoteTitleOne),
+        findsOneWidget,
+      );
+      await tester.tap(find.text(ViewConstants.cancel));
       await settleUi(tester);
 
       expect(randomAdditionsProvider.additions, hasLength(1));
@@ -1200,7 +1563,7 @@ void main() {
         (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
 
       await tester.tap(find.byKey(const Key('idea-editor-add-section')));
@@ -1238,7 +1601,7 @@ void main() {
     testWidgets('flushes autosave when closing a dirty draft', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -1259,7 +1622,7 @@ void main() {
     testWidgets('flushes autosave when the app is paused', (tester) async {
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settleUi(tester);
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -1283,9 +1646,10 @@ void main() {
 
       await pumpIdeasApp(tester);
 
-      await tester.tap(find.byKey(const Key('ideas-fab')));
+      await tester.tap(find.byKey(const Key('ideas-new-idea-button')));
       await settlePersistenceAction(tester);
-      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
+      expect(provider.ideas, isEmpty);
+      expect(find.byKey(const Key('idea-editor-save-failed')), findsNothing);
 
       await tester.enterText(
         find.byKey(const Key('idea-editor-title')),
@@ -1297,7 +1661,7 @@ void main() {
       await settlePersistenceAction(tester);
 
       expect(find.byKey(const Key('idea-editor-save-failed')), findsOneWidget);
-      expect(provider.ideas.single.title, 'ideaEditorUntitledIdea');
+      expect(provider.ideas, isEmpty);
 
       failingRepo.failWrites = false;
       await tester.enterText(
@@ -1311,32 +1675,6 @@ void main() {
       expect(provider.ideas.single.title, 'Failure recovered');
     });
   });
-}
-
-class _FakeCloudBackupService extends CloudBackupService {
-  bool backupExistsResult = false;
-
-  @override
-  Future<bool> backupExists() async => backupExistsResult;
-
-  @override
-  Future<CloudBackupAccount?> connect({bool forceAccountPicker = false}) async {
-    return const CloudBackupAccount(
-      email: 'writer@example.com',
-      provider: 'test',
-    );
-  }
-
-  @override
-  Future<void> disconnect() async {}
-}
-
-class _FakeCloudBackupScheduler extends CloudBackupScheduler {
-  @override
-  Future<void> cancelDailyBackup() async {}
-
-  @override
-  Future<void> scheduleDailyBackup() async {}
 }
 
 class _FailingIdeasRepo extends InMemoryIdeasRepo {

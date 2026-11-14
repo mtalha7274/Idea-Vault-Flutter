@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.0.6
+
+- **Cloud backup** checks for an existing backup before turning on, never auto-uploads an empty vault, and keeps a **backup history** per device
+- **Restore** works with backup off, can **merge** or **replace**, is validated first, and can be **undone** for 7 days
+- Honest **backup status** with specific messages, and a dismissible **restore banner**
+- **Locked notes are encrypted** on the device and in backups, with **6-digit PIN or passphrase** and a **recovery code**
+- **PIN attempt limits**, biometric-only unlock, **re-lock** in the background and hidden in the app switcher
+- **Search** covers every section with highlighted snippets
+- No more empty **"Untitled Idea"** notes
+- **Formatting editor**: bold, italic, headings, lists, checklists, code and links show as formatting instead of symbols
+- Editor **undo/redo** in the top bar; **lock** moved to the options sheet
+- Home: compact title with a **new idea** button, quick **Random Notes** button, and clear **selection** for ideas and random notes
+- "Random Additions" renamed to **"Random Notes"**
+
 ## v1.0.5
 
 - **Free trial** information is now saved and restored with **cloud backup**

@@ -8,6 +8,7 @@ import '../core/constants/view_constants.dart';
 import '../core/services/note_lock_auth_service.dart';
 import '../core/services/note_lock_biometric_service.dart';
 import '../core/utils/idea_search.dart';
+import '../core/utils/search_text_normalizer.dart';
 import '../data/repositories/local/idea_list_preferences.dart';
 import '../injection_container.dart';
 import '../models/idea.dart';
@@ -29,11 +30,14 @@ class SearchIdeasScreen extends StatefulWidget {
 }
 
 class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
+  static const Duration _debounceDelay = Duration(milliseconds: 150);
+
   late final TextEditingController _searchController;
   late final NoteLockAuthService _noteLockAuthService;
   late final NoteLockBiometricService _noteLockBiometricService;
-
-  String get _searchQuery => _searchController.text.trim();
+  final IdeaSearchIndex _searchIndex = IdeaSearchIndex();
+  Timer? _debounceTimer;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -53,6 +57,7 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController
       ..removeListener(_handleSearchChanged)
       ..dispose();
@@ -60,17 +65,33 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
   }
 
   void _handleSearchChanged() {
-    if (!mounted) {
+    _debounceTimer?.cancel();
+    final nextQuery = _searchController.text.trim();
+    if (nextQuery.isEmpty) {
+      _applyQuery(nextQuery);
       return;
     }
-    setState(() {});
+    _debounceTimer = Timer(_debounceDelay, () => _applyQuery(nextQuery));
+  }
+
+  void _applyQuery(String query) {
+    if (!mounted || query == _searchQuery) {
+      return;
+    }
+    setState(() {
+      _searchQuery = query;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().baseTheme;
     final ideas = context.watch<IdeasProvider>().ideas;
-    final results = filterIdeasBySearch(ideas, _searchQuery);
+    final searchResults = _searchIndex.search(ideas, _searchQuery);
+    final results = [for (final result in searchResults) result.idea];
+    final resultsById = {
+      for (final result in searchResults) result.idea.id: result,
+    };
     final layoutOption = sl<IdeaListPreferencesRepo>().getLayoutOption();
 
     return PopScope(
@@ -97,7 +118,7 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
                   ),
                 ),
                 Expanded(
-                  child: _searchQuery.isEmpty
+                  child: searchQueryTerms(_searchQuery).isEmpty
                       ? const _SearchEmptyPrompt()
                       : results.isEmpty
                           ? const _NoSearchResultsState()
@@ -106,7 +127,10 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
                               child: IdeasLayout(
                                 ideas: results,
                                 layoutOption: layoutOption,
-                                onTap: (idea) => unawaited(_openIdea(idea)),
+                                searchResults: resultsById,
+                                onTap: (idea) => unawaited(
+                                  _openIdea(idea, resultsById[idea.id]),
+                                ),
                               ),
                             ),
                 ),
@@ -118,9 +142,16 @@ class _SearchIdeasScreenState extends State<SearchIdeasScreen> {
     );
   }
 
-  Future<void> _openIdea(Idea idea) async {
+  Future<void> _openIdea(Idea idea, IdeaSearchResult? result) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!idea.isLocked) {
-      await AppRouter.push(context, IdeaEditorScreen(ideaId: idea.id));
+      await AppRouter.push(
+        context,
+        IdeaEditorScreen(
+          ideaId: idea.id,
+          initialSectionId: result?.sectionId,
+        ),
+      );
       return;
     }
 
@@ -186,7 +217,7 @@ class _SearchEmptyPrompt extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               TranslatedText(
-                ViewConstants.searchIdeasEmptyPrompt,
+                ViewConstants.searchIdeasEmptyPromptAll,
                 textAlign: TextAlign.center,
                 style: ideaVaultBody(
                   context,

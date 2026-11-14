@@ -1,6 +1,8 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/view_constants.dart';
 import '../../models/idea.dart';
 import '../../viewmodels/providers/theme_provider.dart';
 import '../../views/ideas/idea_vault_theme.dart';
@@ -72,7 +74,10 @@ class _IdeaEditorSectionSheetState extends State<_IdeaEditorSectionSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isEditing ? 'Edit section' : 'Add section',
+            (isEditing
+                    ? ViewConstants.editorSectionSheetEditTitle
+                    : ViewConstants.editorSectionSheetAddTitle)
+                .tr(),
             style: ideaVaultHeadline(
               context,
               size: 24,
@@ -82,9 +87,10 @@ class _IdeaEditorSectionSheetState extends State<_IdeaEditorSectionSheet> {
           ),
           const SizedBox(height: 10),
           Text(
-            isEditing
-                ? 'Rename this section or remove it from this idea.'
-                : 'Create another space for this idea.',
+            (isEditing
+                    ? ViewConstants.editorSectionSheetEditBody
+                    : ViewConstants.editorSectionSheetAddBody)
+                .tr(),
             style: ideaVaultBody(
               context,
               size: 15,
@@ -100,7 +106,7 @@ class _IdeaEditorSectionSheetState extends State<_IdeaEditorSectionSheet> {
             autofocus: true,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
-              hintText: 'Section name',
+              hintText: ViewConstants.editorSectionSheetNameHint.tr(),
               filled: true,
               fillColor: sheetTheme.surfaceLow,
               border: OutlineInputBorder(
@@ -112,62 +118,78 @@ class _IdeaEditorSectionSheetState extends State<_IdeaEditorSectionSheet> {
           const SizedBox(height: 18),
           Row(
             children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'Cancel',
-                  style: ideaVaultLabel(
-                    context,
-                    size: 14,
-                    weight: FontWeight.w700,
-                    color: sheetTheme.textMuted,
-                  ),
-                ),
-              ),
-              if (canDelete) ...[
-                TextButton(
-                  key: const Key('idea-editor-delete-section'),
-                  onPressed: () => Navigator.of(context).pop(
-                    const IdeaEditorSectionSheetResult.delete(),
-                  ),
+              Flexible(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text(
-                    'Delete',
+                    ViewConstants.editorSectionSheetCancel.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: ideaVaultLabel(
                       context,
                       size: 14,
                       weight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.error,
+                      color: sheetTheme.textMuted,
+                    ),
+                  ),
+                ),
+              ),
+              if (canDelete) ...[
+                Flexible(
+                  child: TextButton(
+                    key: const Key('idea-editor-delete-section'),
+                    onPressed: () => Navigator.of(context).pop(
+                      const IdeaEditorSectionSheetResult.delete(),
+                    ),
+                    child: Text(
+                      ViewConstants.editorSectionSheetDelete.tr(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ideaVaultLabel(
+                        context,
+                        size: 14,
+                        weight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 ),
               ],
               const Spacer(),
-              FilledButton(
-                key: const Key('idea-editor-create-section'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: sheetTheme.primary,
-                  foregroundColor: sheetTheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
+              Flexible(
+                flex: 2,
+                child: FilledButton(
+                  key: const Key('idea-editor-create-section'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: sheetTheme.primary,
+                    foregroundColor: sheetTheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
                   ),
-                ),
-                onPressed: () {
-                  final nextName = _nameController.text.trim();
-                  if (nextName.isEmpty) {
-                    return;
-                  }
-                  Navigator.of(context).pop(
-                    IdeaEditorSectionSheetResult.rename(nextName),
-                  );
-                },
-                child: Text(
-                  isEditing ? 'Save' : 'Add',
-                  style: ideaVaultLabel(
-                    context,
-                    size: 14,
-                    weight: FontWeight.w700,
-                    color: sheetTheme.onPrimary,
+                  onPressed: () {
+                    final nextName = _nameController.text.trim();
+                    if (nextName.isEmpty) {
+                      return;
+                    }
+                    Navigator.of(context).pop(
+                      IdeaEditorSectionSheetResult.rename(nextName),
+                    );
+                  },
+                  child: Text(
+                    (isEditing
+                            ? ViewConstants.editorSectionSheetSave
+                            : ViewConstants.editorSectionSheetAdd)
+                        .tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ideaVaultLabel(
+                      context,
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: sheetTheme.onPrimary,
+                    ),
                   ),
                 ),
               ),
