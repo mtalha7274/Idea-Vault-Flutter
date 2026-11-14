@@ -1,18 +1,29 @@
 # Changelog
 
-## v1.0.6
+## v1.0.7
 
 - **Cloud backup** checks for an existing backup before turning on, never auto-uploads an empty vault, and keeps a **backup history** per device
 - **Restore** works with backup off, can **merge** or **replace**, is validated first, and can be **undone** for 7 days
 - Honest **backup status** with specific messages, and a dismissible **restore banner**
-- **Locked notes are encrypted** on the device and in backups, with **6-digit PIN or passphrase** and a **recovery code**
-- **PIN attempt limits**, biometric-only unlock, **re-lock** in the background and hidden in the app switcher
+- Google Drive backup moved to a **new Google Cloud project**, so Android users need to sign in to backup once after updating
+- **Locked notes are encrypted** on the device and in backups, with a **6-digit PIN or passphrase** and a **recovery code**
+- **PIN attempt limits**, biometric-only unlock, **re-lock** in the background, and hidden in the app switcher
 - **Search** covers every section with highlighted snippets
 - No more empty **"Untitled Idea"** notes
 - **Formatting editor**: bold, italic, headings, lists, checklists, code and links show as formatting instead of symbols
-- Editor **undo/redo** in the top bar; **lock** moved to the options sheet
-- Home: compact title with a **new idea** button, quick **Random Notes** button, and clear **selection** for ideas and random notes
+- **Links**: cleaner add/edit sheet, and tapping a link shows a **preview** with Open, Copy and Edit
+- **Checklists** can be ticked with a tap, with new checkbox styling
+- **Inline code** and **code blocks** in rounded boxes with Slack-style colours
+- **Toolbar** runs edge to edge, with an arrow that steps through tools one at a time
+- Editor **undo/redo** moved to a smaller top bar, and **lock** moved to the options sheet
+- **Simpler options sheet**
+- **Home**: compact title with a **new idea** button, a quick **Random Notes** button, and clear **selection** for ideas and random notes
 - "Random Additions" renamed to **"Random Notes"**
+
+## v1.0.6
+
+- Removed **subscriptions**, the **paywall** and **AI** features, so everything is free
+- Fixed **auto backup** issues
 
 ## v1.0.5
 
